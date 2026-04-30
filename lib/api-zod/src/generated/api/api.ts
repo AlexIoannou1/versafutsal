@@ -676,6 +676,19 @@ export const ListOwnerBookingsQueryParams = zod.object({
   status: zod
     .enum(["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"])
     .optional(),
+  from: zod
+    .date()
+    .optional()
+    .describe("Filter bookings starting at or after this datetime"),
+  to: zod
+    .date()
+    .optional()
+    .describe("Filter bookings starting at or before this datetime"),
+  pitchId: zod.coerce
+    .string()
+    .uuid()
+    .optional()
+    .describe("Filter by a specific pitch"),
 });
 
 export const ListOwnerBookingsResponse = zod.object({
@@ -726,6 +739,58 @@ export const ListOwnerBookingsResponse = zod.object({
 });
 
 /**
+ * @summary Get a specific booking for the venue owner
+ */
+export const GetOwnerBookingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetOwnerBookingResponse = zod.object({
+  booking: zod
+    .object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      pitchId: zod.string().uuid(),
+      playerId: zod.string().uuid(),
+      startAt: zod.coerce.date(),
+      endAt: zod.coerce.date(),
+      status: zod.enum([
+        "PENDING",
+        "CONFIRMED",
+        "CANCELLED",
+        "REFUNDED",
+        "NO_SHOW",
+      ]),
+      policySnapshot: zod.object({}).passthrough(),
+      cancellationReason: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .and(
+      zod.object({
+        venue: zod.object({
+          id: zod.string().uuid(),
+          name: zod.string(),
+          district: zod.string(),
+          address: zod.string(),
+        }),
+        pitch: zod.object({
+          id: zod.string().uuid(),
+          name: zod.string(),
+          type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+          size: zod.string(),
+          slotDurationMinutes: zod.number(),
+        }),
+        player: zod.object({
+          id: zod.string().uuid(),
+          name: zod.string(),
+          email: zod.string().email(),
+        }),
+      }),
+    ),
+});
+
+/**
  * @summary Block a pitch slot for maintenance
  */
 export const CreateMaintenanceBlockParams = zod.object({
@@ -746,6 +811,39 @@ export const DeleteMaintenanceBlockParams = zod.object({
   venueId: zod.coerce.string().uuid(),
   pitchId: zod.coerce.string().uuid(),
   blockId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Cancel a booking (player cancels own, owner cancels at their venue)
+ */
+export const CancelBookingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const CancelBookingBody = zod.object({
+  reason: zod.string().nullish().describe("Optional cancellation reason"),
+});
+
+export const CancelBookingResponse = zod.object({
+  booking: zod.object({
+    id: zod.string().uuid(),
+    status: zod.enum([
+      "PENDING",
+      "CONFIRMED",
+      "CANCELLED",
+      "REFUNDED",
+      "NO_SHOW",
+    ]),
+    cancellationReason: zod.string().nullish(),
+  }),
+  refund: zod
+    .object({
+      refundId: zod.string().nullish(),
+      amount: zod.string(),
+      currency: zod.string(),
+      status: zod.enum(["SUCCEEDED", "FAILED", "PENDING"]),
+    })
+    .nullish(),
 });
 
 /**
@@ -872,6 +970,39 @@ export const RejectVenueResponse = zod.object({
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
+});
+
+/**
+ * @summary Force-refund any booking regardless of cancellation policy (admin only)
+ */
+export const AdminRefundBookingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AdminRefundBookingBody = zod.object({
+  reason: zod.string().nullish().describe("Optional cancellation reason"),
+});
+
+export const AdminRefundBookingResponse = zod.object({
+  booking: zod.object({
+    id: zod.string().uuid(),
+    status: zod.enum([
+      "PENDING",
+      "CONFIRMED",
+      "CANCELLED",
+      "REFUNDED",
+      "NO_SHOW",
+    ]),
+    cancellationReason: zod.string().nullish(),
+  }),
+  refund: zod
+    .object({
+      refundId: zod.string().nullish(),
+      amount: zod.string(),
+      currency: zod.string(),
+      status: zod.enum(["SUCCEEDED", "FAILED", "PENDING"]),
+    })
+    .nullish(),
 });
 
 /**

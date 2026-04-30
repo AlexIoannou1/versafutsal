@@ -6,7 +6,9 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  TouchableOpacity,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
@@ -46,6 +48,7 @@ function formatTimeRange(startIso: string, endIso: string) {
 export default function OwnerDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user } = useAuth();
 
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
@@ -194,7 +197,11 @@ export default function OwnerDashboardScreen() {
     const pitch = item.pitch as { name: string } | undefined;
     const venue = item.venue as { name: string } | undefined;
     return (
-      <View style={s.card}>
+      <TouchableOpacity
+        style={s.card}
+        onPress={() => router.push(`/owner/booking/${item.id}`)}
+        activeOpacity={0.7}
+      >
         <View style={s.cardHeader}>
           <Text style={s.playerName} numberOfLines={1}>
             {player?.name ?? player?.email ?? "Player"}
@@ -217,7 +224,10 @@ export default function OwnerDashboardScreen() {
             {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
           </Text>
         </View>
-      </View>
+        <View style={[s.metaRow, { justifyContent: "flex-end", marginTop: 4 }]}>
+          <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
+        </View>
+      </TouchableOpacity>
     );
   };
 

@@ -25,6 +25,8 @@ import type {
   ApiError,
   ApproveVenue200,
   AuthResponse,
+  CancelBookingRequest,
+  CancelBookingResponse,
   CheckoutFeeResponse,
   CheckoutRequest,
   CheckoutResponse,
@@ -39,6 +41,7 @@ import type {
   GetAdminSettings200,
   GetBookingPayment200,
   GetCheckoutFeeParams,
+  GetOwnerBooking200,
   GetOwnerVenue200,
   GetPitchAvailability200,
   GetPitchAvailabilityParams,
@@ -2183,6 +2186,93 @@ export function useListOwnerBookings<
 }
 
 /**
+ * @summary Get a specific booking for the venue owner
+ */
+export const getGetOwnerBookingUrl = (id: string) => {
+  return `/api/owner/bookings/${id}`;
+};
+
+export const getOwnerBooking = async (
+  id: string,
+  options?: RequestInit,
+): Promise<GetOwnerBooking200> => {
+  return customFetch<GetOwnerBooking200>(getGetOwnerBookingUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOwnerBookingQueryKey = (id: string) => {
+  return [`/api/owner/bookings/${id}`] as const;
+};
+
+export const getGetOwnerBookingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerBooking>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerBooking>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOwnerBookingQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerBooking>>> = ({
+    signal,
+  }) => getOwnerBooking(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerBooking>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerBookingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerBooking>>
+>;
+export type GetOwnerBookingQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get a specific booking for the venue owner
+ */
+
+export function useGetOwnerBooking<
+  TData = Awaited<ReturnType<typeof getOwnerBooking>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerBooking>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerBookingQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Block a pitch slot for maintenance
  */
 export const getCreateMaintenanceBlockUrl = (
@@ -2388,6 +2478,93 @@ export const useDeleteMaintenanceBlock = <
   TContext
 > => {
   return useMutation(getDeleteMaintenanceBlockMutationOptions(options));
+};
+
+/**
+ * @summary Cancel a booking (player cancels own, owner cancels at their venue)
+ */
+export const getCancelBookingUrl = (id: string) => {
+  return `/api/bookings/${id}/cancel`;
+};
+
+export const cancelBooking = async (
+  id: string,
+  cancelBookingRequest?: CancelBookingRequest,
+  options?: RequestInit,
+): Promise<CancelBookingResponse> => {
+  return customFetch<CancelBookingResponse>(getCancelBookingUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cancelBookingRequest),
+  });
+};
+
+export const getCancelBookingMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelBooking>>,
+    TError,
+    { id: string; data: BodyType<CancelBookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelBooking>>,
+  TError,
+  { id: string; data: BodyType<CancelBookingRequest> },
+  TContext
+> => {
+  const mutationKey = ["cancelBooking"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelBooking>>,
+    { id: string; data: BodyType<CancelBookingRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return cancelBooking(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelBookingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelBooking>>
+>;
+export type CancelBookingMutationBody = BodyType<CancelBookingRequest>;
+export type CancelBookingMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Cancel a booking (player cancels own, owner cancels at their venue)
+ */
+export const useCancelBooking = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelBooking>>,
+    TError,
+    { id: string; data: BodyType<CancelBookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelBooking>>,
+  TError,
+  { id: string; data: BodyType<CancelBookingRequest> },
+  TContext
+> => {
+  return useMutation(getCancelBookingMutationOptions(options));
 };
 
 /**
@@ -2740,6 +2917,93 @@ export const useRejectVenue = <
   TContext
 > => {
   return useMutation(getRejectVenueMutationOptions(options));
+};
+
+/**
+ * @summary Force-refund any booking regardless of cancellation policy (admin only)
+ */
+export const getAdminRefundBookingUrl = (id: string) => {
+  return `/api/admin/bookings/${id}/refund`;
+};
+
+export const adminRefundBooking = async (
+  id: string,
+  cancelBookingRequest?: CancelBookingRequest,
+  options?: RequestInit,
+): Promise<CancelBookingResponse> => {
+  return customFetch<CancelBookingResponse>(getAdminRefundBookingUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(cancelBookingRequest),
+  });
+};
+
+export const getAdminRefundBookingMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminRefundBooking>>,
+    TError,
+    { id: string; data: BodyType<CancelBookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminRefundBooking>>,
+  TError,
+  { id: string; data: BodyType<CancelBookingRequest> },
+  TContext
+> => {
+  const mutationKey = ["adminRefundBooking"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminRefundBooking>>,
+    { id: string; data: BodyType<CancelBookingRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminRefundBooking(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminRefundBookingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminRefundBooking>>
+>;
+export type AdminRefundBookingMutationBody = BodyType<CancelBookingRequest>;
+export type AdminRefundBookingMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Force-refund any booking regardless of cancellation policy (admin only)
+ */
+export const useAdminRefundBooking = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminRefundBooking>>,
+    TError,
+    { id: string; data: BodyType<CancelBookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminRefundBooking>>,
+  TError,
+  { id: string; data: BodyType<CancelBookingRequest> },
+  TContext
+> => {
+  return useMutation(getAdminRefundBookingMutationOptions(options));
 };
 
 /**

@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import {
-  useGetPlayerBooking,
+  useGetOwnerBooking,
   useCancelBooking,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -30,18 +30,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending Confirmation",
+  PENDING: "Pending",
   CONFIRMED: "Confirmed",
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
-  NO_SHOW: "No Show",
-};
-
-const STATUS_TITLES: Record<string, string> = {
-  PENDING: "Booking Requested",
-  CONFIRMED: "Booking Confirmed",
-  CANCELLED: "Booking Cancelled",
-  REFUNDED: "Booking Refunded",
   NO_SHOW: "No Show",
 };
 
@@ -62,27 +54,7 @@ function formatTime(iso: string) {
   });
 }
 
-function canCancelBooking(booking: {
-  status: string;
-  startAt: string;
-  policySnapshot?: unknown;
-}): { allowed: boolean; reason?: string } {
-  if (booking.status !== "CONFIRMED" && booking.status !== "PENDING") {
-    return { allowed: false, reason: "Booking is already " + booking.status.toLowerCase() };
-  }
-  const snapshot = (booking.policySnapshot ?? {}) as { cancellationWindowHours?: number };
-  const windowHours = snapshot.cancellationWindowHours ?? 24;
-  const hoursUntilStart = (new Date(booking.startAt).getTime() - Date.now()) / (1000 * 60 * 60);
-  if (hoursUntilStart < windowHours) {
-    return {
-      allowed: false,
-      reason: `Cancellation is only allowed up to ${windowHours}h before the booking (${hoursUntilStart.toFixed(1)}h remaining).`,
-    };
-  }
-  return { allowed: true };
-}
-
-export default function PlayerBookingDetailScreen() {
+export default function OwnerBookingDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -92,9 +64,8 @@ export default function PlayerBookingDetailScreen() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
-  const { data, isLoading, error } = useGetPlayerBooking(id!);
+  const { data, isLoading, error } = useGetOwnerBooking(id!);
   const booking = data?.booking;
-
   const cancelMutation = useCancelBooking();
 
   const s = StyleSheet.create({
@@ -107,21 +78,21 @@ export default function PlayerBookingDetailScreen() {
       color: colors.mutedForeground,
       textAlign: "center",
     },
-    successBanner: {
+    banner: {
       alignItems: "center",
-      padding: 32,
+      padding: 28,
       paddingBottom: 16,
     },
-    successIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 36,
+    bannerIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       alignItems: "center",
       justifyContent: "center",
-      marginBottom: 16,
+      marginBottom: 12,
     },
-    successTitle: {
-      fontSize: 22,
+    bannerTitle: {
+      fontSize: 20,
       fontFamily: "Inter_700Bold",
       color: colors.foreground,
       marginBottom: 4,
@@ -131,9 +102,9 @@ export default function PlayerBookingDetailScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
     },
-    statusWrap: {
+    statusRow: {
       alignItems: "center",
-      marginBottom: 24,
+      marginBottom: 20,
     },
     statusBadge: {
       flexDirection: "row",
@@ -196,19 +167,7 @@ export default function PlayerBookingDetailScreen() {
       paddingBottom: insets.bottom + (Platform.OS === "web" ? 8 : 12),
       gap: 10,
     },
-    primaryBtn: {
-      backgroundColor: colors.primary,
-      borderRadius: 12,
-      height: 52,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    primaryBtnText: {
-      fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.primaryForeground,
-    },
-    secondaryBtn: {
+    backBtn: {
       borderRadius: 12,
       height: 44,
       alignItems: "center",
@@ -216,30 +175,23 @@ export default function PlayerBookingDetailScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    secondaryBtnText: {
+    backBtnText: {
       fontSize: 14,
       fontFamily: "Inter_500Medium",
       color: colors.foreground,
     },
     dangerBtn: {
       borderRadius: 12,
-      height: 44,
+      height: 48,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 1,
       borderColor: "#EF4444",
     },
     dangerBtnText: {
-      fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
       color: "#EF4444",
-    },
-    policyNote: {
-      fontSize: 11,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-      textAlign: "center",
-      marginTop: -4,
     },
     modalOverlay: {
       flex: 1,
@@ -282,7 +234,7 @@ export default function PlayerBookingDetailScreen() {
       flexDirection: "row",
       gap: 10,
     },
-    modalCancelBtn: {
+    modalKeepBtn: {
       flex: 1,
       height: 48,
       borderRadius: 12,
@@ -322,20 +274,11 @@ export default function PlayerBookingDetailScreen() {
   }
 
   const statusColor = STATUS_COLORS[booking.status] ?? colors.primary;
+  const player = booking.player as { name: string; email: string } | undefined;
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
-  const pitch = booking.pitch as {
-    name: string;
-    type: string;
-    size: string;
-    slotDurationMinutes: number;
-  } | undefined;
+  const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
 
-  const cancelCheck = canCancelBooking(booking);
-
-  const snapshot = (booking.policySnapshot ?? {}) as {
-    pricePerHour?: string | null;
-    cancellationWindowHours?: number;
-  };
+  const canCancel = booking.status === "CONFIRMED" || booking.status === "PENDING";
 
   async function handleConfirmCancel() {
     if (!id) return;
@@ -345,8 +288,8 @@ export default function PlayerBookingDetailScreen() {
         data: { reason: cancelReason || undefined },
       });
       setShowCancelModal(false);
-      await queryClient.invalidateQueries({ queryKey: ["getPlayerBooking", id] });
-      await queryClient.invalidateQueries({ queryKey: ["listPlayerBookings"] });
+      await queryClient.invalidateQueries({ queryKey: ["getOwnerBooking", id] });
+      await queryClient.invalidateQueries({ queryKey: ["listOwnerBookings"] });
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
@@ -357,26 +300,20 @@ export default function PlayerBookingDetailScreen() {
 
   return (
     <View style={s.container}>
-      <Stack.Screen options={{ title: "Booking", headerBackTitle: "Back" }} />
+      <Stack.Screen options={{ title: "Booking Detail", headerBackTitle: "Back" }} />
 
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-        <View style={s.successBanner}>
-          <View style={[s.successIcon, { backgroundColor: statusColor + "20" }]}>
-            <Feather
-              name={
-                booking.status === "CANCELLED" || booking.status === "REFUNDED"
-                  ? "x-circle"
-                  : "check-circle"
-              }
-              size={36}
-              color={statusColor}
-            />
+        <View style={s.banner}>
+          <View style={[s.bannerIcon, { backgroundColor: statusColor + "20" }]}>
+            <Feather name="calendar" size={30} color={statusColor} />
           </View>
-          <Text style={s.successTitle}>{STATUS_TITLES[booking.status] ?? "Booking"}</Text>
-          <Text style={s.bookingId}>#{booking.id.slice(0, 8).toUpperCase()}</Text>
+          <Text style={s.bannerTitle}>Booking #{booking.id.slice(0, 8).toUpperCase()}</Text>
+          <Text style={s.bookingId}>
+            {formatDate(booking.startAt)} · {formatTime(booking.startAt)} – {formatTime(booking.endAt)}
+          </Text>
         </View>
 
-        <View style={s.statusWrap}>
+        <View style={s.statusRow}>
           <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
             <Feather name="circle" size={8} color={statusColor} />
             <Text style={[s.statusText, { color: statusColor }]}>
@@ -386,7 +323,7 @@ export default function PlayerBookingDetailScreen() {
         </View>
 
         {booking.cancellationReason && (
-          <View style={[s.card, { marginBottom: 12 }]}>
+          <View style={s.card}>
             <Text style={s.cardTitle}>Cancellation Reason</Text>
             <View style={[s.row, s.rowFirst]}>
               <Text style={[s.rowValue, { color: "#EF4444" }]}>{booking.cancellationReason}</Text>
@@ -395,34 +332,30 @@ export default function PlayerBookingDetailScreen() {
         )}
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Venue</Text>
+          <Text style={s.cardTitle}>Player</Text>
           <View style={[s.row, s.rowFirst]}>
             <Text style={s.rowLabel}>Name</Text>
-            <Text style={s.rowValue}>{venue?.name ?? "—"}</Text>
+            <Text style={s.rowValue}>{player?.name ?? "—"}</Text>
           </View>
           <View style={s.row}>
-            <Text style={s.rowLabel}>District</Text>
-            <Text style={s.rowValue}>{venue?.district ?? "—"}</Text>
-          </View>
-          <View style={s.row}>
-            <Text style={s.rowLabel}>Address</Text>
-            <Text style={s.rowValue}>{venue?.address ?? "—"}</Text>
+            <Text style={s.rowLabel}>Email</Text>
+            <Text style={s.rowValue}>{player?.email ?? "—"}</Text>
           </View>
         </View>
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Pitch</Text>
+          <Text style={s.cardTitle}>Venue & Pitch</Text>
           <View style={[s.row, s.rowFirst]}>
-            <Text style={s.rowLabel}>Name</Text>
+            <Text style={s.rowLabel}>Venue</Text>
+            <Text style={s.rowValue}>{venue?.name ?? "—"}</Text>
+          </View>
+          <View style={s.row}>
+            <Text style={s.rowLabel}>Pitch</Text>
             <Text style={s.rowValue}>{pitch?.name ?? "—"}</Text>
           </View>
           <View style={s.row}>
             <Text style={s.rowLabel}>Type</Text>
-            <Text style={s.rowValue}>{pitch?.type ?? "—"}</Text>
-          </View>
-          <View style={s.row}>
-            <Text style={s.rowLabel}>Size</Text>
-            <Text style={s.rowValue}>{pitch?.size ?? "—"}</Text>
+            <Text style={s.rowValue}>{pitch?.type ?? "—"} · {pitch?.size ?? "—"}</Text>
           </View>
         </View>
 
@@ -439,30 +372,14 @@ export default function PlayerBookingDetailScreen() {
             </Text>
           </View>
           <View style={s.row}>
-            <Text style={s.rowLabel}>Booked</Text>
+            <Text style={s.rowLabel}>Created</Text>
             <Text style={s.rowValue}>{formatDate(booking.createdAt)}</Text>
           </View>
-          {snapshot.cancellationWindowHours != null && (
-            <View style={s.row}>
-              <Text style={s.rowLabel}>Cancel by</Text>
-              <Text style={s.rowValue}>
-                Up to {snapshot.cancellationWindowHours}h before start
-              </Text>
-            </View>
-          )}
         </View>
       </ScrollView>
 
       <View style={s.bottomBar}>
-        <TouchableOpacity
-          style={s.primaryBtn}
-          onPress={() => router.replace("/(player)/bookings")}
-          activeOpacity={0.8}
-        >
-          <Text style={s.primaryBtnText}>View All Bookings</Text>
-        </TouchableOpacity>
-
-        {cancelCheck.allowed && (
+        {canCancel && (
           <TouchableOpacity
             style={s.dangerBtn}
             onPress={() => setShowCancelModal(true)}
@@ -471,17 +388,12 @@ export default function PlayerBookingDetailScreen() {
             <Text style={s.dangerBtnText}>Cancel Booking</Text>
           </TouchableOpacity>
         )}
-
-        {!cancelCheck.allowed && booking.status === "CONFIRMED" && cancelCheck.reason && (
-          <Text style={s.policyNote}>{cancelCheck.reason}</Text>
-        )}
-
         <TouchableOpacity
-          style={s.secondaryBtn}
+          style={s.backBtn}
           onPress={() => router.back()}
           activeOpacity={0.8}
         >
-          <Text style={s.secondaryBtnText}>Back</Text>
+          <Text style={s.backBtnText}>Back</Text>
         </TouchableOpacity>
       </View>
 
@@ -490,15 +402,12 @@ export default function PlayerBookingDetailScreen() {
           <View style={s.modalSheet}>
             <Text style={s.modalTitle}>Cancel Booking</Text>
             <Text style={s.modalSubtitle}>
-              Are you sure? This cannot be undone.
-              {snapshot.pricePerHour
-                ? " A full refund will be processed to your original payment method."
-                : ""}
+              Cancelling as venue owner. A refund will be issued automatically if payment was collected.
             </Text>
 
             <TextInput
               style={s.reasonInput}
-              placeholder="Reason for cancellation (optional)"
+              placeholder="Reason for cancellation (required)"
               placeholderTextColor={colors.mutedForeground}
               value={cancelReason}
               onChangeText={setCancelReason}
@@ -507,7 +416,7 @@ export default function PlayerBookingDetailScreen() {
 
             <View style={s.modalBtnRow}>
               <TouchableOpacity
-                style={s.modalCancelBtn}
+                style={s.modalKeepBtn}
                 onPress={() => setShowCancelModal(false)}
                 activeOpacity={0.8}
               >
@@ -516,13 +425,13 @@ export default function PlayerBookingDetailScreen() {
               <TouchableOpacity
                 style={s.modalConfirmBtn}
                 onPress={handleConfirmCancel}
-                disabled={cancelMutation.isPending}
+                disabled={cancelMutation.isPending || !cancelReason.trim()}
                 activeOpacity={0.8}
               >
                 {cancelMutation.isPending ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={[s.modalBtnText, { color: "#fff" }]}>Cancel Booking</Text>
+                  <Text style={[s.modalBtnText, { color: "#fff" }]}>Confirm Cancel</Text>
                 )}
               </TouchableOpacity>
             </View>

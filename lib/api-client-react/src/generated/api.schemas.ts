@@ -339,6 +339,38 @@ export interface CreateMaintenanceBlockRequest {
   reason?: string;
 }
 
+export interface CancelBookingRequest {
+  /** Optional cancellation reason */
+  reason?: string | null;
+}
+
+export type RefundResultStatus =
+  (typeof RefundResultStatus)[keyof typeof RefundResultStatus];
+
+export const RefundResultStatus = {
+  SUCCEEDED: "SUCCEEDED",
+  FAILED: "FAILED",
+  PENDING: "PENDING",
+} as const;
+
+export interface RefundResult {
+  refundId?: string | null;
+  amount: string;
+  currency: string;
+  status: RefundResultStatus;
+}
+
+export type CancelBookingResponseBooking = {
+  id: string;
+  status: BookingStatus;
+  cancellationReason?: string | null;
+};
+
+export interface CancelBookingResponse {
+  booking: CancelBookingResponseBooking;
+  refund?: RefundResult | null;
+}
+
 export interface CheckoutFeeResponse {
   feeEnabled: boolean;
   /** EUR amount string, e.g. "1.00" or "0.00" */
@@ -523,10 +555,26 @@ export type GetPlayerBooking200 = {
 
 export type ListOwnerBookingsParams = {
   status?: BookingStatus;
+  /**
+   * Filter bookings starting at or after this datetime
+   */
+  from?: string;
+  /**
+   * Filter bookings starting at or before this datetime
+   */
+  to?: string;
+  /**
+   * Filter by a specific pitch
+   */
+  pitchId?: string;
 };
 
 export type ListOwnerBookings200 = {
   bookings: BookingWithDetails[];
+};
+
+export type GetOwnerBooking200 = {
+  booking: BookingWithDetails;
 };
 
 export type CreateMaintenanceBlock201 = {

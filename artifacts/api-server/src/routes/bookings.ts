@@ -8,9 +8,13 @@ import {
   openingHoursTable,
   pricingRulesTable,
   usersTable,
+  paymentsTable,
+  refundsTable,
+  auditLogTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, lt, gt, inArray, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { paymentProvider } from "../lib/payment-provider";
 
 const router: IRouter = Router();
 
@@ -493,10 +497,15 @@ router.get<{ id: string }>(
 
 // ─── Owner Bookings ───────────────────────────────────────────────────────────
 
-// GET /owner/bookings
+// GET /owner/bookings?status=&from=&to=&pitchId=
 router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
-    const { status } = req.query as { status?: string };
+    const { status, from, to, pitchId } = req.query as {
+      status?: string;
+      from?: string;
+      to?: string;
+      pitchId?: string;
+    };
 
     const ownerVenues = await db
       .select({ id: venuesTable.id })
@@ -510,7 +519,7 @@ router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (re
       return;
     }
 
-    const conditions: ReturnType<typeof eq | typeof inArray>[] = [
+    const conditions: ReturnType<typeof eq | typeof inArray | typeof gte | typeof lte>[] = [
       inArray(bookingsTable.venueId, venueIds),
     ];
     if (status) {
@@ -520,6 +529,17 @@ router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (re
           status as "PENDING" | "CONFIRMED" | "CANCELLED" | "REFUNDED" | "NO_SHOW",
         ),
       );
+    }
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate.getTime())) conditions.push(gte(bookingsTable.startAt, fromDate));
+    }
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate.getTime())) conditions.push(lte(bookingsTable.startAt, toDate));
+    }
+    if (pitchId) {
+      conditions.push(eq(bookingsTable.pitchId, pitchId));
     }
 
     const rows = await db
@@ -557,6 +577,248 @@ router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (re
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// GET /owner/bookings/:id — single booking detail (owner must own the venue)
+router.get<{ id: string }>(
+  "/owner/bookings/:id",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const ownerVenues = await db
+        .select({ id: venuesTable.id })
+        .from(venuesTable)
+        .where(eq(venuesTable.ownerId, req.user!.userId));
+
+      const venueIds = ownerVenues.map((v) => v.id);
+
+      if (venueIds.length === 0) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const [row] = await db
+        .select({
+          booking: bookingsTable,
+          venue: {
+            id: venuesTable.id,
+            name: venuesTable.name,
+            district: venuesTable.district,
+            address: venuesTable.address,
+          },
+          pitch: {
+            id: pitchesTable.id,
+            name: pitchesTable.name,
+            type: pitchesTable.type,
+            size: pitchesTable.size,
+            slotDurationMinutes: pitchesTable.slotDurationMinutes,
+          },
+          player: {
+            id: usersTable.id,
+            name: usersTable.name,
+            email: usersTable.email,
+          },
+        })
+        .from(bookingsTable)
+        .innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+        .innerJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+        .innerJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
+        .where(
+          and(
+            eq(bookingsTable.id, req.params.id),
+            inArray(bookingsTable.venueId, venueIds),
+          ),
+        )
+        .limit(1);
+
+      if (!row) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      res.json({ booking: enrichBooking(row) });
+    } catch (err) {
+      console.error("GET /owner/bookings/:id error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─── Cancellations ────────────────────────────────────────────────────────────
+
+// POST /bookings/:id/cancel — Player (own booking) or VENUE_OWNER (their venue's booking)
+router.post<{ id: string }>(
+  "/bookings/:id/cancel",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const bookingId = req.params.id;
+      const { reason } = req.body as { reason?: string };
+      const actorRole = req.user!.role;
+      const actorId = req.user!.userId;
+
+      // ── Fetch booking with venue owner info ───────────────────────────────
+      const [row] = await db
+        .select({
+          booking: bookingsTable,
+          venueOwnerId: venuesTable.ownerId,
+          venueId: venuesTable.id,
+        })
+        .from(bookingsTable)
+        .innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+        .where(eq(bookingsTable.id, bookingId))
+        .limit(1);
+
+      if (!row) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const { booking, venueOwnerId } = row;
+
+      // ── Authorization ─────────────────────────────────────────────────────
+      if (actorRole === "PLAYER" && booking.playerId !== actorId) {
+        res.status(403).json({ error: "You can only cancel your own bookings" });
+        return;
+      }
+      if (actorRole === "VENUE_OWNER" && venueOwnerId !== actorId) {
+        res.status(403).json({ error: "You can only cancel bookings at your venues" });
+        return;
+      }
+      if (actorRole === "ADMIN") {
+        res.status(403).json({ error: "Admins must use POST /admin/bookings/:id/refund" });
+        return;
+      }
+
+      // ── Status check ──────────────────────────────────────────────────────
+      if (booking.status !== "CONFIRMED" && booking.status !== "PENDING") {
+        res.status(400).json({
+          error: `Cannot cancel a booking with status ${booking.status}`,
+        });
+        return;
+      }
+
+      // ── Policy check (player only — owners can always cancel) ─────────────
+      if (actorRole === "PLAYER") {
+        const snapshot = booking.policySnapshot as {
+          cancellationWindowHours?: number;
+        };
+        const windowHours = snapshot?.cancellationWindowHours ?? 24;
+        const hoursUntilStart =
+          (booking.startAt.getTime() - Date.now()) / (1000 * 60 * 60);
+
+        if (hoursUntilStart < windowHours) {
+          res.status(400).json({
+            error: `Cancellation is only allowed up to ${windowHours} hours before the booking. Your booking starts in ${hoursUntilStart.toFixed(1)} hours.`,
+            code: "OUTSIDE_CANCELLATION_WINDOW",
+          });
+          return;
+        }
+      }
+
+      // ── Find succeeded payment (if any) ───────────────────────────────────
+      const [payment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(
+          and(
+            eq(paymentsTable.bookingId, bookingId),
+            eq(paymentsTable.status, "SUCCEEDED"),
+          ),
+        )
+        .limit(1);
+
+      // ── Call payment provider first (outside tx — always-succeed in mock) ──
+      let refundId: string | null = null;
+      if (payment) {
+        const refundResult = await paymentProvider.refundPayment({
+          providerPaymentId: payment.providerPaymentId!,
+          amount: payment.amount,
+          reason: reason,
+        });
+        if (!refundResult.success) {
+          res.status(502).json({ error: "Refund processing failed. Please try again." });
+          return;
+        }
+        refundId = refundResult.refundId;
+      }
+
+      // ── Atomic transaction: cancel booking + refund record + audit ─────────
+      await db.transaction(async (tx) => {
+        // Cancel booking
+        await tx
+          .update(bookingsTable)
+          .set({
+            status: "CANCELLED",
+            cancellationReason: reason ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookingsTable.id, bookingId));
+
+        if (payment) {
+          // Insert refund record (payment status already updated by provider above)
+          await tx.insert(refundsTable).values({
+            paymentId: payment.id,
+            amount: payment.amount,
+            status: "SUCCEEDED",
+            reason: reason ?? null,
+            processedAt: new Date(),
+          });
+
+          // Write audit log: BOOKING_CANCELLED + REFUND_ISSUED
+          await tx.insert(auditLogTable).values([
+            {
+              actorUserId: actorId,
+              entityType: "BOOKING",
+              entityId: bookingId,
+              action: "BOOKING_CANCELLED",
+              metadata: { reason: reason ?? null, cancelledBy: actorRole },
+            },
+            {
+              actorUserId: actorId,
+              entityType: "PAYMENT",
+              entityId: payment.id,
+              action: "REFUND_ISSUED",
+              metadata: {
+                refundId,
+                amount: payment.amount,
+                providerPaymentId: payment.providerPaymentId,
+              },
+            },
+          ]);
+        } else {
+          // No payment — just log the cancellation
+          await tx.insert(auditLogTable).values({
+            actorUserId: actorId,
+            entityType: "BOOKING",
+            entityId: bookingId,
+            action: "BOOKING_CANCELLED",
+            metadata: { reason: reason ?? null, cancelledBy: actorRole, noPayment: true },
+          });
+        }
+      });
+
+      res.json({
+        booking: {
+          id: bookingId,
+          status: "CANCELLED",
+          cancellationReason: reason ?? null,
+        },
+        refund: payment
+          ? {
+              refundId,
+              amount: payment.amount,
+              currency: payment.currency,
+              status: "SUCCEEDED",
+            }
+          : null,
+      });
+    } catch (err) {
+      console.error("POST /bookings/:id/cancel error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // ─── Maintenance Blocks ───────────────────────────────────────────────────────
 

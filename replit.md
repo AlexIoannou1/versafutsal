@@ -60,6 +60,17 @@ Push notification hook: `hooks/usePushNotifications.ts` — requests permission 
 MockPaymentProvider: `api-server/src/lib/payment-provider.ts` — always succeeds, mirrors Stripe interface  
 Notifications helper: `api-server/src/lib/notifications.ts` — in-app + Expo push (non-fatal)
 
+### Cancellation & Refund API Endpoints (Task #5)
+- `POST /api/bookings/:id/cancel` — player cancel (enforces cancellationWindowHours from policySnapshot); owner cancel (no window restriction); issues refund via MockPaymentProvider, inserts refund record + audit log
+- `GET /api/owner/bookings/:id` — single booking detail for owner (with player/venue/pitch)
+- `GET /api/owner/bookings?from=&to=&pitchId=` — owner bookings with date/pitch filters
+- `POST /api/admin/bookings/:id/refund` — admin force-refund any booking (writes ADMIN_REFUND_ISSUED audit)
+
+Owner calendar screen: `(owner)/calendar.tsx` — week/day view with pitch filter chips, tappable booking blocks  
+Owner booking detail: `owner/booking/[id].tsx` — shows player/venue/pitch info + owner cancel flow  
+Player booking detail: `player/booking/[id].tsx` — shows full booking + player cancel flow (policy-aware)  
+Owner dashboard: `(owner)/index.tsx` — booking cards now tappable → owner booking detail  
+
 ### Booking API Endpoints (Task #3)
 - `GET /api/venues/:venueId/pitches/:pitchId/availability?date=YYYY-MM-DD` — slot grid (open hours - maintenance blocks - existing bookings)
 - `POST /api/bookings` — create booking (concurrency-safe via PG unique constraint `unique_pitch_slot`)
