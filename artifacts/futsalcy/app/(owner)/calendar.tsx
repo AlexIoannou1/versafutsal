@@ -255,6 +255,14 @@ export default function OwnerCalendarScreen() {
       fontSize: 10,
       fontFamily: "Inter_400Regular",
     },
+    dayBlockStatus: {
+      fontSize: 9,
+      fontFamily: "Inter_600SemiBold",
+      letterSpacing: 0.3,
+      textTransform: "uppercase",
+      marginTop: 1,
+      opacity: 0.85,
+    },
     emptyCell: {
       height: 30,
       alignItems: "center",
@@ -466,6 +474,9 @@ export default function OwnerCalendarScreen() {
                           </Text>
                           <Text style={[s.dayBlockName, { color }]} numberOfLines={1}>
                             {player?.name ?? "Player"}
+                          </Text>
+                          <Text style={[s.dayBlockStatus, { color }]} numberOfLines={1}>
+                            {b.status}
                           </Text>
                         </TouchableOpacity>
                       );
