@@ -269,6 +269,19 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
       return;
     }
 
+    if (cancellationWindowHours !== undefined) {
+      if (
+        !Number.isInteger(cancellationWindowHours) ||
+        cancellationWindowHours < 0 ||
+        cancellationWindowHours > 168
+      ) {
+        res.status(400).json({
+          error: "cancellationWindowHours must be an integer between 0 and 168 (7 days).",
+        });
+        return;
+      }
+    }
+
     const [venue] = await db
       .insert(venuesTable)
       .values({
@@ -314,6 +327,19 @@ router.put<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_
         amenities: string[];
         cancellationWindowHours: number;
       }>;
+
+    if (cancellationWindowHours !== undefined) {
+      if (
+        !Number.isInteger(cancellationWindowHours) ||
+        cancellationWindowHours < 0 ||
+        cancellationWindowHours > 168
+      ) {
+        res.status(400).json({
+          error: "cancellationWindowHours must be an integer between 0 and 168 (7 days).",
+        });
+        return;
+      }
+    }
 
     const [updated] = await db
       .update(venuesTable)
