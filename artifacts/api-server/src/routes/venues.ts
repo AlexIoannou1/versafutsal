@@ -102,7 +102,15 @@ router.get("/venues", async (req, res) => {
       .from(venuePhotosTable)
       .where(inArray(venuePhotosTable.venueId, venueIds));
 
-    // Get price ranges
+    // Get pitch types per venue + price ranges
+    const pitchRows = await db
+      .select({
+        venueId: pitchesTable.venueId,
+        type: pitchesTable.type,
+      })
+      .from(pitchesTable)
+      .where(inArray(pitchesTable.venueId, venueIds));
+
     const priceRangeRows = await db
       .select({
         venueId: pitchesTable.venueId,
@@ -119,6 +127,12 @@ router.get("/venues", async (req, res) => {
     for (const photo of photos) {
       if (!photoMap.has(photo.venueId)) photoMap.set(photo.venueId, photo.url);
     }
+    const pitchTypesMap = new Map<string, string[]>();
+    for (const row of pitchRows) {
+      const types = pitchTypesMap.get(row.venueId) ?? [];
+      if (!types.includes(row.type)) types.push(row.type);
+      pitchTypesMap.set(row.venueId, types);
+    }
 
     // Apply price filters
     let venues = filteredVenues.map((v) => {
@@ -128,6 +142,7 @@ router.get("/venues", async (req, res) => {
         coverPhoto: photoMap.get(v.id) ?? null,
         minPrice: priceRange?.minPrice ? parseFloat(priceRange.minPrice) : null,
         maxPrice: priceRange?.maxPrice ? parseFloat(priceRange.maxPrice) : null,
+        pitchTypes: pitchTypesMap.get(v.id) ?? [],
       };
     });
 
@@ -655,6 +670,23 @@ router.put(
     try {
       const venue = await assertVenueOwner(req.params.id, req.user!.userId, res);
       if (!venue) return;
+
+      // Verify the pitch actually belongs to this venue (IDOR prevention)
+      const [pitch] = await db
+        .select()
+        .from(pitchesTable)
+        .where(
+          and(
+            eq(pitchesTable.id, req.params.pitchId),
+            eq(pitchesTable.venueId, req.params.id),
+          ),
+        )
+        .limit(1);
+
+      if (!pitch) {
+        res.status(404).json({ error: "Pitch not found in this venue" });
+        return;
+      }
 
       const { rules } = req.body as {
         rules: Array<{

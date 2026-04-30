@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, type ComponentProps } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,15 @@ import {
   TextInput,
   RefreshControl,
   Image,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { useListVenues } from "@workspace/api-client-react";
+import { useListVenues, type VenueSummary } from "@workspace/api-client-react";
+
+type FeatherName = ComponentProps<typeof Feather>["name"];
 
 const DISTRICTS = [
   { key: "", label: "All" },
@@ -26,22 +29,16 @@ const DISTRICTS = [
 ];
 
 const TYPES = [
-  { key: "", label: "All" },
+  { key: "", label: "Any" },
   { key: "INDOOR", label: "Indoor" },
   { key: "OUTDOOR", label: "Outdoor" },
   { key: "HYBRID", label: "Hybrid" },
 ];
 
-type VenueSummary = {
-  id: string;
-  name: string;
-  district: string;
-  address: string;
-  amenities: string[];
-  coverPhoto?: string | null;
-  minPrice?: number | null;
-  maxPrice?: number | null;
-  status: string;
+const PITCH_TYPE_ICONS: Record<string, FeatherName> = {
+  INDOOR: "home",
+  OUTDOOR: "sun",
+  HYBRID: "layers",
 };
 
 export default function PlayerVenuesScreen() {
@@ -52,16 +49,23 @@ export default function PlayerVenuesScreen() {
   const [search, setSearch] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedType, setSelectedType] = useState("");
+  const [minPriceText, setMinPriceText] = useState("");
+  const [maxPriceText, setMaxPriceText] = useState("");
 
-  const params: Record<string, string> = {};
+  const minPrice = minPriceText.trim() !== "" ? parseFloat(minPriceText) : undefined;
+  const maxPrice = maxPriceText.trim() !== "" ? parseFloat(maxPriceText) : undefined;
+
+  const params: Record<string, string | number> = {};
   if (selectedDistrict) params.district = selectedDistrict;
   if (selectedType) params.type = selectedType;
+  if (minPrice != null && !isNaN(minPrice)) params.minPrice = minPrice;
+  if (maxPrice != null && !isNaN(maxPrice)) params.maxPrice = maxPrice;
 
   const { data, isLoading, refetch, isRefetching } = useListVenues(
-    Object.keys(params).length > 0 ? params : undefined,
+    Object.keys(params).length > 0 ? (params as Parameters<typeof useListVenues>[0]) : undefined,
   );
 
-  const allVenues: VenueSummary[] = (data?.venues as VenueSummary[] | undefined) ?? [];
+  const allVenues: VenueSummary[] = data?.venues ?? [];
 
   const venues = search.trim()
     ? allVenues.filter(
@@ -104,7 +108,16 @@ export default function PlayerVenuesScreen() {
       color: colors.foreground,
       marginLeft: 8,
     },
-    filterRow: { flexDirection: "row", gap: 8 },
+    filterLabel: {
+      fontSize: 11,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 6,
+    },
+    filterSection: { marginBottom: 10 },
+    filterRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
     filterChip: {
       paddingHorizontal: 12,
       paddingVertical: 6,
@@ -112,6 +125,24 @@ export default function PlayerVenuesScreen() {
       borderWidth: 1,
     },
     filterChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+    priceRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+    priceInput: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.foreground,
+    },
+    priceSep: {
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+    },
     list: { padding: 16 },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     emptyIcon: {
@@ -169,6 +200,21 @@ export default function PlayerVenuesScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
     },
+    pitchTypeRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
+    pitchTypeChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: colors.primary + "15",
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    pitchTypeText: {
+      fontSize: 11,
+      fontFamily: "Inter_500Medium",
+      color: colors.primary,
+    },
     cardBottom: {
       flexDirection: "row",
       alignItems: "center",
@@ -205,15 +251,21 @@ export default function PlayerVenuesScreen() {
     },
   });
 
-  const filterSections = [
-    { label: "District", options: DISTRICTS, selected: selectedDistrict, setSelected: setSelectedDistrict },
-    { label: "Type", options: TYPES, selected: selectedType, setSelected: setSelectedType },
-  ];
+  const pitchTypeLabel: Record<string, string> = {
+    INDOOR: "Indoor",
+    OUTDOOR: "Outdoor",
+    HYBRID: "Hybrid",
+  };
 
   return (
     <View style={s.container}>
-      <View style={s.headerArea}>
+      <ScrollView
+        style={s.headerArea}
+        scrollEnabled={false}
+        contentContainerStyle={{ flexGrow: 0 }}
+      >
         <Text style={s.headerTitle}>Find a Venue</Text>
+
         <View style={s.searchRow}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
           <TextInput
@@ -230,13 +282,14 @@ export default function PlayerVenuesScreen() {
           )}
         </View>
 
-        <View style={s.filterRow}>
-          {filterSections.map((section) =>
-            section.options.map((opt) => {
-              const active = section.selected === opt.key;
+        <View style={s.filterSection}>
+          <Text style={s.filterLabel}>District</Text>
+          <View style={s.filterRow}>
+            {DISTRICTS.map((opt) => {
+              const active = selectedDistrict === opt.key;
               return (
                 <TouchableOpacity
-                  key={`${section.label}-${opt.key}`}
+                  key={opt.key}
                   style={[
                     s.filterChip,
                     {
@@ -244,7 +297,7 @@ export default function PlayerVenuesScreen() {
                       borderColor: active ? colors.primary : colors.border,
                     },
                   ]}
-                  onPress={() => section.setSelected(opt.key)}
+                  onPress={() => setSelectedDistrict(opt.key)}
                 >
                   <Text
                     style={[
@@ -256,10 +309,66 @@ export default function PlayerVenuesScreen() {
                   </Text>
                 </TouchableOpacity>
               );
-            }),
-          )}
+            })}
+          </View>
         </View>
-      </View>
+
+        <View style={s.filterSection}>
+          <Text style={s.filterLabel}>Pitch Type</Text>
+          <View style={s.filterRow}>
+            {TYPES.map((opt) => {
+              const active = selectedType === opt.key;
+              return (
+                <TouchableOpacity
+                  key={opt.key}
+                  style={[
+                    s.filterChip,
+                    {
+                      backgroundColor: active ? colors.primary : "transparent",
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => setSelectedType(opt.key)}
+                >
+                  <Text
+                    style={[
+                      s.filterChipText,
+                      { color: active ? colors.primaryForeground : colors.mutedForeground },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={s.filterSection}>
+          <Text style={s.filterLabel}>Price Range (€/hr)</Text>
+          <View style={s.priceRow}>
+            <TextInput
+              style={s.priceInput}
+              value={minPriceText}
+              onChangeText={setMinPriceText}
+              placeholder="Min"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="numeric"
+              returnKeyType="done"
+            />
+            <Text style={s.priceSep}>–</Text>
+            <TextInput
+              style={s.priceInput}
+              value={maxPriceText}
+              onChangeText={setMaxPriceText}
+              placeholder="Max"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="numeric"
+              returnKeyType="done"
+            />
+          </View>
+        </View>
+      </ScrollView>
 
       {isLoading ? (
         <View style={s.center}>
@@ -272,7 +381,7 @@ export default function PlayerVenuesScreen() {
           </View>
           <Text style={s.emptyTitle}>No venues found</Text>
           <Text style={s.emptySub}>
-            {search || selectedDistrict || selectedType
+            {search || selectedDistrict || selectedType || minPriceText || maxPriceText
               ? "Try adjusting your filters."
               : "No approved venues yet. Check back soon!"}
           </Text>
@@ -310,6 +419,23 @@ export default function PlayerVenuesScreen() {
                   <Feather name="map-pin" size={13} color={colors.mutedForeground} />
                   <Text style={s.cardMetaText}>{item.district}</Text>
                 </View>
+
+                {item.pitchTypes.length > 0 && (
+                  <View style={s.pitchTypeRow}>
+                    {item.pitchTypes.map((pt) => (
+                      <View key={pt} style={s.pitchTypeChip}>
+                        <Feather
+                          name={PITCH_TYPE_ICONS[pt] ?? "circle"}
+                          size={11}
+                          color={colors.primary}
+                        />
+                        <Text style={s.pitchTypeText}>
+                          {pitchTypeLabel[pt] ?? pt}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
                 {item.amenities.length > 0 && (
                   <View style={s.amenitiesRow}>

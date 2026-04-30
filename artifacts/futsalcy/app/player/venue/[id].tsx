@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, type ComponentProps } from "react";
 import {
   View,
   Text,
@@ -25,7 +25,9 @@ function formatTime(t: string): string {
   return `${h12}:${m} ${ampm}`;
 }
 
-const TYPE_ICONS: Record<string, string> = {
+type FeatherName = ComponentProps<typeof Feather>["name"];
+
+const TYPE_ICONS: Record<string, FeatherName> = {
   INDOOR: "home",
   OUTDOOR: "sun",
   HYBRID: "layers",
@@ -364,7 +366,7 @@ export default function PlayerVenueDetailScreen() {
                   <Text style={s.pitchName}>{pitch.name}</Text>
                   <View style={s.pitchTypeBadge}>
                     <Feather
-                      name={(TYPE_ICONS[pitch.type] as any) ?? "circle"}
+                      name={TYPE_ICONS[pitch.type] ?? "circle"}
                       size={12}
                       color={colors.foreground}
                     />

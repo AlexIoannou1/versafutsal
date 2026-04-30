@@ -181,6 +181,7 @@ export interface VenueSummary {
   coverPhoto?: string | null;
   minPrice?: number | null;
   maxPrice?: number | null;
+  pitchTypes: PitchType[];
   status: VenueStatus;
   createdAt: string;
 }

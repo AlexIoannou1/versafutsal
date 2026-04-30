@@ -985,12 +985,16 @@ components:
         maxPrice:
           type: number
           nullable: true
+        pitchTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PitchType"
         status:
           $ref: "#/components/schemas/VenueStatus"
         createdAt:
           type: string
           format: date-time
-      required: [id, name, district, address, amenities, status, createdAt]
+      required: [id, name, district, address, amenities, pitchTypes, status, createdAt]
 
     OwnerVenueSummary:
       allOf:

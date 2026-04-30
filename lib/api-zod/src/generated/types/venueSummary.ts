@@ -5,6 +5,7 @@
  * FutsalCY API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PitchType } from "./pitchType";
 import type { VenueStatus } from "./venueStatus";
 
 export interface VenueSummary {
@@ -16,6 +17,7 @@ export interface VenueSummary {
   coverPhoto?: string | null;
   minPrice?: number | null;
   maxPrice?: number | null;
+  pitchTypes: PitchType[];
   status: VenueStatus;
   createdAt: Date;
 }

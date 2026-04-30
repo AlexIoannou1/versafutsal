@@ -82,6 +82,7 @@ export const ListVenuesResponse = zod.object({
       coverPhoto: zod.string().nullish(),
       minPrice: zod.number().nullish(),
       maxPrice: zod.number().nullish(),
+      pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
       status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
       createdAt: zod.coerce.date(),
     }),
@@ -183,6 +184,7 @@ export const ListOwnerVenuesResponse = zod.object({
         coverPhoto: zod.string().nullish(),
         minPrice: zod.number().nullish(),
         maxPrice: zod.number().nullish(),
+        pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
         status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
         createdAt: zod.coerce.date(),
       })
