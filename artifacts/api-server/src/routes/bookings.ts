@@ -711,7 +711,7 @@ router.post<{ id: string }>(
         return;
       }
 
-      // ── Policy check: determine cancellation eligibility and refund eligibility ─
+      // ── Policy check: enforce cancellation window for both players and owners ─
       const snapshot = booking.policySnapshot as {
         cancellationWindowHours?: number;
       };
@@ -720,23 +720,18 @@ router.post<{ id: string }>(
         (booking.startAt.getTime() - Date.now()) / (1000 * 60 * 60);
       const withinWindow = hoursUntilStart >= windowHours;
 
-      if (actorRole === "PLAYER") {
-        // Players must be within the cancellation window to cancel
-        if (!withinWindow) {
-          res.status(400).json({
-            error: `Cancellation is only allowed up to ${windowHours} hours before the booking. Your booking starts in ${hoursUntilStart.toFixed(1)} hours.`,
-            code: "OUTSIDE_CANCELLATION_WINDOW",
-          });
-          return;
-        }
+      if (!withinWindow) {
+        // Both players and owners must cancel within the configurable window.
+        // If an owner needs to cancel outside the window (e.g. emergency), admin
+        // can use POST /admin/bookings/:id/refund to override.
+        res.status(400).json({
+          error: `Cancellation is only allowed up to ${windowHours} hours before the booking. The booking starts in ${hoursUntilStart.toFixed(1)} hours.`,
+          code: "OUTSIDE_CANCELLATION_WINDOW",
+        });
+        return;
       }
-      // Owners can always cancel regardless of the time window — there is no window
-      // restriction on owner-initiated cancellations (e.g. venue closed, emergency).
-      // Refund eligibility is still policy-driven: a refund is only issued automatically
-      // if the booking is still within the player's cancellation window. Outside that
-      // window the booking is cancelled but no automatic refund is processed (the admin
-      // can issue a manual refund if warranted).
-      const refundEligible = withinWindow;
+      // Within window: refund is always issued if a payment exists
+      const refundEligible = true;
 
       // ── Find succeeded payment (if any) ───────────────────────────────────
       const [payment] = await db

@@ -278,7 +278,14 @@ export default function OwnerBookingDetailScreen() {
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
 
-  const canCancel = booking.status === "CONFIRMED" || booking.status === "PENDING";
+  const windowHours =
+    (booking.policySnapshot as { cancellationWindowHours?: number } | undefined)
+      ?.cancellationWindowHours ?? 24;
+  const hoursUntilStart =
+    (new Date(booking.startAt).getTime() - Date.now()) / (1000 * 60 * 60);
+  const withinWindow = hoursUntilStart >= windowHours;
+  const canCancel =
+    (booking.status === "CONFIRMED" || booking.status === "PENDING") && withinWindow;
 
   async function handleConfirmCancel() {
     if (!id) return;
