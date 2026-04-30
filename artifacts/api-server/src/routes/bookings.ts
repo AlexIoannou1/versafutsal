@@ -690,6 +690,12 @@ router.post<{ id: string }>(
         return;
       }
 
+      // Owners must provide a reason for audit quality (UI enforces this; API mirrors it)
+      if (actorRole === "VENUE_OWNER" && !reason?.trim()) {
+        res.status(400).json({ error: "A cancellation reason is required for owner-initiated cancellations." });
+        return;
+      }
+
       // ── Status check ──────────────────────────────────────────────────────
       // Players may only cancel CONFIRMED bookings (PENDING bookings have no payment).
       // Owners may cancel both CONFIRMED and PENDING bookings at their venue.
