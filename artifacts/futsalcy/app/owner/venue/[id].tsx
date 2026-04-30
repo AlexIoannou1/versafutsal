@@ -30,6 +30,8 @@ import {
   deletePitch,
   setOpeningHours,
   setPricingRules,
+  useCreateMaintenanceBlock,
+  useDeleteMaintenanceBlock,
 } from "@workspace/api-client-react";
 
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -43,6 +45,14 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: "#FF3B30",
 };
 
+type MaintenanceBlock = {
+  id: string;
+  pitchId: string;
+  startAt: string;
+  endAt: string;
+  reason?: string | null;
+};
+
 type Pitch = {
   id: string;
   name: string;
@@ -50,6 +60,7 @@ type Pitch = {
   type: "INDOOR" | "OUTDOOR" | "HYBRID";
   slotDurationMinutes: number;
   pricingRules: Array<{ id: string; dayType: string; pricePerHour: string }>;
+  maintenanceBlocks?: MaintenanceBlock[];
 };
 
 type HourEntry = {
@@ -124,6 +135,64 @@ export default function OwnerVenueDetailScreen() {
   const [samePrice, setSamePrice] = useState(true);
   const [allDayPrice, setAllDayPrice] = useState("");
   const [pricingSaving, setPricingSaving] = useState(false);
+
+  // ─── Maintenance blocks modal state ──────────────────────────────────────
+  const [blockModalPitch, setBlockModalPitch] = useState<Pitch | null>(null);
+  const [blockStartDate, setBlockStartDate] = useState("");
+  const [blockStartTime, setBlockStartTime] = useState("00:00");
+  const [blockEndDate, setBlockEndDate] = useState("");
+  const [blockEndTime, setBlockEndTime] = useState("23:59");
+  const [blockReason, setBlockReason] = useState("");
+
+  const { mutate: doCreateBlock, isPending: blockCreating } = useCreateMaintenanceBlock();
+  const { mutate: doDeleteBlock } = useDeleteMaintenanceBlock();
+
+  function openBlockModal(pitch: Pitch) {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    setBlockStartDate(today);
+    setBlockStartTime("00:00");
+    setBlockEndDate(today);
+    setBlockEndTime("23:59");
+    setBlockReason("");
+    setBlockModalPitch(pitch);
+  }
+
+  function handleCreateBlock() {
+    if (!blockModalPitch || !id) return;
+    const startAt = `${blockStartDate}T${blockStartTime}:00.000Z`;
+    const endAt = `${blockEndDate}T${blockEndTime}:00.000Z`;
+    if (new Date(startAt) >= new Date(endAt)) {
+      Alert.alert("Invalid Range", "Start must be before end.");
+      return;
+    }
+    doCreateBlock(
+      { venueId: id, pitchId: blockModalPitch.id, data: { startAt, endAt, reason: blockReason || undefined } },
+      {
+        onSuccess: () => {
+          setBlockModalPitch(null);
+          invalidate();
+        },
+        onError: () => Alert.alert("Error", "Could not create maintenance block."),
+      },
+    );
+  }
+
+  function handleDeleteBlock(blockId: string, pitchId: string) {
+    if (!id) return;
+    Alert.alert("Delete Block", "Remove this maintenance block?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () =>
+          doDeleteBlock(
+            { venueId: id, pitchId, blockId },
+            { onSuccess: invalidate, onError: () => Alert.alert("Error", "Could not delete block.") },
+          ),
+      },
+    ]);
+  }
 
   // ─── Opening hours state ──────────────────────────────────────────────────
   const [hours, setHours] = useState<HourEntry[]>(defaultHours());
@@ -779,6 +848,10 @@ export default function OwnerVenueDetailScreen() {
                   <Feather name="dollar-sign" size={12} color={colors.foreground} />
                   <Text style={s.pitchActionText}>Set Pricing</Text>
                 </TouchableOpacity>
+                <TouchableOpacity style={[s.pitchActionBtn, { borderColor: colors.primary + "60" }]} onPress={() => openBlockModal(pitch)}>
+                  <Feather name="slash" size={12} color={colors.primary} />
+                  <Text style={[s.pitchActionText, { color: colors.primary }]}>Maintenance</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.pitchActionBtn, { borderColor: colors.destructive + "40" }]}
                   onPress={() => handleDeletePitch(pitch.id, pitch.name)}
@@ -930,6 +1003,68 @@ export default function OwnerVenueDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={[s.mSaveBtn, pitchAdding && { opacity: 0.5 }]} onPress={handleAddPitch} disabled={pitchAdding}>
                 <Text style={s.mSaveText}>{pitchAdding ? "Adding…" : "Add Pitch"}</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Maintenance Block Modal */}
+      <Modal visible={!!blockModalPitch} transparent animationType="slide" onRequestClose={() => setBlockModalPitch(null)}>
+        <KeyboardAvoidingView style={s.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <ScrollView contentContainerStyle={s.modalSheet} keyboardShouldPersistTaps="handled">
+            <Text style={s.modalTitle}>Maintenance — {blockModalPitch?.name}</Text>
+            {blockModalPitch?.maintenanceBlocks && blockModalPitch.maintenanceBlocks.length > 0 && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={[s.mLabel, { marginBottom: 8 }]}>Existing Blocks</Text>
+                {blockModalPitch.maintenanceBlocks.map((blk) => (
+                  <View key={blk.id} style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.muted, borderRadius: 8, padding: 10, marginBottom: 6 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.foreground }}>
+                        {new Date(blk.startAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {" – "}
+                        {new Date(blk.endAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </Text>
+                      {blk.reason && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>{blk.reason}</Text>}
+                    </View>
+                    <TouchableOpacity onPress={() => handleDeleteBlock(blk.id, blockModalPitch.id)} style={{ padding: 6 }}>
+                      <Feather name="trash-2" size={14} color={colors.destructive} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            <Text style={[s.mLabel, { marginBottom: 8 }]}>Create New Block</Text>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.mLabel, { marginBottom: 4 }]}>Start Date</Text>
+                <TextInput style={s.mInput} value={blockStartDate} onChangeText={setBlockStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.mLabel, { marginBottom: 4 }]}>Start Time (UTC)</Text>
+                <TextInput style={s.mInput} value={blockStartTime} onChangeText={setBlockStartTime} placeholder="00:00" placeholderTextColor={colors.mutedForeground} />
+              </View>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.mLabel, { marginBottom: 4 }]}>End Date</Text>
+                <TextInput style={s.mInput} value={blockEndDate} onChangeText={setBlockEndDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.mLabel, { marginBottom: 4 }]}>End Time (UTC)</Text>
+                <TextInput style={s.mInput} value={blockEndTime} onChangeText={setBlockEndTime} placeholder="23:59" placeholderTextColor={colors.mutedForeground} />
+              </View>
+            </View>
+            <View style={[s.mField, { marginBottom: 16 }]}>
+              <Text style={s.mLabel}>Reason (optional)</Text>
+              <TextInput style={s.mInput} value={blockReason} onChangeText={setBlockReason} placeholder="e.g. Resurfacing, Inspection" placeholderTextColor={colors.mutedForeground} />
+            </View>
+            <View style={s.mActions}>
+              <TouchableOpacity style={s.mCancelBtn} onPress={() => setBlockModalPitch(null)}>
+                <Text style={s.mCancelText}>Close</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[s.mSaveBtn, blockCreating && { opacity: 0.5 }]} onPress={handleCreateBlock} disabled={blockCreating}>
+                <Text style={s.mSaveText}>{blockCreating ? "Saving…" : "Create Block"}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

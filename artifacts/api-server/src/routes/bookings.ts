@@ -9,7 +9,7 @@ import {
   pricingRulesTable,
   usersTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, inArray, desc } from "drizzle-orm";
+import { eq, and, gte, lte, lt, gt, inArray, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -245,17 +245,49 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
       return;
     }
 
+    // ── Server-side slot validation ──────────────────────────────────────────
+    // Verify startAt falls exactly on a valid slot boundary for this pitch/date.
+    const dateStr = startDate.toISOString().slice(0, 10); // YYYY-MM-DD
+    const dayOfWeek = startDate.getUTCDay();
+
+    const [hoursRow] = await db
+      .select()
+      .from(openingHoursTable)
+      .where(
+        and(
+          eq(openingHoursTable.venueId, pitchRow.venueId),
+          eq(openingHoursTable.dayOfWeek, dayOfWeek),
+        ),
+      )
+      .limit(1);
+
+    if (!hoursRow || hoursRow.isClosed) {
+      res.status(400).json({ error: "The venue is closed on this day" });
+      return;
+    }
+
+    const validSlots = generateSlots(dateStr, hoursRow.openTime, hoursRow.closeTime, pitchRow.slotDurationMinutes);
+    const validStartTimes = new Set(validSlots.map((s) => s.startAt));
+
+    if (!validStartTimes.has(startDate.toISOString())) {
+      res.status(400).json({
+        error: "The selected time is not a valid slot for this pitch. Please choose from the availability grid.",
+      });
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const endDate = new Date(startDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
 
-    // Check maintenance blocks
+    // Check maintenance blocks (exclusive boundaries to avoid blocking adjacent slots)
     const conflictingBlock = await db
       .select({ id: maintenanceBlocksTable.id })
       .from(maintenanceBlocksTable)
       .where(
         and(
           eq(maintenanceBlocksTable.pitchId, pitchId),
-          lte(maintenanceBlocksTable.startAt, endDate),
-          gte(maintenanceBlocksTable.endAt, startDate),
+          lt(maintenanceBlocksTable.startAt, endDate),
+          gt(maintenanceBlocksTable.endAt, startDate),
         ),
       )
       .limit(1);

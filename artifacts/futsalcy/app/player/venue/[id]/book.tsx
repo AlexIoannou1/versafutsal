@@ -12,7 +12,7 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { useGetPitchAvailability, useCreateBooking } from "@workspace/api-client-react";
+import { useGetPitchAvailability } from "@workspace/api-client-react";
 
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS_SHORT = [
@@ -62,10 +62,11 @@ export default function BookPitchScreen() {
     slotMins: string;
   }>();
 
+  const decodedPitchName = pitchName ? decodeURIComponent(String(pitchName)) : "Pitch";
+
   const dateOptions = useMemo(buildDateOptions, []);
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState<{ startAt: string; endAt: string } | null>(null);
-  const [bookingError, setBookingError] = useState<string | null>(null);
 
   const selectedDateStr = dateOptions[selectedDateIdx]?.dayStr ?? "";
 
@@ -76,24 +77,10 @@ export default function BookPitchScreen() {
   );
   const slots = availData?.slots ?? [];
 
-  const { mutate: createBooking, isPending: isBooking } = useCreateBooking();
-
-  function handleBookNow() {
+  function handleContinue() {
     if (!selectedSlot) return;
-    setBookingError(null);
-    createBooking(
-      { data: { pitchId: pitchId!, startAt: selectedSlot.startAt } },
-      {
-        onSuccess: (res) => {
-          router.replace(`/player/booking/${res.booking.id}`);
-        },
-        onError: (err: unknown) => {
-          const msg =
-            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            "Booking failed. Please try again.";
-          setBookingError(msg);
-        },
-      },
+    router.push(
+      `/player/venue/${venueId}/book-summary?pitchId=${pitchId}&pitchName=${encodeURIComponent(decodedPitchName)}&slotMins=${slotMins}&startAt=${encodeURIComponent(selectedSlot.startAt)}&endAt=${encodeURIComponent(selectedSlot.endAt)}`,
     );
   }
 
@@ -245,8 +232,6 @@ export default function BookPitchScreen() {
     loaderWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   });
 
-  const decodedPitchName = pitchName ? decodeURIComponent(String(pitchName)) : "Pitch";
-
   return (
     <View style={s.container}>
       <Stack.Screen options={{ title: decodedPitchName, headerBackTitle: "Back" }} />
@@ -312,7 +297,6 @@ export default function BookPitchScreen() {
                   onPress={() => {
                     if (!isAvailable) return;
                     setSelectedSlot(isSelected ? null : { startAt: slot.startAt, endAt: slot.endAt });
-                    setBookingError(null);
                   }}
                   disabled={!isAvailable}
                   activeOpacity={isAvailable ? 0.7 : 1}
@@ -338,7 +322,6 @@ export default function BookPitchScreen() {
 
       {/* Bottom Bar */}
       <View style={s.bottomBar}>
-        {bookingError && <Text style={s.errorText}>{bookingError}</Text>}
         {selectedSlot && (
           <View style={s.selectedInfo}>
             <Text style={s.selectedInfoText}>
@@ -348,26 +331,20 @@ export default function BookPitchScreen() {
         )}
         <TouchableOpacity
           style={[s.confirmBtn, !selectedSlot && s.confirmBtnDisabled]}
-          onPress={handleBookNow}
-          disabled={!selectedSlot || isBooking}
+          onPress={handleContinue}
+          disabled={!selectedSlot}
           activeOpacity={0.8}
         >
-          {isBooking ? (
-            <ActivityIndicator color={colors.primaryForeground} />
-          ) : (
-            <>
-              <Feather
-                name="check-circle"
-                size={20}
-                color={selectedSlot ? colors.primaryForeground : colors.mutedForeground}
-              />
-              <Text
-                style={[s.confirmBtnText, !selectedSlot && s.confirmBtnTextDisabled]}
-              >
-                {selectedSlot ? "Confirm Booking" : "Select a Slot"}
-              </Text>
-            </>
-          )}
+          <Feather
+            name="arrow-right"
+            size={20}
+            color={selectedSlot ? colors.primaryForeground : colors.mutedForeground}
+          />
+          <Text
+            style={[s.confirmBtnText, !selectedSlot && s.confirmBtnTextDisabled]}
+          >
+            {selectedSlot ? "Review Booking" : "Select a Slot"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

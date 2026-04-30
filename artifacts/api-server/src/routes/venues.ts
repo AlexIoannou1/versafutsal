@@ -6,6 +6,7 @@ import {
   openingHoursTable,
   pricingRulesTable,
   venuePhotosTable,
+  maintenanceBlocksTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -30,17 +31,27 @@ async function getVenueWithDetails(venueId: string) {
   ]);
 
   const pitchIds = pitches.map((p) => p.id);
-  const pricing =
+  const [pricing, blocks] = await Promise.all([
     pitchIds.length > 0
-      ? await db
-          .select()
-          .from(pricingRulesTable)
-          .where(inArray(pricingRulesTable.pitchId, pitchIds))
-      : [];
+      ? db.select().from(pricingRulesTable).where(inArray(pricingRulesTable.pitchId, pitchIds))
+      : ([] as (typeof pricingRulesTable.$inferSelect)[]),
+    pitchIds.length > 0
+      ? db.select().from(maintenanceBlocksTable).where(inArray(maintenanceBlocksTable.pitchId, pitchIds))
+      : ([] as (typeof maintenanceBlocksTable.$inferSelect)[]),
+  ]);
 
   const pitchesWithPricing = pitches.map((p) => ({
     ...p,
     pricingRules: pricing.filter((r) => r.pitchId === p.id),
+    maintenanceBlocks: blocks
+      .filter((b) => b.pitchId === p.id)
+      .map((b) => ({
+        id: b.id,
+        pitchId: b.pitchId,
+        startAt: b.startAt.toISOString(),
+        endAt: b.endAt.toISOString(),
+        reason: b.reason,
+      })),
   }));
 
   return { ...venue, photos, pitches: pitchesWithPricing, openingHours: hours };
