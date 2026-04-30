@@ -93,6 +93,7 @@ export default function VenueNewScreen() {
   const [pitchSize, setPitchSize] = useState("5v5");
   const [pitchPrice, setPitchPrice] = useState("");
   const [pitchSaved, setPitchSaved] = useState(false);
+  const [pitchNameError, setPitchNameError] = useState("");
 
   // Step 2 — Opening hours
   const [schedule, setSchedule] = useState<DaySchedule[]>(DEFAULT_HOURS.map((d) => ({ ...d })));
@@ -138,7 +139,11 @@ export default function VenueNewScreen() {
 
     if (step === 1) {
       if (!venueId) return;
-      if (!pitchName.trim()) { Alert.alert("Required", "Pitch name is required."); return; }
+      if (!pitchName.trim()) {
+        setPitchNameError("Pitch name is required.");
+        return;
+      }
+      setPitchNameError("");
 
       setStepLoading(true);
       try {
@@ -219,10 +224,6 @@ export default function VenueNewScreen() {
     } else {
       setStep((s) => s - 1);
     }
-  };
-
-  const skipPitch = () => {
-    if (step === 1) setStep(2);
   };
 
   const s = StyleSheet.create({
@@ -331,8 +332,6 @@ export default function VenueNewScreen() {
       gap: 10,
     },
     noteText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.primary, lineHeight: 18 },
-    skipLink: { alignSelf: "center", paddingVertical: 8, marginTop: 4 },
-    skipText: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textDecorationLine: "underline" },
     footer: {
       flexDirection: "row",
       gap: 12,
@@ -504,20 +503,25 @@ export default function VenueNewScreen() {
             <View style={s.note}>
               <Feather name="info" size={16} color={colors.primary} />
               <Text style={s.noteText}>
-                Add your first pitch. You can add more from the venue management screen later.
+                Add at least one pitch — required before your venue can be submitted for approval. You can add more pitches later from the venue management screen.
               </Text>
             </View>
 
             <View style={s.field}>
               <Text style={s.label}>Pitch Name *</Text>
               <TextInput
-                style={s.input}
+                style={[s.input, pitchNameError ? { borderColor: colors.destructive } : undefined]}
                 value={pitchName}
-                onChangeText={setPitchName}
+                onChangeText={(v) => { setPitchName(v); if (v.trim()) setPitchNameError(""); }}
                 placeholder="e.g. Pitch A"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="words"
               />
+              {!!pitchNameError && (
+                <Text style={{ fontSize: 12, color: colors.destructive, marginTop: 4, fontFamily: "Inter_400Regular" }}>
+                  {pitchNameError}
+                </Text>
+              )}
             </View>
 
             <View style={s.field}>
@@ -585,9 +589,6 @@ export default function VenueNewScreen() {
               />
             </View>
 
-            <TouchableOpacity style={s.skipLink} onPress={skipPitch}>
-              <Text style={s.skipText}>Skip this step — add pitches later</Text>
-            </TouchableOpacity>
           </>
         )}
 
