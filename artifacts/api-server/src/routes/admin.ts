@@ -3,12 +3,13 @@ import { db } from "@workspace/db";
 import {
   venuesTable,
   usersTable,
+  pitchesTable,
   bookingsTable,
   paymentsTable,
   refundsTable,
   auditLogTable,
 } from "@workspace/db/schema";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, gte, lte, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 
@@ -159,6 +160,96 @@ router.put<{ id: string }>(
 );
 
 // ─── Admin Bookings ────────────────────────────────────────────────────────────
+
+// GET /admin/bookings?from=&to=&status= — List all bookings across all venues (admin only)
+router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { from, to, status } = req.query as { from?: string; to?: string; status?: string };
+
+    const conditions: ReturnType<typeof eq>[] = [];
+    if (status) conditions.push(eq(bookingsTable.status, status as never));
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate.getTime())) conditions.push(gte(bookingsTable.startAt, fromDate) as never);
+    }
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate.getTime())) conditions.push(lte(bookingsTable.startAt, toDate) as never);
+    }
+
+    const rows = await db
+      .select({
+        booking: bookingsTable,
+        player: { id: usersTable.id, name: usersTable.name, email: usersTable.email },
+        venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district },
+        pitch: { id: pitchesTable.id, name: pitchesTable.name, type: pitchesTable.type, size: pitchesTable.size },
+      })
+      .from(bookingsTable)
+      .leftJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
+      .leftJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+      .leftJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+      .where(conditions.length > 0 ? and(...(conditions as Parameters<typeof and>)) : undefined)
+      .orderBy(desc(bookingsTable.startAt));
+
+    res.json({
+      bookings: rows.map((r) => ({
+        ...r.booking,
+        startAt: r.booking.startAt.toISOString(),
+        endAt: r.booking.endAt.toISOString(),
+        createdAt: r.booking.createdAt.toISOString(),
+        updatedAt: r.booking.updatedAt.toISOString(),
+        player: r.player,
+        venue: r.venue,
+        pitch: r.pitch,
+      })),
+    });
+  } catch (err) {
+    console.error("GET /admin/bookings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /admin/bookings/:id — Single booking detail for admin
+router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const bookingId = req.params.id;
+
+    const [row] = await db
+      .select({
+        booking: bookingsTable,
+        player: { id: usersTable.id, name: usersTable.name, email: usersTable.email },
+        venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district, address: venuesTable.address },
+        pitch: { id: pitchesTable.id, name: pitchesTable.name, type: pitchesTable.type, size: pitchesTable.size },
+      })
+      .from(bookingsTable)
+      .leftJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
+      .leftJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+      .leftJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+      .where(eq(bookingsTable.id, bookingId))
+      .limit(1);
+
+    if (!row) {
+      res.status(404).json({ error: "Booking not found" });
+      return;
+    }
+
+    res.json({
+      booking: {
+        ...row.booking,
+        startAt: row.booking.startAt.toISOString(),
+        endAt: row.booking.endAt.toISOString(),
+        createdAt: row.booking.createdAt.toISOString(),
+        updatedAt: row.booking.updatedAt.toISOString(),
+        player: row.player,
+        venue: row.venue,
+        pitch: row.pitch,
+      },
+    });
+  } catch (err) {
+    console.error("GET /admin/bookings/:id error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // POST /admin/bookings/:id/refund — Force-refund any booking regardless of policy (admin only)
 router.post<{ id: string }>(

@@ -19,7 +19,10 @@ import type {
 import type {
   AddVenuePhoto201,
   AddVenuePhotoRequest,
+  AdminGetBooking200,
   AdminGetVenue200,
+  AdminListBookings200,
+  AdminListBookingsParams,
   AdminListVenues200,
   AdminListVenuesParams,
   ApiError,
@@ -2918,6 +2921,190 @@ export const useRejectVenue = <
 > => {
   return useMutation(getRejectVenueMutationOptions(options));
 };
+
+/**
+ * @summary List all bookings across all venues (admin only)
+ */
+export const getAdminListBookingsUrl = (params?: AdminListBookingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/bookings?${stringifiedParams}`
+    : `/api/admin/bookings`;
+};
+
+export const adminListBookings = async (
+  params?: AdminListBookingsParams,
+  options?: RequestInit,
+): Promise<AdminListBookings200> => {
+  return customFetch<AdminListBookings200>(getAdminListBookingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminListBookingsQueryKey = (
+  params?: AdminListBookingsParams,
+) => {
+  return [`/api/admin/bookings`, ...(params ? [params] : [])] as const;
+};
+
+export const getAdminListBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminListBookings>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: AdminListBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminListBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAdminListBookingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminListBookings>>
+  > = ({ signal }) => adminListBookings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminListBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminListBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminListBookings>>
+>;
+export type AdminListBookingsQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary List all bookings across all venues (admin only)
+ */
+
+export function useAdminListBookings<
+  TData = Awaited<ReturnType<typeof adminListBookings>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: AdminListBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminListBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminListBookingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a single booking detail (admin only)
+ */
+export const getAdminGetBookingUrl = (id: string) => {
+  return `/api/admin/bookings/${id}`;
+};
+
+export const adminGetBooking = async (
+  id: string,
+  options?: RequestInit,
+): Promise<AdminGetBooking200> => {
+  return customFetch<AdminGetBooking200>(getAdminGetBookingUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminGetBookingQueryKey = (id: string) => {
+  return [`/api/admin/bookings/${id}`] as const;
+};
+
+export const getAdminGetBookingQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminGetBooking>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminGetBooking>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAdminGetBookingQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetBooking>>> = ({
+    signal,
+  }) => adminGetBooking(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminGetBooking>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminGetBookingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminGetBooking>>
+>;
+export type AdminGetBookingQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get a single booking detail (admin only)
+ */
+
+export function useAdminGetBooking<
+  TData = Awaited<ReturnType<typeof adminGetBooking>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminGetBooking>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminGetBookingQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Force-refund any booking regardless of cancellation policy (admin only)

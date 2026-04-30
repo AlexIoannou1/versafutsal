@@ -64,12 +64,16 @@ Notifications helper: `api-server/src/lib/notifications.ts` — in-app + Expo pu
 - `POST /api/bookings/:id/cancel` — player cancel (enforces cancellationWindowHours from policySnapshot); owner cancel (no window restriction); issues refund via MockPaymentProvider, inserts refund record + audit log
 - `GET /api/owner/bookings/:id` — single booking detail for owner (with player/venue/pitch)
 - `GET /api/owner/bookings?from=&to=&pitchId=` — owner bookings with date/pitch filters
+- `GET /api/admin/bookings` — list all bookings platform-wide (admin only, sortable by from/to/status)
+- `GET /api/admin/bookings/:id` — single booking detail for admin (with player/venue/pitch)
 - `POST /api/admin/bookings/:id/refund` — admin force-refund any booking (writes ADMIN_REFUND_ISSUED audit)
 
-Owner calendar screen: `(owner)/calendar.tsx` — week/day view with pitch filter chips, tappable booking blocks  
+Owner calendar screen: `(owner)/calendar.tsx` — week/day view with pitch filter chips, tappable booking blocks (shows all statuses; cancelled/refunded dimmed)  
 Owner booking detail: `owner/booking/[id].tsx` — shows player/venue/pitch info + owner cancel flow  
 Player booking detail: `player/booking/[id].tsx` — shows full booking + player cancel flow (policy-aware)  
 Owner dashboard: `(owner)/index.tsx` — booking cards now tappable → owner booking detail  
+Admin overview: `(admin)/index.tsx` — "Recent Bookings" section (10 most recent, tappable → admin booking detail)  
+Admin booking detail: `admin/booking/[id].tsx` — shows player/venue/pitch info + "Issue Manual Refund" button (admin-only modal with audit log)
 
 ### Booking API Endpoints (Task #3)
 - `GET /api/venues/:venueId/pitches/:pitchId/availability?date=YYYY-MM-DD` — slot grid (open hours - maintenance blocks - existing bookings)

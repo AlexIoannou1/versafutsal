@@ -973,6 +973,114 @@ export const RejectVenueResponse = zod.object({
 });
 
 /**
+ * @summary List all bookings across all venues (admin only)
+ */
+export const AdminListBookingsQueryParams = zod.object({
+  from: zod.date().optional(),
+  to: zod.date().optional(),
+  status: zod.coerce.string().optional(),
+});
+
+export const AdminListBookingsResponse = zod.object({
+  bookings: zod.array(
+    zod
+      .object({
+        id: zod.string().uuid(),
+        venueId: zod.string().uuid(),
+        pitchId: zod.string().uuid(),
+        playerId: zod.string().uuid(),
+        startAt: zod.coerce.date(),
+        endAt: zod.coerce.date(),
+        status: zod.enum([
+          "PENDING",
+          "CONFIRMED",
+          "CANCELLED",
+          "REFUNDED",
+          "NO_SHOW",
+        ]),
+        policySnapshot: zod.object({}).passthrough(),
+        cancellationReason: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      })
+      .and(
+        zod.object({
+          venue: zod.object({
+            id: zod.string().uuid(),
+            name: zod.string(),
+            district: zod.string(),
+            address: zod.string(),
+          }),
+          pitch: zod.object({
+            id: zod.string().uuid(),
+            name: zod.string(),
+            type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+            size: zod.string(),
+            slotDurationMinutes: zod.number(),
+          }),
+          player: zod.object({
+            id: zod.string().uuid(),
+            name: zod.string(),
+            email: zod.string().email(),
+          }),
+        }),
+      ),
+  ),
+});
+
+/**
+ * @summary Get a single booking detail (admin only)
+ */
+export const AdminGetBookingParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AdminGetBookingResponse = zod.object({
+  booking: zod
+    .object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      pitchId: zod.string().uuid(),
+      playerId: zod.string().uuid(),
+      startAt: zod.coerce.date(),
+      endAt: zod.coerce.date(),
+      status: zod.enum([
+        "PENDING",
+        "CONFIRMED",
+        "CANCELLED",
+        "REFUNDED",
+        "NO_SHOW",
+      ]),
+      policySnapshot: zod.object({}).passthrough(),
+      cancellationReason: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .and(
+      zod.object({
+        venue: zod.object({
+          id: zod.string().uuid(),
+          name: zod.string(),
+          district: zod.string(),
+          address: zod.string(),
+        }),
+        pitch: zod.object({
+          id: zod.string().uuid(),
+          name: zod.string(),
+          type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+          size: zod.string(),
+          slotDurationMinutes: zod.number(),
+        }),
+        player: zod.object({
+          id: zod.string().uuid(),
+          name: zod.string(),
+          email: zod.string().email(),
+        }),
+      }),
+    ),
+});
+
+/**
  * @summary Force-refund any booking regardless of cancellation policy (admin only)
  */
 export const AdminRefundBookingParams = zod.object({

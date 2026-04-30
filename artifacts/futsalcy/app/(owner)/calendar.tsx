@@ -84,7 +84,17 @@ export default function OwnerCalendarScreen() {
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const fromDate = viewMode === "week" ? weekStart : currentDate;
-  const toDate = viewMode === "week" ? addDays(weekStart, 6) : addDays(currentDate, 1);
+  const toDate = useMemo(() => {
+    if (viewMode === "week") {
+      const d = addDays(weekStart, 6);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    } else {
+      const d = new Date(currentDate);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    }
+  }, [viewMode, weekStart, currentDate]);
 
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings({
     from: fromDate.toISOString(),
@@ -110,12 +120,12 @@ export default function OwnerCalendarScreen() {
     ? allBookings
     : allBookings.filter((b) => (b.pitch as { id: string } | undefined)?.id === selectedPitchId);
 
-  const activeBookings = bookings.filter(
-    (b) => b.status !== "CANCELLED" && b.status !== "REFUNDED",
-  );
-
   function getBookingsForDay(day: Date) {
-    return activeBookings.filter((b) => isSameDay(new Date(b.startAt), day));
+    return bookings.filter((b) => isSameDay(new Date(b.startAt), day));
+  }
+
+  function isInactiveBooking(status: string) {
+    return status === "CANCELLED" || status === "REFUNDED";
   }
 
   const s = StyleSheet.create({
@@ -442,11 +452,12 @@ export default function OwnerCalendarScreen() {
                   ) : (
                     dayBookings.map((b) => {
                       const color = STATUS_COLORS[b.status] ?? colors.primary;
+                      const inactive = isInactiveBooking(b.status);
                       const player = b.player as { name: string } | undefined;
                       return (
                         <TouchableOpacity
                           key={b.id}
-                          style={[s.dayBookingBlock, { backgroundColor: color + "25" }]}
+                          style={[s.dayBookingBlock, { backgroundColor: color + "25" }, inactive && { opacity: 0.4 }]}
                           onPress={() => router.push(`/owner/booking/${b.id}`)}
                           activeOpacity={0.7}
                         >
@@ -479,26 +490,27 @@ export default function OwnerCalendarScreen() {
             </Text>
           </View>
 
-          {activeBookings.length === 0 ? (
+          {bookings.length === 0 ? (
             <View style={s.emptyDay}>
               <Feather name="calendar" size={32} color={colors.mutedForeground} />
               <Text style={s.emptyDayText}>No bookings for this day</Text>
             </View>
           ) : (
-            activeBookings.map((b) => {
+            bookings.map((b) => {
               const color = STATUS_COLORS[b.status] ?? colors.primary;
+              const inactive = isInactiveBooking(b.status);
               const player = b.player as { name: string; email: string } | undefined;
               const pitch = b.pitch as { name: string } | undefined;
               const venue = b.venue as { name: string } | undefined;
               return (
                 <TouchableOpacity
                   key={b.id}
-                  style={s.bookingCard}
+                  style={[s.bookingCard, inactive && { opacity: 0.45 }]}
                   onPress={() => router.push(`/owner/booking/${b.id}`)}
                   activeOpacity={0.7}
                 >
                   <View style={s.bookingCardHeader}>
-                    <Text style={s.bookingCardTime}>
+                    <Text style={[s.bookingCardTime, inactive && { textDecorationLine: "line-through" }]}>
                       {formatTime(b.startAt)} – {formatTime(b.endAt)}
                     </Text>
                     <View style={[s.bookingStatusBadge, { backgroundColor: color + "20" }]}>

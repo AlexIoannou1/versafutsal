@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
@@ -23,11 +24,29 @@ import {
   useUpdateAdminSettings,
   useSetVenueFeeOverride,
   useAdminListVenues,
+  useAdminListBookings,
 } from "@workspace/api-client-react";
+
+const BOOKING_STATUS_COLORS: Record<string, string> = {
+  PENDING: "#F59E0B",
+  CONFIRMED: "#00C851",
+  CANCELLED: "#EF4444",
+  REFUNDED: "#6366F1",
+  NO_SHOW: "#6B7280",
+};
+
+function formatDateShortAdmin(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function formatTimeAdmin(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
 
 export default function AdminSettingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -37,6 +56,9 @@ export default function AdminSettingsScreen() {
 
   const { data: venuesData, isLoading: venuesLoading } = useAdminListVenues({ status: "APPROVED" });
   const venues = venuesData?.venues ?? [];
+
+  const { data: bookingsData, isLoading: bookingsLoading } = useAdminListBookings();
+  const recentBookings = (bookingsData?.bookings ?? []).slice(0, 10);
 
   const updateSettings = useUpdateAdminSettings();
   const setVenueOverride = useSetVenueFeeOverride();
@@ -390,6 +412,54 @@ export default function AdminSettingsScreen() {
             Tap a venue to cycle: Default → Fee ON → Fee OFF → Default
           </Text>
         )}
+      </View>
+
+      {/* Recent Bookings */}
+      <View style={s.section}>
+        <Text style={s.sectionTitle}>Recent Bookings</Text>
+        <View style={s.card}>
+          {bookingsLoading ? (
+            <View style={{ paddingVertical: 24, alignItems: "center" }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : recentBookings.length === 0 ? (
+            <View style={s.row}>
+              <Text style={s.rowSub}>No bookings yet.</Text>
+            </View>
+          ) : (
+            recentBookings.map((booking, idx) => {
+              const statusColor = BOOKING_STATUS_COLORS[booking.status] ?? colors.mutedForeground;
+              const player = booking.player as { name: string; email: string } | undefined;
+              const venue = booking.venue as { name: string } | undefined;
+              const pitch = booking.pitch as { name: string } | undefined;
+              return (
+                <TouchableOpacity
+                  key={booking.id}
+                  style={[s.venueRow, idx < recentBookings.length - 1 && s.rowBorder]}
+                  onPress={() => router.push(`/admin/booking/${booking.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text style={s.rowLabel} numberOfLines={1}>
+                        {player?.name ?? player?.email ?? "Player"}
+                      </Text>
+                      <View style={[s.overrideChip, { backgroundColor: statusColor + "20" }]}>
+                        <Text style={[s.overrideChipText, { color: statusColor }]}>
+                          {booking.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={s.rowSub} numberOfLines={1}>
+                      {venue?.name ?? ""} · {pitch?.name ?? ""} · {formatDateShortAdmin(booking.startAt)} {formatTimeAdmin(booking.startAt)}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
       </View>
 
       <View style={s.footer} />

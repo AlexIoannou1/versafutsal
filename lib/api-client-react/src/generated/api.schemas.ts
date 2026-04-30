@@ -610,6 +610,20 @@ export type RejectVenue200 = {
   venue: VenueRecord;
 };
 
+export type AdminListBookingsParams = {
+  from?: string;
+  to?: string;
+  status?: string;
+};
+
+export type AdminListBookings200 = {
+  bookings: BookingWithDetails[];
+};
+
+export type AdminGetBooking200 = {
+  booking: BookingWithDetails;
+};
+
 export type GetCheckoutFeeParams = {
   venueId?: string;
 };
