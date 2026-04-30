@@ -779,11 +779,16 @@ router.post<{ id: string }>(
           .where(eq(bookingsTable.id, bookingId));
 
         if (payment && refundEligible) {
-          // Mark payment as refunded atomically with booking/refund/audit writes
-          await tx
+          // Idempotency guard: update payment only if it is still SUCCEEDED.
+          // Prevents double-refund under concurrent cancel requests.
+          const [guardedPayment] = await tx
             .update(paymentsTable)
             .set({ status: "REFUNDED", updatedAt: new Date() })
-            .where(eq(paymentsTable.id, payment.id));
+            .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, "SUCCEEDED")))
+            .returning();
+          if (!guardedPayment) {
+            throw Object.assign(new Error("ALREADY_REFUNDED"), { code: "ALREADY_REFUNDED" });
+          }
 
           // Insert refund record
           await tx.insert(refundsTable).values({
@@ -852,6 +857,10 @@ router.post<{ id: string }>(
         hoursUntilStart: parseFloat(hoursUntilStart.toFixed(2)),
       });
     } catch (err) {
+      if ((err as { code?: string }).code === "ALREADY_REFUNDED") {
+        res.status(409).json({ error: "This booking was already refunded by a concurrent request." });
+        return;
+      }
       console.error("POST /bookings/:id/cancel error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
