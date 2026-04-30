@@ -35,11 +35,70 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { selectedMode, login } = useAuth();
 
+  // All hooks must be called unconditionally before any early return.
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Admin accounts cannot be self-registered. Show a clear message.
+  if (selectedMode === "ADMIN") {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.background,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 32,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: "Inter_700Bold",
+            fontSize: 18,
+            color: colors.foreground,
+            textAlign: "center",
+            marginBottom: 12,
+          }}
+        >
+          Admin accounts cannot be created here
+        </Text>
+        <Text
+          style={{
+            fontFamily: "Inter_400Regular",
+            fontSize: 14,
+            color: colors.mutedForeground,
+            textAlign: "center",
+            marginBottom: 32,
+            lineHeight: 20,
+          }}
+        >
+          Admin accounts are provisioned separately. Please sign in with your existing credentials.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{
+            backgroundColor: colors.primary,
+            borderRadius: 12,
+            paddingHorizontal: 24,
+            paddingVertical: 14,
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 15,
+              color: colors.primaryForeground,
+            }}
+          >
+            Back to Sign In
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
@@ -244,10 +303,7 @@ export default function RegisterScreen() {
           <Text style={s.submitText}>{loading ? "Creating account…" : "Create Account"}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={s.loginLink}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={s.loginLink} onPress={() => router.back()}>
           <Text style={s.loginText}>
             Already have an account? <Text style={s.loginBold}>Sign in</Text>
           </Text>

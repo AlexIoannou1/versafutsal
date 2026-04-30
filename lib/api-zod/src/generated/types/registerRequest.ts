@@ -5,12 +5,14 @@
  * FutsalCY API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { UserRole } from "./userRole";
+import type { RegisterRequestRole } from "./registerRequestRole";
 
 export interface RegisterRequest {
   email: string;
   /** @minLength 6 */
   password: string;
   name: string;
-  role?: UserRole;
+  /** Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.
+   */
+  role?: RegisterRequestRole;
 }

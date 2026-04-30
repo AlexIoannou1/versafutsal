@@ -24,7 +24,12 @@ export const RegisterUserBody = zod.object({
   email: zod.string().email(),
   password: zod.string().min(registerUserBodyPasswordMin),
   name: zod.string(),
-  role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]).optional(),
+  role: zod
+    .enum(["PLAYER", "VENUE_OWNER"])
+    .optional()
+    .describe(
+      "Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.\n",
+    ),
 });
 
 /**

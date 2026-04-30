@@ -29,12 +29,26 @@ export interface UserProfile {
   createdAt: string;
 }
 
+/**
+ * Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.
+
+ */
+export type RegisterRequestRole =
+  (typeof RegisterRequestRole)[keyof typeof RegisterRequestRole];
+
+export const RegisterRequestRole = {
+  PLAYER: "PLAYER",
+  VENUE_OWNER: "VENUE_OWNER",
+} as const;
+
 export interface RegisterRequest {
   email: string;
   /** @minLength 6 */
   password: string;
   name: string;
-  role?: UserRole;
+  /** Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.
+   */
+  role?: RegisterRequestRole;
 }
 
 export interface LoginRequest {

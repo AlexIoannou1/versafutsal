@@ -13,5 +13,6 @@ export * from "./loginRequest";
 export * from "./meResponse";
 export * from "./meResponseUser";
 export * from "./registerRequest";
+export * from "./registerRequestRole";
 export * from "./userProfile";
 export * from "./userRole";

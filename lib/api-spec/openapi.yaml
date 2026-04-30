@@ -167,7 +167,11 @@ components:
         name:
           type: string
         role:
-          $ref: "#/components/schemas/UserRole"
+          type: string
+          enum: [PLAYER, VENUE_OWNER]
+          description: >
+            Public registration only allows PLAYER or VENUE_OWNER.
+            ADMIN accounts must be created via seed or a protected admin API.
       required:
         - email
         - password
