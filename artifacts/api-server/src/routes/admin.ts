@@ -166,15 +166,20 @@ router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res
   try {
     const { from, to, status } = req.query as { from?: string; to?: string; status?: string };
 
-    const conditions: ReturnType<typeof eq>[] = [];
-    if (status) conditions.push(eq(bookingsTable.status, status as never));
+    const conditions = [];
+    if (status) {
+      const validStatuses = ["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"] as const;
+      if (validStatuses.includes(status as (typeof validStatuses)[number])) {
+        conditions.push(eq(bookingsTable.status, status as (typeof validStatuses)[number]));
+      }
+    }
     if (from) {
       const fromDate = new Date(from);
-      if (!isNaN(fromDate.getTime())) conditions.push(gte(bookingsTable.startAt, fromDate) as never);
+      if (!isNaN(fromDate.getTime())) conditions.push(gte(bookingsTable.startAt, fromDate));
     }
     if (to) {
       const toDate = new Date(to);
-      if (!isNaN(toDate.getTime())) conditions.push(lte(bookingsTable.startAt, toDate) as never);
+      if (!isNaN(toDate.getTime())) conditions.push(lte(bookingsTable.startAt, toDate));
     }
 
     const rows = await db
