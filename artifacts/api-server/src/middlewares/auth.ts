@@ -2,7 +2,14 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import type { UserRole } from "@workspace/db";
 
-const JWT_SECRET = process.env["JWT_SECRET"] || "futsalcy-secret-dev";
+const JWT_SECRET = process.env["JWT_SECRET"];
+
+if (!JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET environment variable is required but was not set. " +
+      "Set it to a long random string before starting the server.",
+  );
+}
 
 export interface JwtPayload {
   userId: string;
@@ -18,6 +25,9 @@ declare global {
   }
 }
 
+// JWT_SECRET is validated above; non-null assertion is safe here.
+const SECRET = JWT_SECRET!;
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
 
@@ -29,7 +39,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   const token = authHeader.slice(7);
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    const payload = jwt.verify(token, SECRET) as JwtPayload;
     req.user = payload;
     next();
   } catch {
@@ -52,5 +62,5 @@ export function requireRole(...roles: UserRole[]) {
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign(payload, SECRET, { expiresIn: "30d" });
 }

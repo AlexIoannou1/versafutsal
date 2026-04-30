@@ -52,8 +52,10 @@ pnpm --filter @workspace/futsalcy run dev
 | Admin | admin@futsalcy.com | Demo1234! |
 
 ### Seeded Venues
-1. **Nicosia Futsal Center** — 3 pitches (5v5 x2, 7v7 x1) — **APPROVED**
+1. **Nicosia Futsal Center** — 3 pitches (5v5 x2, 7v7 x1) — **PENDING approval**
 2. **Limassol Sports Arena** — 2 pitches (5v5 x2) — **PENDING approval**
+
+Both venues start in **PENDING** state so the Admin role can demonstrate venue approval workflow.
 
 ---
 
@@ -62,7 +64,9 @@ pnpm --filter @workspace/futsalcy run dev
 | Command | Description |
 |---------|-------------|
 | `pnpm --filter @workspace/api-spec run codegen` | Regenerate API hooks from OpenAPI spec |
-| `pnpm --filter @workspace/db run push` | Push schema changes to DB |
+| `pnpm --filter @workspace/db run generate` | Generate migration files from schema |
+| `pnpm --filter @workspace/db run migrate` | Apply pending migrations |
+| `pnpm --filter @workspace/db run push` | Push schema changes to DB (dev only) |
 | `pnpm --filter @workspace/api-server run seed` | Seed demo data |
 | `pnpm run typecheck` | Full TypeScript typecheck |
 
@@ -73,7 +77,7 @@ pnpm --filter @workspace/futsalcy run dev
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `JWT_SECRET` | No | JWT signing secret (defaults to dev secret) |
+| `JWT_SECRET` | **Yes** | JWT signing secret — server refuses to start without it |
 | `PORT` | Yes | Server port (injected by Replit) |
 | `EXPO_PUBLIC_DOMAIN` | Yes | Domain for Expo → API communication |
 

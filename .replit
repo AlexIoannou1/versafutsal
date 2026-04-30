@@ -30,3 +30,8 @@ externalPort = 8081
 [[ports]]
 localPort = 20728
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "8a810286b318834c06d294480b92f1c9c0e1e0988d540acff990d0d4ce2a485147c2b15c2a307a43a913c8c5c06eee2c"
