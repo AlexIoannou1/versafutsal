@@ -23,6 +23,8 @@ export interface PaymentProvider {
     subtotalAmount: string;
     paymentType: "FULL" | "DEPOSIT";
     idempotencyKey: string;
+    /** Pre-computed deposit amount from venue pricing rules. Required when paymentType=DEPOSIT. */
+    depositAmountOverride?: string;
   }): Promise<PaymentIntentResult>;
 
   confirmPayment(providerPaymentId: string): Promise<{ success: boolean; errorMessage?: string }>;
@@ -75,14 +77,15 @@ export class MockPaymentProvider implements PaymentProvider {
     subtotalAmount: string;
     paymentType: "FULL" | "DEPOSIT";
     idempotencyKey: string;
+    depositAmountOverride?: string;
   }): Promise<PaymentIntentResult> {
-    const { bookingId, venueId, subtotalAmount, paymentType, idempotencyKey } = opts;
+    const { bookingId, venueId, subtotalAmount, paymentType, idempotencyKey, depositAmountOverride } = opts;
 
     const { feeAmount, feeWaived } = await getEffectiveFee(venueId);
 
     const baseAmount =
       paymentType === "DEPOSIT"
-        ? computeDepositAmount(subtotalAmount)
+        ? (depositAmountOverride ?? computeDepositAmount(subtotalAmount))
         : subtotalAmount;
 
     const totalAmount = feeWaived

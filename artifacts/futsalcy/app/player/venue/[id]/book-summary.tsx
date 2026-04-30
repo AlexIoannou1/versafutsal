@@ -39,6 +39,10 @@ function formatTime12(iso: string) {
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+function makeIdempotencyKey() {
+  return `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 type PaymentType = "FULL" | "DEPOSIT";
 
 export default function BookSummaryScreen() {
@@ -58,10 +62,11 @@ export default function BookSummaryScreen() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Idempotency key generated once per render to prevent double-taps
-  const idempotencyKeyRef = useRef<string>(
-    `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-  );
+  // Persisted booking ID — set on first successful createBooking, reused on checkout retry
+  const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
+
+  // New idempotency key per attempt; regenerated after each failure to avoid conflicts
+  const idempotencyKeyRef = useRef<string>(makeIdempotencyKey());
 
   const decodedStartAt = startAt ? decodeURIComponent(String(startAt)) : "";
   const decodedEndAt = endAt ? decodeURIComponent(String(endAt)) : "";
@@ -76,56 +81,83 @@ export default function BookSummaryScreen() {
   );
 
   const pitch = venue?.pitches?.find((p) => p.id === pitchId);
-  const pricePerHour = pitch?.pricingRules?.[0]?.pricePerHour ?? null;
+  const pricingRule = pitch?.pricingRules?.[0];
+  const pricePerHour = pricingRule?.pricePerHour ?? null;
   const slotMinutes = parseInt(slotMins ?? "60", 10);
   const subtotal = pricePerHour != null ? (parseFloat(pricePerHour) * slotMinutes) / 60 : null;
 
+  // Deposit availability and amount from venue pricing rule config
+  const depositType = pricingRule?.depositType ?? "NONE";
+  const depositAvailable = depositType !== "NONE";
+  const depositAmount: number | null = (() => {
+    if (!depositAvailable || subtotal == null) return null;
+    if (depositType === "FIXED" && pricingRule?.depositAmount) {
+      return parseFloat(pricingRule.depositAmount);
+    }
+    if (depositType === "PERCENT" && pricingRule?.depositAmount) {
+      return subtotal * (parseFloat(pricingRule.depositAmount) / 100);
+    }
+    return null;
+  })();
+
   const feeEnabled = feeData?.feeEnabled ?? true;
   const feeAmount = feeEnabled ? parseFloat(feeData?.feeAmount ?? "1.00") : 0;
-  const feeLabel = feeEnabled ? `€${(feeAmount).toFixed(2)}` : "Waived";
+  const feeLabel = feeEnabled ? `€${feeAmount.toFixed(2)}` : "Waived";
 
-  const depositAmount = subtotal != null ? Math.max(1, subtotal * 0.3) : null;
-  const baseAmount = paymentType === "DEPOSIT" ? depositAmount : subtotal;
+  const baseAmount = paymentType === "DEPOSIT" && depositAmount != null ? depositAmount : subtotal;
   const totalDue = baseAmount != null ? baseAmount + feeAmount : null;
 
   const { mutate: createBooking } = useCreateBooking();
   const { mutate: checkoutBooking } = useCheckoutBooking();
 
+  // Inner function: perform checkout against an existing booking ID
+  function doCheckout(bookingId: string) {
+    checkoutBooking(
+      {
+        bookingId,
+        data: {
+          paymentType,
+          idempotencyKey: idempotencyKeyRef.current,
+        },
+      },
+      {
+        onSuccess: () => {
+          setIsProcessing(false);
+          router.replace(`/player/booking/${bookingId}`);
+        },
+        onError: (err: unknown) => {
+          setIsProcessing(false);
+          // Regenerate key so the next retry doesn't collide with the failed attempt's record
+          idempotencyKeyRef.current = makeIdempotencyKey();
+          const msg =
+            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+            "Payment failed. Tap Pay Now to try again.";
+          setCheckoutError(msg);
+        },
+      },
+    );
+  }
+
   function handlePayNow() {
-    if (!pitchId || !decodedStartAt || isProcessing) return;
+    if (isProcessing) return;
     setCheckoutError(null);
     setIsProcessing(true);
 
-    // Step 1: Create PENDING booking
+    if (pendingBookingId) {
+      // Booking already created — retry checkout against same booking, new idempotency key
+      doCheckout(pendingBookingId);
+      return;
+    }
+
+    // First attempt — create the PENDING booking then immediately check out
     createBooking(
       { data: { pitchId: pitchId!, startAt: decodedStartAt } },
       {
         onSuccess: (res) => {
           const bookingId = res.booking.id;
-
-          // Step 2: Checkout (creates payment intent + confirms)
-          checkoutBooking(
-            {
-              bookingId,
-              data: {
-                paymentType,
-                idempotencyKey: idempotencyKeyRef.current,
-              },
-            },
-            {
-              onSuccess: () => {
-                setIsProcessing(false);
-                router.replace(`/player/booking/${bookingId}`);
-              },
-              onError: (err: unknown) => {
-                setIsProcessing(false);
-                const msg =
-                  (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-                  "Payment failed. Please try again.";
-                setCheckoutError(msg);
-              },
-            },
-          );
+          // Persist so retries reuse this booking, not create a conflicting one
+          setPendingBookingId(bookingId);
+          doCheckout(bookingId);
         },
         onError: (err: unknown) => {
           setIsProcessing(false);
@@ -211,7 +243,6 @@ export default function BookSummaryScreen() {
       color: colors.foreground,
       flex: 1,
     },
-    // Price breakdown
     breakdownCard: {
       backgroundColor: colors.card,
       borderRadius: 12,
@@ -266,7 +297,6 @@ export default function BookSummaryScreen() {
       fontFamily: "Inter_700Bold",
       color: colors.primary,
     },
-    // Payment type selector
     selectorCard: {
       marginHorizontal: 16,
       marginBottom: 12,
@@ -309,7 +339,6 @@ export default function BookSummaryScreen() {
       color: colors.mutedForeground,
       marginTop: 2,
     },
-    // Policy
     disclaimerCard: {
       marginHorizontal: 16,
       marginBottom: 16,
@@ -324,7 +353,6 @@ export default function BookSummaryScreen() {
       flex: 1,
       lineHeight: 18,
     },
-    // Bottom bar
     bottomBar: {
       backgroundColor: colors.background,
       borderTopWidth: 1,
@@ -440,8 +468,8 @@ export default function BookSummaryScreen() {
           </View>
         </View>
 
-        {/* Payment Type Selector */}
-        {subtotal != null && (
+        {/* Payment Type Selector — only if venue allows deposit payments */}
+        {subtotal != null && depositAvailable && depositAmount != null && (
           <View style={s.selectorCard}>
             <Text style={s.selectorLabel}>Payment Option</Text>
             <View style={s.selectorRow}>
@@ -449,6 +477,7 @@ export default function BookSummaryScreen() {
                 style={[s.selectorBtn, paymentType === "FULL" && s.selectorBtnActive]}
                 onPress={() => setPaymentType("FULL")}
                 activeOpacity={0.8}
+                disabled={isProcessing}
               >
                 <Text style={[s.selectorBtnTitle, paymentType === "FULL" && s.selectorBtnTitleActive]}>
                   Pay in Full
@@ -459,11 +488,17 @@ export default function BookSummaryScreen() {
                 style={[s.selectorBtn, paymentType === "DEPOSIT" && s.selectorBtnActive]}
                 onPress={() => setPaymentType("DEPOSIT")}
                 activeOpacity={0.8}
+                disabled={isProcessing}
               >
                 <Text style={[s.selectorBtnTitle, paymentType === "DEPOSIT" && s.selectorBtnTitleActive]}>
                   Pay Deposit
                 </Text>
-                <Text style={s.selectorBtnSub}>€{depositAmount!.toFixed(2)} (30%)</Text>
+                <Text style={s.selectorBtnSub}>
+                  €{depositAmount.toFixed(2)}
+                  {depositType === "PERCENT" && pricingRule?.depositAmount
+                    ? ` (${pricingRule.depositAmount}%)`
+                    : ""}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -474,7 +509,7 @@ export default function BookSummaryScreen() {
           <Text style={s.cardTitle}>Price Breakdown</Text>
           <View style={[s.breakdownRow, s.breakdownRowFirst]}>
             <Text style={s.breakdownLabel}>
-              {paymentType === "DEPOSIT" ? "Deposit (30%)" : "Pitch subtotal"}
+              {paymentType === "DEPOSIT" ? "Deposit" : "Pitch subtotal"}
             </Text>
             <Text style={s.breakdownValue}>
               {baseAmount != null ? `€${baseAmount.toFixed(2)}` : "—"}
@@ -521,7 +556,8 @@ export default function BookSummaryScreen() {
             <>
               <Feather name="lock" size={18} color={colors.primaryForeground} />
               <Text style={s.primaryBtnText}>
-                Pay Now {totalDue != null ? `· €${totalDue.toFixed(2)}` : ""}
+                {checkoutError ? "Retry Payment" : "Pay Now"}
+                {totalDue != null ? ` · €${totalDue.toFixed(2)}` : ""}
               </Text>
             </>
           )}

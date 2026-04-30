@@ -56,37 +56,46 @@ router.post<{ bookingId: string }>(
         .where(eq(paymentsTable.idempotencyKey, effectiveKey))
         .limit(1);
 
-      if (existingPayment?.status === "SUCCEEDED") {
-        // Fetch the booking so the response matches CheckoutResponse contract
-        const [alreadyBooking] = await db
-          .select()
-          .from(bookingsTable)
-          .where(eq(bookingsTable.id, bookingId))
-          .limit(1);
+      if (existingPayment) {
+        // An existing payment record for this idempotency key exists.
+        // Return a deterministic response regardless of status to avoid
+        // hitting the DB unique constraint on a second insert attempt.
+        if (existingPayment.status === "SUCCEEDED") {
+          const [alreadyBooking] = await db
+            .select()
+            .from(bookingsTable)
+            .where(eq(bookingsTable.id, bookingId))
+            .limit(1);
 
-        res.json({
-          alreadyProcessed: true,
-          booking: alreadyBooking
-            ? {
-                id: alreadyBooking.id,
-                status: alreadyBooking.status,
-                startAt: alreadyBooking.startAt.toISOString(),
-                endAt: alreadyBooking.endAt.toISOString(),
-              }
-            : { id: bookingId, status: "CONFIRMED" },
-          payment: {
-            id: existingPayment.id,
-            amount: existingPayment.amount,
-            feeAmount: existingPayment.feeAmount,
-            feeWaived: existingPayment.feeWaived,
-            paymentType: existingPayment.paymentType,
-            currency: existingPayment.currency,
-            status: existingPayment.status,
-            provider: existingPayment.provider,
-            createdAt: existingPayment.createdAt.toISOString(),
-            updatedAt: existingPayment.updatedAt.toISOString(),
-          },
-        });
+          res.json({
+            alreadyProcessed: true,
+            booking: alreadyBooking
+              ? {
+                  id: alreadyBooking.id,
+                  status: alreadyBooking.status,
+                  startAt: alreadyBooking.startAt.toISOString(),
+                  endAt: alreadyBooking.endAt.toISOString(),
+                }
+              : { id: bookingId, status: "CONFIRMED" },
+            payment: {
+              id: existingPayment.id,
+              amount: existingPayment.amount,
+              feeAmount: existingPayment.feeAmount,
+              feeWaived: existingPayment.feeWaived,
+              paymentType: existingPayment.paymentType,
+              currency: existingPayment.currency,
+              status: existingPayment.status,
+              provider: existingPayment.provider,
+              createdAt: existingPayment.createdAt.toISOString(),
+              updatedAt: existingPayment.updatedAt.toISOString(),
+            },
+          });
+        } else {
+          // FAILED or PENDING with this key — client must supply a fresh idempotency key to retry.
+          res.status(409).json({
+            error: `A payment with this idempotency key already exists with status: ${existingPayment.status}. Use a new idempotency key to retry.`,
+          });
+        }
         return;
       }
 
@@ -142,11 +151,32 @@ router.post<{ bookingId: string }>(
         .from(pricingRulesTable)
         .where(eq(pricingRulesTable.pitchId, booking.pitchId));
 
-      const pricePerHour = pricingRules[0]?.pricePerHour ?? null;
-      const subtotal =
+      const rule = pricingRules[0];
+      const pricePerHour = rule?.pricePerHour ?? null;
+      const subtotalNum =
         pricePerHour != null
-          ? ((parseFloat(pricePerHour) * pitchRow.slotDurationMinutes) / 60).toFixed(2)
-          : "0.00";
+          ? (parseFloat(pricePerHour) * pitchRow.slotDurationMinutes) / 60
+          : 0;
+      const subtotal = subtotalNum.toFixed(2);
+
+      // Compute deposit amount from venue pricing rule config (not a hardcoded %)
+      let depositAmountOverride: string | undefined;
+      if (paymentType === "DEPOSIT") {
+        if (!rule || rule.depositType === "NONE") {
+          res.status(400).json({ error: "Deposit payments are not configured for this venue" });
+          return;
+        }
+        if (rule.depositType === "FIXED" && rule.depositAmount) {
+          depositAmountOverride = parseFloat(rule.depositAmount).toFixed(2);
+        } else if (rule.depositType === "PERCENT" && rule.depositAmount) {
+          const pct = parseFloat(rule.depositAmount) / 100;
+          depositAmountOverride = (subtotalNum * pct).toFixed(2);
+        }
+        if (!depositAmountOverride) {
+          res.status(400).json({ error: "Invalid deposit configuration for this pitch" });
+          return;
+        }
+      }
 
       // Create payment intent via MockPaymentProvider
       const intent = await paymentProvider.createPaymentIntent({
@@ -155,6 +185,7 @@ router.post<{ bookingId: string }>(
         subtotalAmount: subtotal,
         paymentType,
         idempotencyKey: effectiveKey,
+        depositAmountOverride,
       });
 
       // Confirm payment (always succeeds in Mock)
