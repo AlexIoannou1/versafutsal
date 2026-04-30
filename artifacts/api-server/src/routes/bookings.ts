@@ -698,16 +698,18 @@ router.post<{ id: string }>(
         return;
       }
 
-      // ── Policy check (player only — owners can always cancel) ─────────────
-      if (actorRole === "PLAYER") {
-        const snapshot = booking.policySnapshot as {
-          cancellationWindowHours?: number;
-        };
-        const windowHours = snapshot?.cancellationWindowHours ?? 24;
-        const hoursUntilStart =
-          (booking.startAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      // ── Policy check: determine cancellation eligibility and refund eligibility ─
+      const snapshot = booking.policySnapshot as {
+        cancellationWindowHours?: number;
+      };
+      const windowHours = snapshot?.cancellationWindowHours ?? 24;
+      const hoursUntilStart =
+        (booking.startAt.getTime() - Date.now()) / (1000 * 60 * 60);
+      const withinWindow = hoursUntilStart >= windowHours;
 
-        if (hoursUntilStart < windowHours) {
+      if (actorRole === "PLAYER") {
+        // Players must be within the cancellation window to cancel
+        if (!withinWindow) {
           res.status(400).json({
             error: `Cancellation is only allowed up to ${windowHours} hours before the booking. Your booking starts in ${hoursUntilStart.toFixed(1)} hours.`,
             code: "OUTSIDE_CANCELLATION_WINDOW",
@@ -715,6 +717,9 @@ router.post<{ id: string }>(
           return;
         }
       }
+      // Owners can always cancel, but refund eligibility is still policy-driven:
+      // refund is only issued if the booking is still within the cancellation window.
+      const refundEligible = withinWindow;
 
       // ── Find succeeded payment (if any) ───────────────────────────────────
       const [payment] = await db
@@ -730,7 +735,7 @@ router.post<{ id: string }>(
 
       // ── Call payment provider first (outside tx — always-succeed in mock) ──
       let refundId: string | null = null;
-      if (payment) {
+      if (payment && refundEligible) {
         const refundResult = await paymentProvider.refundPayment({
           providerPaymentId: payment.providerPaymentId!,
           amount: payment.amount,
@@ -744,19 +749,22 @@ router.post<{ id: string }>(
       }
 
       // ── Atomic transaction: cancel booking + refund record + audit ─────────
+      // Booking status: REFUNDED if a refund was issued, otherwise CANCELLED
+      const finalStatus: "CANCELLED" | "REFUNDED" =
+        payment && refundEligible ? "REFUNDED" : "CANCELLED";
+
       await db.transaction(async (tx) => {
-        // Cancel booking
         await tx
           .update(bookingsTable)
           .set({
-            status: "CANCELLED",
+            status: finalStatus,
             cancellationReason: reason ?? null,
             updatedAt: new Date(),
           })
           .where(eq(bookingsTable.id, bookingId));
 
-        if (payment) {
-          // Insert refund record (payment status already updated by provider above)
+        if (payment && refundEligible) {
+          // Insert refund record
           await tx.insert(refundsTable).values({
             paymentId: payment.id,
             amount: payment.amount,
@@ -765,13 +773,13 @@ router.post<{ id: string }>(
             processedAt: new Date(),
           });
 
-          // Write audit log: BOOKING_CANCELLED + REFUND_ISSUED
+          // Audit: BOOKING_REFUNDED + REFUND_ISSUED
           await tx.insert(auditLogTable).values([
             {
               actorUserId: actorId,
               entityType: "BOOKING",
               entityId: bookingId,
-              action: "BOOKING_CANCELLED",
+              action: "BOOKING_REFUNDED",
               metadata: { reason: reason ?? null, cancelledBy: actorRole },
             },
             {
@@ -787,13 +795,18 @@ router.post<{ id: string }>(
             },
           ]);
         } else {
-          // No payment — just log the cancellation
+          // Cancelled without refund (either no payment, or outside window)
           await tx.insert(auditLogTable).values({
             actorUserId: actorId,
             entityType: "BOOKING",
             entityId: bookingId,
             action: "BOOKING_CANCELLED",
-            metadata: { reason: reason ?? null, cancelledBy: actorRole, noPayment: true },
+            metadata: {
+              reason: reason ?? null,
+              cancelledBy: actorRole,
+              noRefund: !payment || !refundEligible,
+              outsideWindow: !withinWindow,
+            },
           });
         }
       });
@@ -801,17 +814,21 @@ router.post<{ id: string }>(
       res.json({
         booking: {
           id: bookingId,
-          status: "CANCELLED",
+          status: finalStatus,
           cancellationReason: reason ?? null,
         },
-        refund: payment
-          ? {
-              refundId,
-              amount: payment.amount,
-              currency: payment.currency,
-              status: "SUCCEEDED",
-            }
-          : null,
+        refund:
+          payment && refundEligible
+            ? {
+                refundId,
+                amount: payment.amount,
+                currency: payment.currency,
+                status: "SUCCEEDED",
+              }
+            : null,
+        refundEligible,
+        windowHours,
+        hoursUntilStart: parseFloat(hoursUntilStart.toFixed(2)),
       });
     } catch (err) {
       console.error("POST /bookings/:id/cancel error:", err);

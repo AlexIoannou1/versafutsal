@@ -319,12 +319,15 @@ router.post<{ id: string }>(
         refundId = result.refundId;
       }
 
-      // Atomic transaction: cancel booking + refund record + audit log
+      // Atomic transaction: update booking + refund record + audit log
+      // Booking status: REFUNDED if payment was refunded, CANCELLED if no payment
+      const finalStatus: "CANCELLED" | "REFUNDED" = payment ? "REFUNDED" : "CANCELLED";
+
       await db.transaction(async (tx) => {
         await tx
           .update(bookingsTable)
           .set({
-            status: "CANCELLED",
+            status: finalStatus,
             cancellationReason: reason ?? "Admin force-refund",
             updatedAt: new Date(),
           })
@@ -344,7 +347,7 @@ router.post<{ id: string }>(
               actorUserId: req.user!.userId,
               entityType: "BOOKING",
               entityId: bookingId,
-              action: "BOOKING_CANCELLED",
+              action: "BOOKING_REFUNDED",
               metadata: { reason: reason ?? "Admin force-refund", cancelledBy: "ADMIN" },
             },
             {
@@ -378,7 +381,7 @@ router.post<{ id: string }>(
       res.json({
         booking: {
           id: bookingId,
-          status: "CANCELLED",
+          status: finalStatus,
           cancellationReason: reason ?? "Admin force-refund",
         },
         refund: payment

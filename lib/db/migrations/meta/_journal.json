@@ -15,6 +15,13 @@
       "when": 1777540540375,
       "tag": "0001_huge_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777543270236,
+      "tag": "0002_new_red_wolf",
+      "breakpoints": true
     }
   ]
 }
