@@ -285,14 +285,14 @@ router.post<{ id: string }>(
         return;
       }
 
-      if (booking.status === "REFUNDED" || booking.status === "CANCELLED") {
-        res.status(400).json({
-          error: `Booking is already ${booking.status.toLowerCase()}`,
-        });
+      // Only block if already fully refunded — CANCELLED bookings are refundable
+      // by admin (e.g. owner cancelled outside window, no auto-refund was issued)
+      if (booking.status === "REFUNDED") {
+        res.status(400).json({ error: "Booking has already been refunded." });
         return;
       }
 
-      // Find succeeded payment
+      // Find a payment that can still be refunded (SUCCEEDED = not yet refunded)
       const [payment] = await db
         .select()
         .from(paymentsTable)
@@ -304,93 +304,88 @@ router.post<{ id: string }>(
         )
         .limit(1);
 
+      // If there's no refundable payment, there's nothing to refund
+      if (!payment) {
+        res.status(400).json({
+          error: "No refundable payment found for this booking. It may have no payment or was already refunded.",
+        });
+        return;
+      }
+
       // Call payment provider refund (outside tx).
       // The mock provider always succeeds and does not write to DB, so calling it
       // before the transaction is safe for development. For a real provider, use
       // an idempotency key + outbox/compensation pattern.
       let refundId: string | null = null;
-      if (payment) {
-        const result = await paymentProvider.refundPayment({
-          providerPaymentId: payment.providerPaymentId!,
-          amount: payment.amount,
-          reason: reason ?? "Admin force-refund",
-        });
-        if (!result.success) {
-          res.status(502).json({ error: "Refund processing failed" });
-          return;
-        }
-        refundId = result.refundId;
+      // payment is guaranteed non-null at this point (we return early above if null)
+      const result = await paymentProvider.refundPayment({
+        providerPaymentId: payment.providerPaymentId!,
+        amount: payment.amount,
+        reason: reason ?? "Admin force-refund",
+      });
+      if (!result.success) {
+        res.status(502).json({ error: "Refund processing failed" });
+        return;
       }
+      refundId = result.refundId;
 
-      // Atomic transaction: update booking + refund record + audit log
-      // Booking status: REFUNDED if payment was refunded, CANCELLED if no payment
-      const finalStatus: "CANCELLED" | "REFUNDED" = payment ? "REFUNDED" : "CANCELLED";
-
+      // Atomic transaction: update booking + payment + refund record + audit log
       await db.transaction(async (tx) => {
+        // Admin force-refund always sets booking to REFUNDED
         await tx
           .update(bookingsTable)
           .set({
-            status: finalStatus,
+            status: "REFUNDED",
             cancellationReason: reason ?? "Admin force-refund",
             updatedAt: new Date(),
           })
           .where(eq(bookingsTable.id, bookingId));
 
-        if (payment) {
-          // Mark payment as refunded atomically with booking/refund/audit writes
-          await tx
-            .update(paymentsTable)
-            .set({ status: "REFUNDED", updatedAt: new Date() })
-            .where(eq(paymentsTable.id, payment.id));
+        // Mark payment as refunded atomically
+        await tx
+          .update(paymentsTable)
+          .set({ status: "REFUNDED", updatedAt: new Date() })
+          .where(eq(paymentsTable.id, payment.id));
 
-          await tx.insert(refundsTable).values({
-            paymentId: payment.id,
-            amount: payment.amount,
-            status: "SUCCEEDED",
-            reason: reason ?? "Admin force-refund",
-            processedAt: new Date(),
-          });
+        await tx.insert(refundsTable).values({
+          paymentId: payment.id,
+          amount: payment.amount,
+          status: "SUCCEEDED",
+          reason: reason ?? "Admin force-refund",
+          processedAt: new Date(),
+        });
 
-          await tx.insert(auditLogTable).values([
-            {
-              actorUserId: req.user!.userId,
-              entityType: "BOOKING",
-              entityId: bookingId,
-              action: "BOOKING_REFUNDED",
-              metadata: { reason: reason ?? "Admin force-refund", cancelledBy: "ADMIN" },
-            },
-            {
-              actorUserId: req.user!.userId,
-              entityType: "PAYMENT",
-              entityId: payment.id,
-              action: "ADMIN_REFUND_ISSUED",
-              metadata: {
-                refundId,
-                amount: payment.amount,
-                providerPaymentId: payment.providerPaymentId,
-                adminId: req.user!.userId,
-              },
-            },
-          ]);
-        } else {
-          await tx.insert(auditLogTable).values({
+        await tx.insert(auditLogTable).values([
+          {
             actorUserId: req.user!.userId,
             entityType: "BOOKING",
             entityId: bookingId,
-            action: "BOOKING_CANCELLED",
+            action: "BOOKING_REFUNDED",
             metadata: {
               reason: reason ?? "Admin force-refund",
               cancelledBy: "ADMIN",
-              noPayment: true,
+              previousStatus: booking.status,
             },
-          });
-        }
+          },
+          {
+            actorUserId: req.user!.userId,
+            entityType: "PAYMENT",
+            entityId: payment.id,
+            action: "ADMIN_REFUND_ISSUED",
+            metadata: {
+              refundId,
+              amount: payment.amount,
+              providerPaymentId: payment.providerPaymentId,
+              adminId: req.user!.userId,
+            },
+          },
+        ]);
       });
 
       res.json({
         booking: {
           id: bookingId,
-          status: finalStatus,
+          status: "REFUNDED",
           cancellationReason: reason ?? "Admin force-refund",
         },
         refund: payment

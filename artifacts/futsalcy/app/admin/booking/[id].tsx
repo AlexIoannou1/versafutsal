@@ -300,7 +300,9 @@ export default function AdminBookingDetailScreen() {
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
 
-  const canRefund = booking.status !== "REFUNDED" && booking.status !== "CANCELLED";
+  // Admin can refund any booking with a refundable payment — including CANCELLED ones
+  // (e.g. owner cancelled outside window, auto-refund not issued). Only block REFUNDED.
+  const canRefund = booking.status !== "REFUNDED";
 
   async function handleConfirmRefund() {
     if (!id) return;
@@ -421,7 +423,7 @@ export default function AdminBookingDetailScreen() {
 
         {!canRefund && (
           <Text style={s.alreadyNote}>
-            This booking has already been {booking.status.toLowerCase()}.
+            This booking has already been refunded.
           </Text>
         )}
 
