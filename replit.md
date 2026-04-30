@@ -61,7 +61,7 @@ MockPaymentProvider: `api-server/src/lib/payment-provider.ts` — always succeed
 Notifications helper: `api-server/src/lib/notifications.ts` — in-app + Expo push (non-fatal)
 
 ### Cancellation & Refund API Endpoints (Task #5)
-- `POST /api/bookings/:id/cancel` — player cancel (enforces cancellationWindowHours from policySnapshot); owner cancel (no window restriction); issues refund via MockPaymentProvider, inserts refund record + audit log
+- `POST /api/bookings/:id/cancel` — player and owner cancel (both enforce cancellationWindowHours from policySnapshot); owner must also supply a reason; issues refund when payment exists and within window; inserts refund record + audit log
 - `GET /api/owner/bookings/:id` — single booking detail for owner (with player/venue/pitch)
 - `GET /api/owner/bookings?from=&to=&pitchId=` — owner bookings with date/pitch filters
 - `GET /api/admin/bookings` — list all bookings platform-wide (admin only, sortable by from/to/status)
