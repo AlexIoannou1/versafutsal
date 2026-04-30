@@ -1,0 +1,152 @@
+You are a senior full-stack engineer building a production-ready mobile MVP for a Cyprus futsal booking platform.
+
+Product name
+FutsalCY (working name)
+
+App structure (important)
+This is ONE mobile app (React Native + Expo).
+On first open (and any time before login), the user must choose:
+
+Continue as Player
+Continue as Venue Owner
+(Hidden/secondary) Admin Login (e.g., small link on the login screen)
+After the user chooses Player vs Venue Owner, the authentication screens are the same (email/password), but once logged in the navigation stack and available views must change based on the chosen role + the user’s actual role returned by the backend.
+
+Rules:
+
+If a user logs in as an account whose backend role does not match the selected mode, show an error and offer to switch mode.
+Persist the last selected mode locally (so next app open remembers Player vs Owner).
+Goal
+Build an MVP I can demo to futsal venues in Cyprus and run a pilot with 2–3 venues. The wedge is venue operations: live availability, bookings, deposit/full payments, cancellations/refunds basics, owner calendar, and settlement reporting. Everything else (matchmaking, teams, stats, tournaments/birthday parties) is secondary and must NOT block MVP completion.
+
+Roles (RBAC)
+Backend roles:
+
+PLAYER
+VENUE_OWNER
+ADMIN
+Core monetization (must implement)
+Charge €1 convenience fee per completed booking, paid on the player side.
+Fee must be shown clearly during checkout (no surprise at the last step).
+For pilots, support an admin-controlled fee waiver (feature flag/promo) globally and per venue.
+Non-goals for MVP (explicitly out of scope)
+Do not implement (placeholders only):
+
+matchmaking
+public matches
+teams
+player stats
+tournaments / birthday party management
+Tech Stack Requirements
+Mobile app
+React Native with Expo (TypeScript)
+Navigation: React Navigation
+State: simple (React Query + Context) preferred
+Forms: React Hook Form
+UI: clean/premium (use a consistent component library or build a small design system)
+Backend
+Node.js (TypeScript) using Express (or NestJS if you prefer)
+PostgreSQL
+Prisma ORM
+Auth: email/password + JWT (secure password hashing)
+Payments: Stripe preferred. If Stripe is too heavy for MVP, implement a MockPaymentProvider with identical states so Stripe can be swapped in later without refactors.
+MVP Feature Requirements
+Player mode (mobile views)
+Venue discovery
+List venues with: name, district/city, address/area, photos, amenities, indoor/outdoor, pitch sizes, price range
+Search + filters: district/city, indoor/outdoor, price, availability by date
+Venue details
+Photos carousel
+Map link
+Amenities
+Pitches list (size/type)
+Opening hours summary
+“Book now” CTA
+Live availability + booking flow (must be correct)
+Player selects: venue → pitch → date → start time (slot duration configurable per venue; default 60 mins)
+Show real-time availability per pitch
+Prevent double booking under concurrency (DB-level protection)
+Payments
+Venue-configurable:
+
+deposit (fixed amount or percentage)
+full payment
+Checkout must show:
+
+pitch subtotal
+platform fee: €1
+total due now
+cancellation policy summary
+After payment:
+
+booking confirmed
+confirmation + reminder notifications (push/in-app)
+Venue Owner mode (mobile views)
+Owners can:
+
+Create/manage one or more venues (admin approval required before public listing)
+Add/manage pitches (name, size/type, indoor/outdoor)
+Configure:
+opening hours per day
+slot duration
+pricing rules (MVP: per pitch price/hour + weekday/weekend)
+deposit rules
+cancellation window
+Booking management:
+owner calendar (day/week)
+booking list
+booking detail
+cancel booking (policy + refund workflow)
+Admin (mobile, minimal but functional)
+Approve/reject venues
+View bookings/payments/refunds
+Issue refunds (basic)
+Manage fee waiver:
+global on/off
+per-venue override
+Basic user list
+Cancellations / Refunds (MVP)
+Venue-configurable cancellation window (free cancel until X hours before)
+If cancellation allowed and payment collected:
+create refund record + mark booking refunded
+process Stripe refund or mock refund
+Create audit log entries for booking/payment status changes
+Settlement Reporting (Owner finance)
+Owner needs:
+
+gross booking revenue (pitch price)
+platform fees collected (€1 each unless waived)
+refunds
+net owed to venue
+export/share CSV
+Data Model (Minimum Tables)
+users (id, role, email, passwordHash, createdAt)
+venues (id, ownerId, status pending/approved/rejected, name, district, address, geo?, amenities, createdAt)
+venue_photos (id, venueId, url)
+pitches (id, venueId, name, size, indoorOutdoor)
+opening_hours (venueId, dayOfWeek, openTime, closeTime)
+pricing_rules (pitchId, dayType/weekdayRange, pricePerHour)
+bookings (id, venueId, pitchId, playerId, startAt, endAt, status, policySnapshot, createdAt)
+payments (id, bookingId, provider, amount, currency, status, feeAmount=1.00, createdAt)
+refunds (id, paymentId, amount, status, createdAt)
+admin_settings (feeEnabled, feeAmount, perVenueOverrides)
+audit_log (actorUserId, entityType, entityId, action, metadata, createdAt)
+Concurrency / Correctness (Non-negotiable)
+Booking must be concurrency-safe.
+MVP acceptable approach: slot-based booking only + unique constraint (pitchId, startAt).
+Booking confirmation must be idempotent (no duplicates on retries).
+Deliverables
+Expo app (single app) with Player/Owner mode selection at start and role-based nav stacks
+Backend API + Prisma schema + migrations
+Seed script with demo data (2 venues, 3–6 pitches, hours/pricing, seeded accounts)
+README with run instructions + seeded credentials
+Build Order (Must follow)
+Monorepo scaffold: mobile + backend + Prisma/Postgres + auth
+Mode selection screen + auth + RBAC enforcement
+Venue onboarding + admin approval
+Availability engine + booking creation (no payments yet)
+Payments (deposit/full) + €1 fee + fee waiver + confirmation notifications
+Owner calendar + cancellations + refunds + audit log
+Settlement reporting + CSV export
+UI polish + demo seed
+Start by scaffolding and implementing schema + seed data, then build features strictly in the build order above.
