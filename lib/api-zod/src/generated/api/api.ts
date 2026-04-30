@@ -844,6 +844,22 @@ export const CancelBookingResponse = zod.object({
       status: zod.enum(["SUCCEEDED", "FAILED", "PENDING"]),
     })
     .nullish(),
+  refundEligible: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the booking was within the cancellation window and eligible for a refund.",
+    ),
+  windowHours: zod
+    .number()
+    .optional()
+    .describe("The cancellation window in hours that applied to this booking."),
+  hoursUntilStart: zod
+    .number()
+    .optional()
+    .describe(
+      "Hours remaining until the booking start at the time of cancellation.",
+    ),
 });
 
 /**
@@ -1111,6 +1127,22 @@ export const AdminRefundBookingResponse = zod.object({
       status: zod.enum(["SUCCEEDED", "FAILED", "PENDING"]),
     })
     .nullish(),
+  refundEligible: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Whether the booking was within the cancellation window and eligible for a refund.",
+    ),
+  windowHours: zod
+    .number()
+    .optional()
+    .describe("The cancellation window in hours that applied to this booking."),
+  hoursUntilStart: zod
+    .number()
+    .optional()
+    .describe(
+      "Hours remaining until the booking start at the time of cancellation.",
+    ),
 });
 
 /**

@@ -369,6 +369,12 @@ export type CancelBookingResponseBooking = {
 export interface CancelBookingResponse {
   booking: CancelBookingResponseBooking;
   refund?: RefundResult | null;
+  /** Whether the booking was within the cancellation window and eligible for a refund. */
+  refundEligible?: boolean;
+  /** The cancellation window in hours that applied to this booking. */
+  windowHours?: number;
+  /** Hours remaining until the booking start at the time of cancellation. */
+  hoursUntilStart?: number;
 }
 
 export interface CheckoutFeeResponse {
