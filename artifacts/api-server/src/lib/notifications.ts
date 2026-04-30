@@ -4,7 +4,7 @@ import {
   usersTable,
   type Notification,
 } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 
 type NotifType =
   | "BOOKING_CONFIRMED"
@@ -76,6 +76,48 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
         .where(eq(notificationsTable.id, inserted.id));
     }
   }
+}
+
+// ─── Reminder Dispatcher ──────────────────────────────────────────────────────
+// Polls every minute for scheduled notification rows whose scheduledAt has
+// passed and haven't been delivered yet. Sends Expo push and marks pushSent.
+
+export function startReminderDispatcher(intervalMs = 60_000): NodeJS.Timeout {
+  return setInterval(async () => {
+    try {
+      const now = new Date();
+      const dueRows = await db
+        .select({
+          notif: notificationsTable,
+          pushToken: usersTable.pushToken,
+        })
+        .from(notificationsTable)
+        .innerJoin(usersTable, eq(notificationsTable.userId, usersTable.id))
+        .where(
+          and(
+            eq(notificationsTable.pushSent, false),
+            isNotNull(notificationsTable.scheduledAt),
+            lte(notificationsTable.scheduledAt, now),
+          ),
+        )
+        .limit(50);
+
+      for (const row of dueRows) {
+        if (row.pushToken) {
+          await sendExpoPush(row.pushToken, row.notif.title, row.notif.body, {
+            type: row.notif.type,
+            entityId: row.notif.entityId ?? "",
+          });
+        }
+        await db
+          .update(notificationsTable)
+          .set({ pushSent: true })
+          .where(eq(notificationsTable.id, row.notif.id));
+      }
+    } catch (err) {
+      console.warn("Reminder dispatcher error (non-fatal):", err);
+    }
+  }, intervalMs);
 }
 
 export async function sendBookingConfirmedNotifications(opts: {

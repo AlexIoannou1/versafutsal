@@ -50,21 +50,34 @@ router.post<{ bookingId: string }>(
 
       // Idempotency: if a payment already exists with this key and is SUCCEEDED, return 200
       const effectiveKey = idempotencyKey ?? `${bookingId}:${paymentType}:${req.user!.userId}`;
+
+      // Idempotency: scope the lookup to THIS booking + key to prevent cross-booking leakage
       const [existingPayment] = await db
         .select()
         .from(paymentsTable)
-        .where(eq(paymentsTable.idempotencyKey, effectiveKey))
+        .where(
+          and(
+            eq(paymentsTable.idempotencyKey, effectiveKey),
+            eq(paymentsTable.bookingId, bookingId),
+          ),
+        )
         .limit(1);
 
       if (existingPayment) {
-        // An existing payment record for this idempotency key exists.
+        // An existing payment record for this booking + key exists.
         // Return a deterministic response regardless of status to avoid
         // hitting the DB unique constraint on a second insert attempt.
         if (existingPayment.status === "SUCCEEDED") {
+          // Fetch booking with player ownership check to prevent cross-user data exposure
           const [alreadyBooking] = await db
             .select()
             .from(bookingsTable)
-            .where(eq(bookingsTable.id, bookingId))
+            .where(
+              and(
+                eq(bookingsTable.id, bookingId),
+                eq(bookingsTable.playerId, req.user!.userId),
+              ),
+            )
             .limit(1);
 
           res.json({
@@ -178,15 +191,79 @@ router.post<{ bookingId: string }>(
         }
       }
 
-      // Create payment intent via MockPaymentProvider
-      const intent = await paymentProvider.createPaymentIntent({
-        bookingId,
-        venueId: pitchRow.venueId,
-        subtotalAmount: subtotal,
-        paymentType,
-        idempotencyKey: effectiveKey,
-        depositAmountOverride,
-      });
+      // Create payment intent via MockPaymentProvider (race-safe)
+      // If a concurrent request inserted the same idempotency key, the unique constraint
+      // will fire. Catch it, re-read the winning payment, and return a deterministic response.
+      let intent: Awaited<ReturnType<typeof paymentProvider.createPaymentIntent>>;
+      try {
+        intent = await paymentProvider.createPaymentIntent({
+          bookingId,
+          venueId: pitchRow.venueId,
+          subtotalAmount: subtotal,
+          paymentType,
+          idempotencyKey: effectiveKey,
+          depositAmountOverride,
+        });
+      } catch (insertErr: unknown) {
+        const pgCode =
+          (insertErr as { cause?: { code?: string } })?.cause?.code ??
+          (insertErr as { code?: string })?.code;
+        if (pgCode === "23505") {
+          const [racePayment] = await db
+            .select()
+            .from(paymentsTable)
+            .where(
+              and(
+                eq(paymentsTable.idempotencyKey, effectiveKey),
+                eq(paymentsTable.bookingId, bookingId),
+              ),
+            )
+            .limit(1);
+          if (racePayment?.status === "SUCCEEDED") {
+            const [raceBooking] = await db
+              .select()
+              .from(bookingsTable)
+              .where(
+                and(
+                  eq(bookingsTable.id, bookingId),
+                  eq(bookingsTable.playerId, req.user!.userId),
+                ),
+              )
+              .limit(1);
+            res.json({
+              alreadyProcessed: true,
+              booking: raceBooking
+                ? {
+                    id: raceBooking.id,
+                    status: raceBooking.status,
+                    startAt: raceBooking.startAt.toISOString(),
+                    endAt: raceBooking.endAt.toISOString(),
+                  }
+                : { id: bookingId, status: "CONFIRMED" },
+              payment: {
+                id: racePayment.id,
+                amount: racePayment.amount,
+                feeAmount: racePayment.feeAmount,
+                feeWaived: racePayment.feeWaived,
+                paymentType: racePayment.paymentType,
+                currency: racePayment.currency,
+                status: racePayment.status,
+                provider: racePayment.provider,
+                createdAt: racePayment.createdAt.toISOString(),
+                updatedAt: racePayment.updatedAt.toISOString(),
+              },
+            });
+          } else {
+            res.status(409).json({
+              error: racePayment
+                ? `A payment with this idempotency key already exists with status: ${racePayment.status}. Use a new idempotency key to retry.`
+                : "Concurrent payment conflict. Use a new idempotency key to retry.",
+            });
+          }
+          return;
+        }
+        throw insertErr;
+      }
 
       // Confirm payment (always succeeds in Mock)
       const confirmation = await paymentProvider.confirmPayment(intent.providerPaymentId);
