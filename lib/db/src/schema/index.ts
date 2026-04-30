@@ -3,3 +3,4 @@ export * from "./venues";
 export * from "./bookings";
 export * from "./payments";
 export * from "./admin";
+export * from "./notifications";

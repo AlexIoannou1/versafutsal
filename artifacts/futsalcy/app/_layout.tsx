@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { setBaseUrl } from "@workspace/api-client-react";
 
 // Set API base URL for Expo (mobile needs absolute URL)
@@ -30,6 +31,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const colors = useColors();
+  usePushNotifications();
   return (
     <Stack
       screenOptions={{

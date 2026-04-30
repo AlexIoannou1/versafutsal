@@ -1,0 +1,419 @@
+import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import {
+  bookingsTable,
+  paymentsTable,
+  pitchesTable,
+  venuesTable,
+  usersTable,
+  pricingRulesTable,
+  adminSettingsTable,
+  auditLogTable,
+} from "@workspace/db/schema";
+import { eq, and } from "drizzle-orm";
+import { requireAuth, requireRole } from "../middlewares/auth";
+import { paymentProvider } from "../lib/payment-provider";
+import { sendBookingConfirmedNotifications } from "../lib/notifications";
+import { randomUUID } from "crypto";
+
+const router: IRouter = Router();
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function getOrSeedAdminSettings() {
+  const [existing] = await db.select().from(adminSettingsTable).limit(1);
+  if (existing) return existing;
+
+  const [seeded] = await db.insert(adminSettingsTable).values({}).returning();
+  return seeded!;
+}
+
+// ─── POST /bookings/:bookingId/checkout ──────────────────────────────────────
+// Creates a MockPaymentIntent, confirms it, moves booking → CONFIRMED.
+
+router.post<{ bookingId: string }>(
+  "/bookings/:bookingId/checkout",
+  requireAuth,
+  requireRole("PLAYER"),
+  async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const { paymentType = "FULL", idempotencyKey } = req.body as {
+        paymentType?: "FULL" | "DEPOSIT";
+        idempotencyKey?: string;
+      };
+
+      if (paymentType !== "FULL" && paymentType !== "DEPOSIT") {
+        res.status(400).json({ error: "paymentType must be FULL or DEPOSIT" });
+        return;
+      }
+
+      // Idempotency: if a payment already exists with this key and is SUCCEEDED, return 200
+      const effectiveKey = idempotencyKey ?? `${bookingId}:${paymentType}:${req.user!.userId}`;
+      const [existingPayment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.idempotencyKey, effectiveKey))
+        .limit(1);
+
+      if (existingPayment?.status === "SUCCEEDED") {
+        res.json({
+          alreadyProcessed: true,
+          payment: {
+            ...existingPayment,
+            amount: existingPayment.amount,
+            feeAmount: existingPayment.feeAmount,
+            createdAt: existingPayment.createdAt.toISOString(),
+            updatedAt: existingPayment.updatedAt.toISOString(),
+          },
+        });
+        return;
+      }
+
+      // Fetch booking + pitch + venue
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(
+          and(
+            eq(bookingsTable.id, bookingId),
+            eq(bookingsTable.playerId, req.user!.userId),
+          ),
+        )
+        .limit(1);
+
+      if (!booking) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      if (booking.status === "CONFIRMED") {
+        res.status(409).json({ error: "Booking is already confirmed" });
+        return;
+      }
+
+      if (booking.status !== "PENDING") {
+        res.status(400).json({ error: `Booking cannot be checked out in status: ${booking.status}` });
+        return;
+      }
+
+      const [pitchRow] = await db
+        .select({
+          id: pitchesTable.id,
+          name: pitchesTable.name,
+          slotDurationMinutes: pitchesTable.slotDurationMinutes,
+          venueId: pitchesTable.venueId,
+          venueName: venuesTable.name,
+          venueOwnerId: venuesTable.ownerId,
+        })
+        .from(pitchesTable)
+        .innerJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+        .where(eq(pitchesTable.id, booking.pitchId))
+        .limit(1);
+
+      if (!pitchRow) {
+        res.status(404).json({ error: "Pitch not found" });
+        return;
+      }
+
+      // Calculate subtotal from pricing rules (or policy snapshot)
+      const pricingRules = await db
+        .select()
+        .from(pricingRulesTable)
+        .where(eq(pricingRulesTable.pitchId, booking.pitchId));
+
+      const pricePerHour = pricingRules[0]?.pricePerHour ?? null;
+      const subtotal =
+        pricePerHour != null
+          ? ((parseFloat(pricePerHour) * pitchRow.slotDurationMinutes) / 60).toFixed(2)
+          : "0.00";
+
+      // Create payment intent via MockPaymentProvider
+      const intent = await paymentProvider.createPaymentIntent({
+        bookingId,
+        venueId: pitchRow.venueId,
+        subtotalAmount: subtotal,
+        paymentType,
+        idempotencyKey: effectiveKey,
+      });
+
+      // Confirm payment (always succeeds in Mock)
+      const confirmation = await paymentProvider.confirmPayment(intent.providerPaymentId);
+
+      if (!confirmation.success) {
+        // Write audit log for failure
+        await db.insert(auditLogTable).values({
+          actorUserId: req.user!.userId,
+          entityType: "PAYMENT",
+          entityId: bookingId,
+          action: "PAYMENT_FAILED",
+          metadata: { error: confirmation.errorMessage ?? "Unknown error" },
+        });
+
+        res.status(402).json({ error: confirmation.errorMessage ?? "Payment failed" });
+        return;
+      }
+
+      // Update booking status → CONFIRMED inside a transaction
+      await db.transaction(async (tx) => {
+        await tx
+          .update(bookingsTable)
+          .set({ status: "CONFIRMED", updatedAt: new Date() })
+          .where(eq(bookingsTable.id, bookingId));
+
+        await tx.insert(auditLogTable).values([
+          {
+            actorUserId: req.user!.userId,
+            entityType: "PAYMENT",
+            entityId: bookingId,
+            action: "PAYMENT_CREATED",
+            metadata: {
+              providerPaymentId: intent.providerPaymentId,
+              amount: intent.amount,
+              feeAmount: intent.feeAmount,
+              feeWaived: intent.feeWaived,
+            },
+          },
+          {
+            actorUserId: req.user!.userId,
+            entityType: "BOOKING",
+            entityId: bookingId,
+            action: "BOOKING_CONFIRMED",
+            metadata: { via: "checkout" },
+          },
+        ]);
+      });
+
+      // Send notifications (non-fatal if it fails)
+      try {
+        const [player] = await db
+          .select({ id: usersTable.id, name: usersTable.name })
+          .from(usersTable)
+          .where(eq(usersTable.id, req.user!.userId))
+          .limit(1);
+
+        await sendBookingConfirmedNotifications({
+          bookingId,
+          playerId: req.user!.userId,
+          playerName: player?.name ?? "Player",
+          ownerId: pitchRow.venueOwnerId,
+          venueName: pitchRow.venueName,
+          pitchName: pitchRow.name,
+          startAt: booking.startAt,
+        });
+      } catch (notifErr) {
+        console.warn("Notification dispatch failed (non-fatal):", notifErr);
+      }
+
+      // Fetch updated payment record
+      const [payment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId))
+        .limit(1);
+
+      res.json({
+        booking: { id: bookingId, status: "CONFIRMED" },
+        payment: {
+          id: payment!.id,
+          amount: payment!.amount,
+          feeAmount: payment!.feeAmount,
+          feeWaived: payment!.feeWaived,
+          paymentType: payment!.paymentType,
+          currency: payment!.currency,
+          status: payment!.status,
+          provider: payment!.provider,
+          createdAt: payment!.createdAt.toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("POST /bookings/:bookingId/checkout error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─── GET /player/bookings/:id/payment ────────────────────────────────────────
+// Fetch the payment record for a booking
+
+router.get<{ bookingId: string }>(
+  "/bookings/:bookingId/payment",
+  requireAuth,
+  requireRole("PLAYER"),
+  async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+
+      const [booking] = await db
+        .select({ id: bookingsTable.id, playerId: bookingsTable.playerId })
+        .from(bookingsTable)
+        .where(
+          and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)),
+        )
+        .limit(1);
+
+      if (!booking) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const [payment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.bookingId, bookingId))
+        .limit(1);
+
+      if (!payment) {
+        res.status(404).json({ error: "No payment record for this booking" });
+        return;
+      }
+
+      res.json({
+        payment: {
+          id: payment.id,
+          amount: payment.amount,
+          feeAmount: payment.feeAmount,
+          feeWaived: payment.feeWaived,
+          paymentType: payment.paymentType,
+          currency: payment.currency,
+          status: payment.status,
+          provider: payment.provider,
+          createdAt: payment.createdAt.toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("GET /bookings/:bookingId/payment error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─── PATCH /auth/push-token ───────────────────────────────────────────────────
+// Store / update Expo push token for the authenticated user
+
+router.patch("/auth/push-token", requireAuth, async (req, res) => {
+  try {
+    const { pushToken } = req.body as { pushToken?: string };
+
+    if (!pushToken || typeof pushToken !== "string") {
+      res.status(400).json({ error: "pushToken is required" });
+      return;
+    }
+
+    await db
+      .update(usersTable)
+      .set({ pushToken, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user!.userId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("PATCH /auth/push-token error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /admin/settings ─────────────────────────────────────────────────────
+
+router.get("/admin/settings", requireAuth, requireRole("ADMIN"), async (_req, res) => {
+  try {
+    const settings = await getOrSeedAdminSettings();
+    res.json({ settings });
+  } catch (err) {
+    console.error("GET /admin/settings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /admin/settings ───────────────────────────────────────────────────
+
+router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { feeEnabled, feeAmount } = req.body as {
+      feeEnabled?: boolean;
+      feeAmount?: string;
+    };
+
+    const settings = await getOrSeedAdminSettings();
+
+    const updates: Partial<typeof adminSettingsTable.$inferSelect> = {
+      updatedAt: new Date(),
+    };
+    if (typeof feeEnabled === "boolean") updates.feeEnabled = feeEnabled;
+    if (feeAmount !== undefined) updates.feeAmount = feeAmount;
+
+    const [updated] = await db
+      .update(adminSettingsTable)
+      .set(updates)
+      .where(eq(adminSettingsTable.id, settings.id))
+      .returning();
+
+    res.json({ settings: updated });
+  } catch (err) {
+    console.error("PATCH /admin/settings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /admin/settings/venues/:venueId ───────────────────────────────────
+// Set or clear per-venue fee override
+
+router.patch<{ venueId: string }>(
+  "/admin/settings/venues/:venueId",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req, res) => {
+    try {
+      const { venueId } = req.params;
+      const { feeEnabled } = req.body as { feeEnabled?: boolean | null };
+
+      const settings = await getOrSeedAdminSettings();
+      const overrides = { ...(settings.perVenueOverrides ?? {}) };
+
+      if (feeEnabled === null || feeEnabled === undefined) {
+        delete overrides[venueId];
+      } else {
+        overrides[venueId] = feeEnabled;
+      }
+
+      const [updated] = await db
+        .update(adminSettingsTable)
+        .set({ perVenueOverrides: overrides, updatedAt: new Date() })
+        .where(eq(adminSettingsTable.id, settings.id))
+        .returning();
+
+      res.json({ settings: updated });
+    } catch (err) {
+      console.error("PATCH /admin/settings/venues/:venueId error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─── GET /admin/notifications ─────────────────────────────────────────────────
+// Preview: get current fee to display on checkout
+
+router.get("/checkout/fee", requireAuth, async (req, res) => {
+  try {
+    const { venueId } = req.query as { venueId?: string };
+
+    const settings = await getOrSeedAdminSettings();
+
+    let feeEnabled = settings.feeEnabled;
+    if (venueId) {
+      const overrides = (settings.perVenueOverrides ?? {}) as Record<string, boolean>;
+      if (Object.prototype.hasOwnProperty.call(overrides, venueId)) {
+        feeEnabled = overrides[venueId];
+      }
+    }
+
+    res.json({
+      feeEnabled,
+      feeAmount: feeEnabled ? settings.feeAmount : "0.00",
+    });
+  } catch (err) {
+    console.error("GET /checkout/fee error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+export default router;

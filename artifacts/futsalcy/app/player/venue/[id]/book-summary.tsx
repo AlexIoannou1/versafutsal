@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,12 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { useGetVenue, useCreateBooking } from "@workspace/api-client-react";
+import {
+  useGetVenue,
+  useCreateBooking,
+  useCheckoutBooking,
+  useGetCheckoutFee,
+} from "@workspace/api-client-react";
 
 const MONTHS_FULL = [
   "January","February","March","April","May","June",
@@ -34,6 +39,8 @@ function formatTime12(iso: string) {
   return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+type PaymentType = "FULL" | "DEPOSIT";
+
 export default function BookSummaryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -47,7 +54,14 @@ export default function BookSummaryScreen() {
     endAt: string;
   }>();
 
-  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [paymentType, setPaymentType] = useState<PaymentType>("FULL");
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Idempotency key generated once per render to prevent double-taps
+  const idempotencyKeyRef = useRef<string>(
+    `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   const decodedStartAt = startAt ? decodeURIComponent(String(startAt)) : "";
   const decodedEndAt = endAt ? decodeURIComponent(String(endAt)) : "";
@@ -56,27 +70,69 @@ export default function BookSummaryScreen() {
   const { data: venueData, isLoading: venueLoading } = useGetVenue(venueId!);
   const venue = venueData?.venue;
 
+  const { data: feeData } = useGetCheckoutFee(
+    { venueId: venueId! },
+    { query: { enabled: !!venueId } },
+  );
+
   const pitch = venue?.pitches?.find((p) => p.id === pitchId);
   const pricePerHour = pitch?.pricingRules?.[0]?.pricePerHour ?? null;
   const slotMinutes = parseInt(slotMins ?? "60", 10);
-  const totalPrice = pricePerHour != null ? (parseFloat(pricePerHour) * slotMinutes) / 60 : null;
+  const subtotal = pricePerHour != null ? (parseFloat(pricePerHour) * slotMinutes) / 60 : null;
 
-  const { mutate: createBooking, isPending: isBooking } = useCreateBooking();
+  const feeEnabled = feeData?.feeEnabled ?? true;
+  const feeAmount = feeEnabled ? parseFloat(feeData?.feeAmount ?? "1.00") : 0;
+  const feeLabel = feeEnabled ? `€${(feeAmount).toFixed(2)}` : "Waived";
 
-  function handleConfirmBooking() {
-    if (!pitchId || !decodedStartAt) return;
-    setBookingError(null);
+  const depositAmount = subtotal != null ? Math.max(1, subtotal * 0.3) : null;
+  const baseAmount = paymentType === "DEPOSIT" ? depositAmount : subtotal;
+  const totalDue = baseAmount != null ? baseAmount + feeAmount : null;
+
+  const { mutate: createBooking } = useCreateBooking();
+  const { mutate: checkoutBooking } = useCheckoutBooking();
+
+  function handlePayNow() {
+    if (!pitchId || !decodedStartAt || isProcessing) return;
+    setCheckoutError(null);
+    setIsProcessing(true);
+
+    // Step 1: Create PENDING booking
     createBooking(
       { data: { pitchId: pitchId!, startAt: decodedStartAt } },
       {
         onSuccess: (res) => {
-          router.replace(`/player/booking/${res.booking.id}`);
+          const bookingId = res.booking.id;
+
+          // Step 2: Checkout (creates payment intent + confirms)
+          checkoutBooking(
+            {
+              bookingId,
+              data: {
+                paymentType,
+                idempotencyKey: idempotencyKeyRef.current,
+              },
+            },
+            {
+              onSuccess: () => {
+                setIsProcessing(false);
+                router.replace(`/player/booking/${bookingId}`);
+              },
+              onError: (err: unknown) => {
+                setIsProcessing(false);
+                const msg =
+                  (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+                  "Payment failed. Please try again.";
+                setCheckoutError(msg);
+              },
+            },
+          );
         },
         onError: (err: unknown) => {
+          setIsProcessing(false);
           const msg =
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-            "Booking failed. Please try again.";
-          setBookingError(msg);
+            "Could not reserve slot. Please try again.";
+          setCheckoutError(msg);
         },
       },
     );
@@ -147,7 +203,7 @@ export default function BookSummaryScreen() {
       fontSize: 13,
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
-      width: 72,
+      width: 80,
     },
     rowValue: {
       fontSize: 14,
@@ -155,39 +211,105 @@ export default function BookSummaryScreen() {
       color: colors.foreground,
       flex: 1,
     },
-    priceCard: {
-      backgroundColor: colors.primary + "12",
+    // Price breakdown
+    breakdownCard: {
+      backgroundColor: colors.card,
       borderRadius: 12,
       marginHorizontal: 16,
       marginBottom: 12,
       borderWidth: 1,
-      borderColor: colors.primary + "40",
-      padding: 16,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      borderColor: colors.border,
+      overflow: "hidden",
     },
-    priceLabel: {
+    breakdownRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    breakdownRowFirst: { borderTopWidth: 0 },
+    breakdownLabel: {
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+    },
+    breakdownValue: {
       fontSize: 14,
       fontFamily: "Inter_500Medium",
       color: colors.foreground,
     },
-    priceSub: {
+    breakdownFeeWaived: {
       fontSize: 12,
+      fontFamily: "Inter_500Medium",
+      color: colors.primary,
+    },
+    totalRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: colors.primary + "40",
+      backgroundColor: colors.primary + "08",
+    },
+    totalLabel: {
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
+    },
+    totalValue: {
+      fontSize: 20,
+      fontFamily: "Inter_700Bold",
+      color: colors.primary,
+    },
+    // Payment type selector
+    selectorCard: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      gap: 8,
+    },
+    selectorLabel: {
+      fontSize: 11,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 2,
+    },
+    selectorRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    selectorBtn: {
+      flex: 1,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: colors.border,
+      padding: 12,
+      alignItems: "center",
+      backgroundColor: colors.card,
+    },
+    selectorBtnActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + "12",
+    },
+    selectorBtnTitle: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+    },
+    selectorBtnTitleActive: { color: colors.primary },
+    selectorBtnSub: {
+      fontSize: 11,
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
-    priceAmount: {
-      fontSize: 24,
-      fontFamily: "Inter_700Bold",
-      color: colors.primary,
-    },
-    priceCurrency: {
-      fontSize: 14,
-      fontFamily: "Inter_500Medium",
-      color: colors.primary,
-    },
+    // Policy
     disclaimerCard: {
       marginHorizontal: 16,
       marginBottom: 16,
@@ -202,6 +324,7 @@ export default function BookSummaryScreen() {
       flex: 1,
       lineHeight: 18,
     },
+    // Bottom bar
     bottomBar: {
       backgroundColor: colors.background,
       borderTopWidth: 1,
@@ -225,6 +348,7 @@ export default function BookSummaryScreen() {
       flexDirection: "row",
       gap: 8,
     },
+    primaryBtnDisabled: { opacity: 0.6 },
     primaryBtnText: {
       fontSize: 16,
       fontFamily: "Inter_600SemiBold",
@@ -255,39 +379,33 @@ export default function BookSummaryScreen() {
 
   return (
     <View style={s.container}>
-      <Stack.Screen options={{ title: "Review Booking", headerBackTitle: "Back" }} />
+      <Stack.Screen options={{ title: "Checkout", headerBackTitle: "Back" }} />
 
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={s.heroBanner}>
           <View style={s.heroIcon}>
-            <Feather name="calendar" size={28} color={colors.primary} />
+            <Feather name="credit-card" size={28} color={colors.primary} />
           </View>
-          <Text style={s.heroTitle}>Review your booking</Text>
-          <Text style={s.heroSub}>Check the details below before confirming.</Text>
+          <Text style={s.heroTitle}>Complete your booking</Text>
+          <Text style={s.heroSub}>Review and pay to confirm your slot.</Text>
         </View>
 
         {/* Venue Card */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Venue</Text>
           <View style={[s.row, s.rowFirst]}>
-            <View style={s.rowIcon}>
-              <Feather name="home" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="home" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Name</Text>
             <Text style={s.rowValue} numberOfLines={2}>{venue?.name ?? "—"}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}>
-              <Feather name="map-pin" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="map-pin" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>District</Text>
             <Text style={s.rowValue}>{venue?.district ?? "—"}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}>
-              <Feather name="navigation" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="navigation" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Address</Text>
             <Text style={s.rowValue} numberOfLines={2}>{venue?.address ?? "—"}</Text>
           </View>
@@ -297,23 +415,17 @@ export default function BookSummaryScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>Booking Details</Text>
           <View style={[s.row, s.rowFirst]}>
-            <View style={s.rowIcon}>
-              <Feather name="grid" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="grid" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Pitch</Text>
             <Text style={s.rowValue}>{decodedPitchName}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}>
-              <Feather name="calendar" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="calendar" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Date</Text>
             <Text style={s.rowValue}>{decodedStartAt ? formatFullDate(decodedStartAt) : "—"}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}>
-              <Feather name="clock" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="clock" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Time</Text>
             <Text style={s.rowValue}>
               {decodedStartAt && decodedEndAt
@@ -322,59 +434,95 @@ export default function BookSummaryScreen() {
             </Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}>
-              <Feather name="watch" size={14} color={colors.mutedForeground} />
-            </View>
+            <View style={s.rowIcon}><Feather name="watch" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Duration</Text>
             <Text style={s.rowValue}>{slotMinutes} minutes</Text>
           </View>
         </View>
 
+        {/* Payment Type Selector */}
+        {subtotal != null && (
+          <View style={s.selectorCard}>
+            <Text style={s.selectorLabel}>Payment Option</Text>
+            <View style={s.selectorRow}>
+              <TouchableOpacity
+                style={[s.selectorBtn, paymentType === "FULL" && s.selectorBtnActive]}
+                onPress={() => setPaymentType("FULL")}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.selectorBtnTitle, paymentType === "FULL" && s.selectorBtnTitleActive]}>
+                  Pay in Full
+                </Text>
+                <Text style={s.selectorBtnSub}>€{subtotal.toFixed(2)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.selectorBtn, paymentType === "DEPOSIT" && s.selectorBtnActive]}
+                onPress={() => setPaymentType("DEPOSIT")}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.selectorBtnTitle, paymentType === "DEPOSIT" && s.selectorBtnTitleActive]}>
+                  Pay Deposit
+                </Text>
+                <Text style={s.selectorBtnSub}>€{depositAmount!.toFixed(2)} (30%)</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Price Breakdown */}
-        <View style={s.priceCard}>
-          <View>
-            <Text style={s.priceLabel}>Total to pay</Text>
-            <Text style={s.priceSub}>
-              {pricePerHour != null
-                ? `€${pricePerHour}/hr × ${slotMinutes} min`
-                : "Pricing unavailable"}
+        <View style={s.breakdownCard}>
+          <Text style={s.cardTitle}>Price Breakdown</Text>
+          <View style={[s.breakdownRow, s.breakdownRowFirst]}>
+            <Text style={s.breakdownLabel}>
+              {paymentType === "DEPOSIT" ? "Deposit (30%)" : "Pitch subtotal"}
+            </Text>
+            <Text style={s.breakdownValue}>
+              {baseAmount != null ? `€${baseAmount.toFixed(2)}` : "—"}
             </Text>
           </View>
-          {totalPrice != null ? (
-            <Text style={s.priceAmount}>
-              <Text style={s.priceCurrency}>€</Text>
-              {totalPrice.toFixed(2)}
+          <View style={s.breakdownRow}>
+            <Text style={s.breakdownLabel}>Platform fee</Text>
+            {feeEnabled ? (
+              <Text style={s.breakdownValue}>{feeLabel}</Text>
+            ) : (
+              <Text style={s.breakdownFeeWaived}>Fee waived</Text>
+            )}
+          </View>
+          <View style={s.totalRow}>
+            <Text style={s.totalLabel}>Total due now</Text>
+            <Text style={s.totalValue}>
+              {totalDue != null ? `€${totalDue.toFixed(2)}` : "—"}
             </Text>
-          ) : (
-            <Text style={[s.priceAmount, { fontSize: 16 }]}>—</Text>
-          )}
+          </View>
         </View>
 
-        {/* Payment disclaimer */}
+        {/* Cancellation Policy */}
         <View style={s.disclaimerCard}>
-          <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+          <Feather name="shield" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
           <Text style={s.disclaimerText}>
-            Your booking will be reserved immediately. Payment is collected at the venue.
-            Cancellations made within {venue?.cancellationWindowHours ?? 48} hours of the booking may be non-refundable.
+            Secure payment via MockPaymentProvider. Cancellations made within{" "}
+            {venue?.cancellationWindowHours ?? 48} hours of the booking may incur a fee.
           </Text>
         </View>
       </ScrollView>
 
       {/* CTA */}
       <View style={s.bottomBar}>
-        {bookingError && <Text style={s.errorText}>{bookingError}</Text>}
+        {checkoutError && <Text style={s.errorText}>{checkoutError}</Text>}
         <TouchableOpacity
-          style={s.primaryBtn}
-          onPress={handleConfirmBooking}
-          disabled={isBooking}
+          style={[s.primaryBtn, isProcessing && s.primaryBtnDisabled]}
+          onPress={handlePayNow}
+          disabled={isProcessing}
           activeOpacity={0.85}
         >
-          {isBooking ? (
+          {isProcessing ? (
             <ActivityIndicator color={colors.primaryForeground} />
           ) : (
             <>
-              <Feather name="check-circle" size={20} color={colors.primaryForeground} />
-              <Text style={s.primaryBtnText}>Confirm & Book Slot</Text>
+              <Feather name="lock" size={18} color={colors.primaryForeground} />
+              <Text style={s.primaryBtnText}>
+                Pay Now {totalDue != null ? `· €${totalDue.toFixed(2)}` : ""}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -382,6 +530,7 @@ export default function BookSummaryScreen() {
           style={s.secondaryBtn}
           onPress={() => router.back()}
           activeOpacity={0.8}
+          disabled={isProcessing}
         >
           <Text style={s.secondaryBtnText}>Back to Slots</Text>
         </TouchableOpacity>

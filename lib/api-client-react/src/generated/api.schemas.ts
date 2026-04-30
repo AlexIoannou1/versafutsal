@@ -339,6 +339,97 @@ export interface CreateMaintenanceBlockRequest {
   reason?: string;
 }
 
+export interface CheckoutFeeResponse {
+  feeEnabled: boolean;
+  /** EUR amount string, e.g. "1.00" or "0.00" */
+  feeAmount: string;
+}
+
+export type CheckoutRequestPaymentType =
+  (typeof CheckoutRequestPaymentType)[keyof typeof CheckoutRequestPaymentType];
+
+export const CheckoutRequestPaymentType = {
+  FULL: "FULL",
+  DEPOSIT: "DEPOSIT",
+} as const;
+
+export interface CheckoutRequest {
+  paymentType: CheckoutRequestPaymentType;
+  idempotencyKey?: string | null;
+}
+
+export type PaymentRecordPaymentType =
+  (typeof PaymentRecordPaymentType)[keyof typeof PaymentRecordPaymentType];
+
+export const PaymentRecordPaymentType = {
+  FULL: "FULL",
+  DEPOSIT: "DEPOSIT",
+} as const;
+
+export type PaymentRecordStatus =
+  (typeof PaymentRecordStatus)[keyof typeof PaymentRecordStatus];
+
+export const PaymentRecordStatus = {
+  PENDING: "PENDING",
+  SUCCEEDED: "SUCCEEDED",
+  FAILED: "FAILED",
+  REFUNDED: "REFUNDED",
+  PARTIALLY_REFUNDED: "PARTIALLY_REFUNDED",
+} as const;
+
+export interface PaymentRecord {
+  id: string;
+  amount: string;
+  feeAmount: string;
+  feeWaived: boolean;
+  paymentType: PaymentRecordPaymentType;
+  currency: string;
+  status: PaymentRecordStatus;
+  provider: string;
+  createdAt: string;
+}
+
+export type CheckoutResponseBooking = {
+  id: string;
+  status: string;
+};
+
+export interface CheckoutResponse {
+  alreadyProcessed?: boolean;
+  booking: CheckoutResponseBooking;
+  payment: PaymentRecord;
+}
+
+export interface RegisterPushTokenRequest {
+  /** Expo push token, e.g. ExponentPushToken[...] */
+  pushToken: string;
+}
+
+/**
+ * Map of venueId to feeEnabled override
+ */
+export type AdminSettingsRecordPerVenueOverrides = { [key: string]: boolean };
+
+export interface AdminSettingsRecord {
+  id: string;
+  feeEnabled: boolean;
+  /** EUR amount string */
+  feeAmount: string;
+  /** Map of venueId to feeEnabled override */
+  perVenueOverrides: AdminSettingsRecordPerVenueOverrides;
+  updatedAt: string;
+}
+
+export interface UpdateAdminSettingsRequest {
+  feeEnabled?: boolean;
+  feeAmount?: string;
+}
+
+export interface VenueFeeOverrideRequest {
+  /** true = fee on, false = fee off, null = remove override */
+  feeEnabled?: boolean | null;
+}
+
 export type ListVenuesParams = {
   district?: string;
   type?: ListVenuesType;
@@ -469,4 +560,28 @@ export type ApproveVenue200 = {
 
 export type RejectVenue200 = {
   venue: VenueRecord;
+};
+
+export type GetCheckoutFeeParams = {
+  venueId?: string;
+};
+
+export type GetBookingPayment200 = {
+  payment: PaymentRecord;
+};
+
+export type RegisterPushToken200 = {
+  ok: boolean;
+};
+
+export type GetAdminSettings200 = {
+  settings: AdminSettingsRecord;
+};
+
+export type UpdateAdminSettings200 = {
+  settings: AdminSettingsRecord;
+};
+
+export type SetVenueFeeOverride200 = {
+  settings: AdminSettingsRecord;
 };

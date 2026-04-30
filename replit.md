@@ -47,6 +47,19 @@ Cyprus futsal booking platform (two-sided marketplace).
 - `lib/db/src/schema/` — Drizzle schema (users, venues, pitches, bookings, maintenanceBlocks, …)
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for codegen)
 
+### Payment & Notification API Endpoints (Task #4)
+- `POST /api/bookings/:bookingId/checkout` — confirm booking + charge €1 fee (idempotent, MockPaymentProvider)
+- `GET /api/checkout/fee` — get current platform fee for a venue (respects per-venue overrides)
+- `PATCH /api/auth/push-token` — register Expo push token for current user
+- `GET /api/admin/settings` — get global fee settings (ADMIN only)
+- `PATCH /api/admin/settings` — update `feeEnabled` / `feeAmount` (ADMIN only)
+- `PATCH /api/admin/settings/venues/:venueId` — set per-venue fee override (ADMIN only)
+
+Admin settings screen: `(admin)/index.tsx` — fee toggle, fee amount edit, per-venue override list  
+Push notification hook: `hooks/usePushNotifications.ts` — requests permission + registers token on login  
+MockPaymentProvider: `api-server/src/lib/payment-provider.ts` — always succeeds, mirrors Stripe interface  
+Notifications helper: `api-server/src/lib/notifications.ts` — in-app + Expo push (non-fatal)
+
 ### Booking API Endpoints (Task #3)
 - `GET /api/venues/:venueId/pitches/:pitchId/availability?date=YYYY-MM-DD` — slot grid (open hours - maintenance blocks - existing bookings)
 - `POST /api/bookings` — create booking (concurrency-safe via PG unique constraint `unique_pitch_slot`)

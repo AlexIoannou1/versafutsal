@@ -873,3 +873,159 @@ export const RejectVenueResponse = zod.object({
     updatedAt: zod.coerce.date(),
   }),
 });
+
+/**
+ * @summary Get current platform fee for a venue
+ */
+export const GetCheckoutFeeQueryParams = zod.object({
+  venueId: zod.coerce.string().uuid().optional(),
+});
+
+export const GetCheckoutFeeResponse = zod.object({
+  feeEnabled: zod.boolean(),
+  feeAmount: zod
+    .string()
+    .describe('EUR amount string, e.g. \"1.00\" or \"0.00\"'),
+});
+
+/**
+ * @summary Pay for a PENDING booking (MockPaymentProvider)
+ */
+export const CheckoutBookingParams = zod.object({
+  bookingId: zod.coerce.string().uuid(),
+});
+
+export const checkoutBookingBodyPaymentTypeDefault = `FULL`;
+
+export const CheckoutBookingBody = zod.object({
+  paymentType: zod
+    .enum(["FULL", "DEPOSIT"])
+    .default(checkoutBookingBodyPaymentTypeDefault),
+  idempotencyKey: zod.string().nullish(),
+});
+
+export const CheckoutBookingResponse = zod.object({
+  alreadyProcessed: zod.boolean().optional(),
+  booking: zod.object({
+    id: zod.string().uuid(),
+    status: zod.string(),
+  }),
+  payment: zod.object({
+    id: zod.string().uuid(),
+    amount: zod.string(),
+    feeAmount: zod.string(),
+    feeWaived: zod.boolean(),
+    paymentType: zod.enum(["FULL", "DEPOSIT"]),
+    currency: zod.string(),
+    status: zod.enum([
+      "PENDING",
+      "SUCCEEDED",
+      "FAILED",
+      "REFUNDED",
+      "PARTIALLY_REFUNDED",
+    ]),
+    provider: zod.string(),
+    createdAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Get the payment record for a booking
+ */
+export const GetBookingPaymentParams = zod.object({
+  bookingId: zod.coerce.string().uuid(),
+});
+
+export const GetBookingPaymentResponse = zod.object({
+  payment: zod.object({
+    id: zod.string().uuid(),
+    amount: zod.string(),
+    feeAmount: zod.string(),
+    feeWaived: zod.boolean(),
+    paymentType: zod.enum(["FULL", "DEPOSIT"]),
+    currency: zod.string(),
+    status: zod.enum([
+      "PENDING",
+      "SUCCEEDED",
+      "FAILED",
+      "REFUNDED",
+      "PARTIALLY_REFUNDED",
+    ]),
+    provider: zod.string(),
+    createdAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Register or update Expo push token for the current user
+ */
+export const RegisterPushTokenBody = zod.object({
+  pushToken: zod
+    .string()
+    .describe("Expo push token, e.g. ExponentPushToken[...]"),
+});
+
+export const RegisterPushTokenResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
+ * @summary Get global admin settings (fee, overrides)
+ */
+export const GetAdminSettingsResponse = zod.object({
+  settings: zod.object({
+    id: zod.string().uuid(),
+    feeEnabled: zod.boolean(),
+    feeAmount: zod.string().describe("EUR amount string"),
+    perVenueOverrides: zod
+      .record(zod.string(), zod.boolean())
+      .describe("Map of venueId to feeEnabled override"),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Update global fee settings
+ */
+export const UpdateAdminSettingsBody = zod.object({
+  feeEnabled: zod.boolean().optional(),
+  feeAmount: zod.string().optional(),
+});
+
+export const UpdateAdminSettingsResponse = zod.object({
+  settings: zod.object({
+    id: zod.string().uuid(),
+    feeEnabled: zod.boolean(),
+    feeAmount: zod.string().describe("EUR amount string"),
+    perVenueOverrides: zod
+      .record(zod.string(), zod.boolean())
+      .describe("Map of venueId to feeEnabled override"),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Set or clear per-venue fee override
+ */
+export const SetVenueFeeOverrideParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+});
+
+export const SetVenueFeeOverrideBody = zod.object({
+  feeEnabled: zod
+    .boolean()
+    .nullish()
+    .describe("true = fee on, false = fee off, null = remove override"),
+});
+
+export const SetVenueFeeOverrideResponse = zod.object({
+  settings: zod.object({
+    id: zod.string().uuid(),
+    feeEnabled: zod.boolean(),
+    feeAmount: zod.string().describe("EUR amount string"),
+    perVenueOverrides: zod
+      .record(zod.string(), zod.boolean())
+      .describe("Map of venueId to feeEnabled override"),
+    updatedAt: zod.coerce.date(),
+  }),
+});

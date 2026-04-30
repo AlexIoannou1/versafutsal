@@ -25,6 +25,9 @@ import type {
   ApiError,
   ApproveVenue200,
   AuthResponse,
+  CheckoutFeeResponse,
+  CheckoutRequest,
+  CheckoutResponse,
   CreateBooking201,
   CreateBookingRequest,
   CreateMaintenanceBlock201,
@@ -33,6 +36,9 @@ import type {
   CreatePitchRequest,
   CreateVenue201,
   CreateVenueRequest,
+  GetAdminSettings200,
+  GetBookingPayment200,
+  GetCheckoutFeeParams,
   GetOwnerVenue200,
   GetPitchAvailability200,
   GetPitchAvailabilityParams,
@@ -48,6 +54,8 @@ import type {
   ListVenuesParams,
   LoginRequest,
   MeResponse,
+  RegisterPushToken200,
+  RegisterPushTokenRequest,
   RegisterRequest,
   RejectVenue200,
   RejectVenueRequest,
@@ -55,11 +63,15 @@ import type {
   SetOpeningHoursRequest,
   SetPricingRules200,
   SetPricingRulesRequest,
+  SetVenueFeeOverride200,
   SubmitVenueForApproval200,
+  UpdateAdminSettings200,
+  UpdateAdminSettingsRequest,
   UpdatePitch200,
   UpdatePitchRequest,
   UpdateVenue200,
   UpdateVenueRequest,
+  VenueFeeOverrideRequest,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -2728,4 +2740,612 @@ export const useRejectVenue = <
   TContext
 > => {
   return useMutation(getRejectVenueMutationOptions(options));
+};
+
+/**
+ * @summary Get current platform fee for a venue
+ */
+export const getGetCheckoutFeeUrl = (params?: GetCheckoutFeeParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/checkout/fee?${stringifiedParams}`
+    : `/api/checkout/fee`;
+};
+
+export const getCheckoutFee = async (
+  params?: GetCheckoutFeeParams,
+  options?: RequestInit,
+): Promise<CheckoutFeeResponse> => {
+  return customFetch<CheckoutFeeResponse>(getGetCheckoutFeeUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCheckoutFeeQueryKey = (params?: GetCheckoutFeeParams) => {
+  return [`/api/checkout/fee`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetCheckoutFeeQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCheckoutFee>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetCheckoutFeeParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCheckoutFee>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCheckoutFeeQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCheckoutFee>>> = ({
+    signal,
+  }) => getCheckoutFee(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCheckoutFee>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCheckoutFeeQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCheckoutFee>>
+>;
+export type GetCheckoutFeeQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get current platform fee for a venue
+ */
+
+export function useGetCheckoutFee<
+  TData = Awaited<ReturnType<typeof getCheckoutFee>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: GetCheckoutFeeParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCheckoutFee>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCheckoutFeeQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Pay for a PENDING booking (MockPaymentProvider)
+ */
+export const getCheckoutBookingUrl = (bookingId: string) => {
+  return `/api/bookings/${bookingId}/checkout`;
+};
+
+export const checkoutBooking = async (
+  bookingId: string,
+  checkoutRequest: CheckoutRequest,
+  options?: RequestInit,
+): Promise<CheckoutResponse> => {
+  return customFetch<CheckoutResponse>(getCheckoutBookingUrl(bookingId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(checkoutRequest),
+  });
+};
+
+export const getCheckoutBookingMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkoutBooking>>,
+    TError,
+    { bookingId: string; data: BodyType<CheckoutRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof checkoutBooking>>,
+  TError,
+  { bookingId: string; data: BodyType<CheckoutRequest> },
+  TContext
+> => {
+  const mutationKey = ["checkoutBooking"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof checkoutBooking>>,
+    { bookingId: string; data: BodyType<CheckoutRequest> }
+  > = (props) => {
+    const { bookingId, data } = props ?? {};
+
+    return checkoutBooking(bookingId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CheckoutBookingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof checkoutBooking>>
+>;
+export type CheckoutBookingMutationBody = BodyType<CheckoutRequest>;
+export type CheckoutBookingMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Pay for a PENDING booking (MockPaymentProvider)
+ */
+export const useCheckoutBooking = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof checkoutBooking>>,
+    TError,
+    { bookingId: string; data: BodyType<CheckoutRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof checkoutBooking>>,
+  TError,
+  { bookingId: string; data: BodyType<CheckoutRequest> },
+  TContext
+> => {
+  return useMutation(getCheckoutBookingMutationOptions(options));
+};
+
+/**
+ * @summary Get the payment record for a booking
+ */
+export const getGetBookingPaymentUrl = (bookingId: string) => {
+  return `/api/bookings/${bookingId}/payment`;
+};
+
+export const getBookingPayment = async (
+  bookingId: string,
+  options?: RequestInit,
+): Promise<GetBookingPayment200> => {
+  return customFetch<GetBookingPayment200>(getGetBookingPaymentUrl(bookingId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBookingPaymentQueryKey = (bookingId: string) => {
+  return [`/api/bookings/${bookingId}/payment`] as const;
+};
+
+export const getGetBookingPaymentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBookingPayment>>,
+  TError = ErrorType<ApiError>,
+>(
+  bookingId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBookingPayment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBookingPaymentQueryKey(bookingId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBookingPayment>>
+  > = ({ signal }) =>
+    getBookingPayment(bookingId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookingId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBookingPayment>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBookingPaymentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBookingPayment>>
+>;
+export type GetBookingPaymentQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get the payment record for a booking
+ */
+
+export function useGetBookingPayment<
+  TData = Awaited<ReturnType<typeof getBookingPayment>>,
+  TError = ErrorType<ApiError>,
+>(
+  bookingId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBookingPayment>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBookingPaymentQueryOptions(bookingId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Register or update Expo push token for the current user
+ */
+export const getRegisterPushTokenUrl = () => {
+  return `/api/auth/push-token`;
+};
+
+export const registerPushToken = async (
+  registerPushTokenRequest: RegisterPushTokenRequest,
+  options?: RequestInit,
+): Promise<RegisterPushToken200> => {
+  return customFetch<RegisterPushToken200>(getRegisterPushTokenUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(registerPushTokenRequest),
+  });
+};
+
+export const getRegisterPushTokenMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof registerPushToken>>,
+    TError,
+    { data: BodyType<RegisterPushTokenRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof registerPushToken>>,
+  TError,
+  { data: BodyType<RegisterPushTokenRequest> },
+  TContext
+> => {
+  const mutationKey = ["registerPushToken"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof registerPushToken>>,
+    { data: BodyType<RegisterPushTokenRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return registerPushToken(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RegisterPushTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof registerPushToken>>
+>;
+export type RegisterPushTokenMutationBody = BodyType<RegisterPushTokenRequest>;
+export type RegisterPushTokenMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Register or update Expo push token for the current user
+ */
+export const useRegisterPushToken = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof registerPushToken>>,
+    TError,
+    { data: BodyType<RegisterPushTokenRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof registerPushToken>>,
+  TError,
+  { data: BodyType<RegisterPushTokenRequest> },
+  TContext
+> => {
+  return useMutation(getRegisterPushTokenMutationOptions(options));
+};
+
+/**
+ * @summary Get global admin settings (fee, overrides)
+ */
+export const getGetAdminSettingsUrl = () => {
+  return `/api/admin/settings`;
+};
+
+export const getAdminSettings = async (
+  options?: RequestInit,
+): Promise<GetAdminSettings200> => {
+  return customFetch<GetAdminSettings200>(getGetAdminSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetAdminSettingsQueryKey = () => {
+  return [`/api/admin/settings`] as const;
+};
+
+export const getGetAdminSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetAdminSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminSettings>>
+  > = ({ signal }) => getAdminSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminSettings>>
+>;
+export type GetAdminSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get global admin settings (fee, overrides)
+ */
+
+export function useGetAdminSettings<
+  TData = Awaited<ReturnType<typeof getAdminSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update global fee settings
+ */
+export const getUpdateAdminSettingsUrl = () => {
+  return `/api/admin/settings`;
+};
+
+export const updateAdminSettings = async (
+  updateAdminSettingsRequest: UpdateAdminSettingsRequest,
+  options?: RequestInit,
+): Promise<UpdateAdminSettings200> => {
+  return customFetch<UpdateAdminSettings200>(getUpdateAdminSettingsUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateAdminSettingsRequest),
+  });
+};
+
+export const getUpdateAdminSettingsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminSettings>>,
+    TError,
+    { data: BodyType<UpdateAdminSettingsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAdminSettings>>,
+  TError,
+  { data: BodyType<UpdateAdminSettingsRequest> },
+  TContext
+> => {
+  const mutationKey = ["updateAdminSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAdminSettings>>,
+    { data: BodyType<UpdateAdminSettingsRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateAdminSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAdminSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminSettings>>
+>;
+export type UpdateAdminSettingsMutationBody =
+  BodyType<UpdateAdminSettingsRequest>;
+export type UpdateAdminSettingsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update global fee settings
+ */
+export const useUpdateAdminSettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAdminSettings>>,
+    TError,
+    { data: BodyType<UpdateAdminSettingsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAdminSettings>>,
+  TError,
+  { data: BodyType<UpdateAdminSettingsRequest> },
+  TContext
+> => {
+  return useMutation(getUpdateAdminSettingsMutationOptions(options));
+};
+
+/**
+ * @summary Set or clear per-venue fee override
+ */
+export const getSetVenueFeeOverrideUrl = (venueId: string) => {
+  return `/api/admin/settings/venues/${venueId}`;
+};
+
+export const setVenueFeeOverride = async (
+  venueId: string,
+  venueFeeOverrideRequest: VenueFeeOverrideRequest,
+  options?: RequestInit,
+): Promise<SetVenueFeeOverride200> => {
+  return customFetch<SetVenueFeeOverride200>(
+    getSetVenueFeeOverrideUrl(venueId),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(venueFeeOverrideRequest),
+    },
+  );
+};
+
+export const getSetVenueFeeOverrideMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setVenueFeeOverride>>,
+    TError,
+    { venueId: string; data: BodyType<VenueFeeOverrideRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setVenueFeeOverride>>,
+  TError,
+  { venueId: string; data: BodyType<VenueFeeOverrideRequest> },
+  TContext
+> => {
+  const mutationKey = ["setVenueFeeOverride"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setVenueFeeOverride>>,
+    { venueId: string; data: BodyType<VenueFeeOverrideRequest> }
+  > = (props) => {
+    const { venueId, data } = props ?? {};
+
+    return setVenueFeeOverride(venueId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetVenueFeeOverrideMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setVenueFeeOverride>>
+>;
+export type SetVenueFeeOverrideMutationBody = BodyType<VenueFeeOverrideRequest>;
+export type SetVenueFeeOverrideMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Set or clear per-venue fee override
+ */
+export const useSetVenueFeeOverride = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setVenueFeeOverride>>,
+    TError,
+    { venueId: string; data: BodyType<VenueFeeOverrideRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setVenueFeeOverride>>,
+  TError,
+  { venueId: string; data: BodyType<VenueFeeOverrideRequest> },
+  TContext
+> => {
+  return useMutation(getSetVenueFeeOverrideMutationOptions(options));
 };

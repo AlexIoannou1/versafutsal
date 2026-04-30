@@ -936,6 +936,208 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  # ── Checkout & Payments ────────────────────────────────────────────────────
+  /checkout/fee:
+    get:
+      operationId: getCheckoutFee
+      tags: [bookings]
+      summary: Get current platform fee for a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: venueId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Fee details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutFeeResponse"
+
+  /bookings/{bookingId}/checkout:
+    post:
+      operationId: checkoutBooking
+      tags: [bookings]
+      summary: Pay for a PENDING booking (MockPaymentProvider)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutRequest"
+      responses:
+        "200":
+          description: Payment succeeded, booking confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResponse"
+        "402":
+          description: Payment failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Booking already confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /bookings/{bookingId}/payment:
+    get:
+      operationId: getBookingPayment
+      tags: [bookings]
+      summary: Get the payment record for a booking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Payment record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment:
+                    $ref: "#/components/schemas/PaymentRecord"
+                required: [payment]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Push Token ────────────────────────────────────────────────────────────
+  /auth/push-token:
+    patch:
+      operationId: registerPushToken
+      tags: [auth]
+      summary: Register or update Expo push token for the current user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPushTokenRequest"
+      responses:
+        "200":
+          description: Push token registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+
+  # ── Admin Settings ────────────────────────────────────────────────────────
+  /admin/settings:
+    get:
+      operationId: getAdminSettings
+      tags: [admin]
+      summary: Get global admin settings (fee, overrides)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Admin settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    $ref: "#/components/schemas/AdminSettingsRecord"
+                required: [settings]
+    patch:
+      operationId: updateAdminSettings
+      tags: [admin]
+      summary: Update global fee settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminSettingsRequest"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    $ref: "#/components/schemas/AdminSettingsRecord"
+                required: [settings]
+
+  /admin/settings/venues/{venueId}:
+    patch:
+      operationId: setVenueFeeOverride
+      tags: [admin]
+      summary: Set or clear per-venue fee override
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenueFeeOverrideRequest"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    $ref: "#/components/schemas/AdminSettingsRecord"
+                required: [settings]
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1551,3 +1753,121 @@ components:
         reason:
           type: string
       required: [startAt, endAt]
+
+    # ── Checkout & Payments ──────────────────────────────────────────────────
+
+    CheckoutFeeResponse:
+      type: object
+      properties:
+        feeEnabled:
+          type: boolean
+        feeAmount:
+          type: string
+          description: EUR amount string, e.g. "1.00" or "0.00"
+      required: [feeEnabled, feeAmount]
+
+    CheckoutRequest:
+      type: object
+      properties:
+        paymentType:
+          type: string
+          enum: [FULL, DEPOSIT]
+          default: FULL
+        idempotencyKey:
+          type: string
+          nullable: true
+      required: [paymentType]
+
+    PaymentRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          type: string
+        feeAmount:
+          type: string
+        feeWaived:
+          type: boolean
+        paymentType:
+          type: string
+          enum: [FULL, DEPOSIT]
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, SUCCEEDED, FAILED, REFUNDED, PARTIALLY_REFUNDED]
+        provider:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, amount, feeAmount, feeWaived, paymentType, currency, status, provider, createdAt]
+
+    CheckoutResponse:
+      type: object
+      properties:
+        alreadyProcessed:
+          type: boolean
+        booking:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            status:
+              type: string
+          required: [id, status]
+        payment:
+          $ref: "#/components/schemas/PaymentRecord"
+      required: [booking, payment]
+
+    # ── Push Token ───────────────────────────────────────────────────────────
+
+    RegisterPushTokenRequest:
+      type: object
+      properties:
+        pushToken:
+          type: string
+          description: Expo push token, e.g. ExponentPushToken[...]
+      required: [pushToken]
+
+    # ── Admin Settings ────────────────────────────────────────────────────────
+
+    AdminSettingsRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        feeEnabled:
+          type: boolean
+        feeAmount:
+          type: string
+          description: EUR amount string
+        perVenueOverrides:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: Map of venueId to feeEnabled override
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, feeEnabled, feeAmount, perVenueOverrides, updatedAt]
+
+    UpdateAdminSettingsRequest:
+      type: object
+      properties:
+        feeEnabled:
+          type: boolean
+        feeAmount:
+          type: string
+
+    VenueFeeOverrideRequest:
+      type: object
+      properties:
+        feeEnabled:
+          type: boolean
+          nullable: true
+          description: "true = fee on, false = fee off, null = remove override"
