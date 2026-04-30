@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { db } from "@workspace/db";
 import {
   venuesTable,
@@ -46,7 +46,7 @@ async function getVenueWithDetails(venueId: string) {
   return { ...venue, photos, pitches: pitchesWithPricing, openingHours: hours };
 }
 
-function assertOwnsVenue(venueOwnerId: string, userId: string, res: any): boolean {
+function assertOwnsVenue(venueOwnerId: string, userId: string, res: Response): boolean {
   if (venueOwnerId !== userId) {
     res.status(403).json({ error: "Forbidden: you do not own this venue" });
     return false;
@@ -163,7 +163,7 @@ router.get("/venues", async (req, res) => {
 });
 
 // GET /venues/:id — public venue detail
-router.get("/venues/:id", async (req, res) => {
+router.get<{ id: string }>("/venues/:id", async (req, res) => {
   try {
     const venue = await getVenueWithDetails(req.params.id);
     if (!venue) {
@@ -225,7 +225,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
 });
 
 // GET /owner/venues/:id — owner venue detail
-router.get("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+router.get<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
     const venue = await getVenueWithDetails(req.params.id);
     if (!venue) {
@@ -280,7 +280,7 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
 });
 
 // PUT /owner/venues/:id — update venue
-router.put("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+router.put<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
     const [existing] = await db
       .select()
@@ -326,7 +326,7 @@ router.put("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (
 });
 
 // DELETE /owner/venues/:id — delete venue
-router.delete("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+router.delete<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
     const [existing] = await db
       .select()
@@ -349,7 +349,7 @@ router.delete("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), asyn
 });
 
 // POST /owner/venues/:id/submit — submit venue for review
-router.post(
+router.post<{ id: string }>(
   "/owner/venues/:id/submit",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -398,7 +398,7 @@ router.post(
 );
 
 // POST /owner/venues/:id/photos — add photo URL
-router.post(
+router.post<{ id: string }>(
   "/owner/venues/:id/photos",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -436,7 +436,7 @@ router.post(
 );
 
 // DELETE /owner/venues/:venueId/photos/:photoId — remove photo
-router.delete(
+router.delete<{ venueId: string; photoId: string }>(
   "/owner/venues/:venueId/photos/:photoId",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -473,7 +473,7 @@ router.delete(
 
 // ─── Owner: Pitch CRUD ────────────────────────────────────────────────────────
 
-async function assertVenueOwner(venueId: string, userId: string, res: any) {
+async function assertVenueOwner(venueId: string, userId: string, res: Response) {
   const [venue] = await db
     .select()
     .from(venuesTable)
@@ -492,7 +492,7 @@ async function assertVenueOwner(venueId: string, userId: string, res: any) {
 }
 
 // POST /owner/venues/:id/pitches
-router.post(
+router.post<{ id: string }>(
   "/owner/venues/:id/pitches",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -533,7 +533,7 @@ router.post(
 );
 
 // PUT /owner/venues/:id/pitches/:pitchId
-router.put(
+router.put<{ id: string; pitchId: string }>(
   "/owner/venues/:id/pitches/:pitchId",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -579,7 +579,7 @@ router.put(
 );
 
 // DELETE /owner/venues/:id/pitches/:pitchId
-router.delete(
+router.delete<{ id: string; pitchId: string }>(
   "/owner/venues/:id/pitches/:pitchId",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -608,7 +608,7 @@ router.delete(
 // ─── Owner: Opening Hours ─────────────────────────────────────────────────────
 
 // PUT /owner/venues/:id/opening-hours — replace all opening hours
-router.put(
+router.put<{ id: string }>(
   "/owner/venues/:id/opening-hours",
   requireAuth,
   requireRole("VENUE_OWNER"),
@@ -662,7 +662,7 @@ router.put(
 // ─── Owner: Pricing Rules ──────────────────────────────────────────────────────
 
 // PUT /owner/venues/:id/pitches/:pitchId/pricing — replace pricing rules
-router.put(
+router.put<{ id: string; pitchId: string }>(
   "/owner/venues/:id/pitches/:pitchId/pricing",
   requireAuth,
   requireRole("VENUE_OWNER"),

@@ -46,43 +46,50 @@ router.get("/admin/venues", requireAuth, requireRole("ADMIN"), async (req, res) 
 });
 
 // GET /admin/venues/:id — full venue detail for admin
-router.get("/admin/venues/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
-  try {
-    const [venue] = await db
-      .select()
-      .from(venuesTable)
-      .where(eq(venuesTable.id, req.params.id))
-      .limit(1);
+router.get<{ id: string }>(
+  "/admin/venues/:id",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [venue] = await db
+        .select()
+        .from(venuesTable)
+        .where(eq(venuesTable.id, id))
+        .limit(1);
 
-    if (!venue) {
-      res.status(404).json({ error: "Venue not found" });
-      return;
+      if (!venue) {
+        res.status(404).json({ error: "Venue not found" });
+        return;
+      }
+
+      const [owner] = await db
+        .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+        .from(usersTable)
+        .where(eq(usersTable.id, venue.ownerId))
+        .limit(1);
+
+      res.json({ venue: { ...venue, owner: owner ?? null } });
+    } catch (err) {
+      console.error("GET /admin/venues/:id error:", err);
+      res.status(500).json({ error: "Internal server error" });
     }
-
-    const [owner] = await db
-      .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
-      .from(usersTable)
-      .where(eq(usersTable.id, venue.ownerId))
-      .limit(1);
-
-    res.json({ venue: { ...venue, owner: owner ?? null } });
-  } catch (err) {
-    console.error("GET /admin/venues/:id error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+  },
+);
 
 // PUT /admin/venues/:id/approve — approve a venue
-router.put(
+router.put<{ id: string }>(
   "/admin/venues/:id/approve",
   requireAuth,
   requireRole("ADMIN"),
   async (req, res) => {
     try {
+      const { id } = req.params;
       const [existing] = await db
         .select()
         .from(venuesTable)
-        .where(eq(venuesTable.id, req.params.id))
+        .where(eq(venuesTable.id, id))
         .limit(1);
 
       if (!existing) {
@@ -93,7 +100,7 @@ router.put(
       const [updated] = await db
         .update(venuesTable)
         .set({ status: "APPROVED", rejectionReason: null, updatedAt: new Date() })
-        .where(eq(venuesTable.id, req.params.id))
+        .where(eq(venuesTable.id, id))
         .returning();
 
       res.json({ venue: updated });
@@ -105,16 +112,17 @@ router.put(
 );
 
 // PUT /admin/venues/:id/reject — reject a venue with reason
-router.put(
+router.put<{ id: string }>(
   "/admin/venues/:id/reject",
   requireAuth,
   requireRole("ADMIN"),
   async (req, res) => {
     try {
+      const { id } = req.params;
       const [existing] = await db
         .select()
         .from(venuesTable)
-        .where(eq(venuesTable.id, req.params.id))
+        .where(eq(venuesTable.id, id))
         .limit(1);
 
       if (!existing) {
@@ -131,7 +139,7 @@ router.put(
           rejectionReason: reason ?? null,
           updatedAt: new Date(),
         })
-        .where(eq(venuesTable.id, req.params.id))
+        .where(eq(venuesTable.id, id))
         .returning();
 
       res.json({ venue: updated });
