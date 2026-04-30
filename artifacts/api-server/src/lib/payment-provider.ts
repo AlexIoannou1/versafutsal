@@ -113,21 +113,13 @@ export class MockPaymentProvider implements PaymentProvider {
   async confirmPayment(providerPaymentId: string): Promise<{ success: boolean; errorMessage?: string }> {
     // Deterministic failure mode: set MOCK_PAYMENT_FAIL=true to simulate declines.
     // This allows testing the payment failure UX path without real payment infrastructure.
+    // NOTE: This method only checks for success/failure and does NOT update the DB.
+    // The caller (checkout route) is responsible for updating payment + booking atomically.
     if (process.env.MOCK_PAYMENT_FAIL === "true") {
-      await db
-        .update(paymentsTable)
-        .set({ status: "FAILED", updatedAt: new Date() })
-        .where(eq(paymentsTable.providerPaymentId, providerPaymentId));
-
       return { success: false, errorMessage: "Payment declined (simulated failure mode)" };
     }
 
     // Normal path — always succeeds in demo mode
-    await db
-      .update(paymentsTable)
-      .set({ status: "SUCCEEDED", updatedAt: new Date() })
-      .where(eq(paymentsTable.providerPaymentId, providerPaymentId));
-
     return { success: true };
   }
 

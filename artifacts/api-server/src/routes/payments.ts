@@ -265,29 +265,58 @@ router.post<{ bookingId: string }>(
         throw insertErr;
       }
 
-      // Confirm payment (always succeeds in Mock)
+      // Check if payment provider would accept this charge (mock: checks MOCK_PAYMENT_FAIL env)
       const confirmation = await paymentProvider.confirmPayment(intent.providerPaymentId);
 
       if (!confirmation.success) {
-        // Write audit log for failure
-        await db.insert(auditLogTable).values({
-          actorUserId: req.user!.userId,
-          entityType: "PAYMENT",
-          entityId: bookingId,
-          action: "PAYMENT_FAILED",
-          metadata: { error: confirmation.errorMessage ?? "Unknown error" },
+        // Mark payment FAILED + write audit log atomically
+        await db.transaction(async (tx) => {
+          await tx
+            .update(paymentsTable)
+            .set({ status: "FAILED", updatedAt: new Date() })
+            .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId));
+
+          await tx.insert(auditLogTable).values({
+            actorUserId: req.user!.userId,
+            entityType: "PAYMENT",
+            entityId: bookingId,
+            action: "PAYMENT_FAILED",
+            metadata: { error: confirmation.errorMessage ?? "Unknown error" },
+          });
         });
 
         res.status(402).json({ error: confirmation.errorMessage ?? "Payment failed" });
         return;
       }
 
-      // Update booking status → CONFIRMED inside a transaction
+      // Atomically: mark payment SUCCEEDED + conditionally confirm booking (PENDING → CONFIRMED)
+      // The conditional WHERE on booking prevents double-charge when concurrent checkouts race.
+      let alreadyConfirmedConcurrently = false;
       await db.transaction(async (tx) => {
-        await tx
+        // Confirm booking only if still PENDING — returns 0 rows if concurrent request won
+        const updatedBookings = await tx
           .update(bookingsTable)
           .set({ status: "CONFIRMED", updatedAt: new Date() })
-          .where(eq(bookingsTable.id, bookingId));
+          .where(
+            and(
+              eq(bookingsTable.id, bookingId),
+              eq(bookingsTable.status, "PENDING"),
+            ),
+          )
+          .returning({ id: bookingsTable.id });
+
+        if (updatedBookings.length === 0) {
+          // A concurrent checkout already confirmed this booking. Our payment intent was
+          // created but the booking is confirmed — mark payment SUCCEEDED anyway for
+          // consistency and signal to the caller to return alreadyProcessed.
+          alreadyConfirmedConcurrently = true;
+        }
+
+        // Mark payment as SUCCEEDED (consistent with confirmation) inside the same transaction
+        await tx
+          .update(paymentsTable)
+          .set({ status: "SUCCEEDED", updatedAt: new Date() })
+          .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId));
 
         await tx.insert(auditLogTable).values([
           {
@@ -306,31 +335,33 @@ router.post<{ bookingId: string }>(
             actorUserId: req.user!.userId,
             entityType: "BOOKING",
             entityId: bookingId,
-            action: "BOOKING_CONFIRMED",
-            metadata: { via: "checkout" },
+            action: alreadyConfirmedConcurrently ? "BOOKING_ALREADY_CONFIRMED" : "BOOKING_CONFIRMED",
+            metadata: { via: "checkout", concurrent: alreadyConfirmedConcurrently },
           },
         ]);
       });
 
-      // Send notifications (non-fatal if it fails)
-      try {
-        const [player] = await db
-          .select({ id: usersTable.id, name: usersTable.name })
-          .from(usersTable)
-          .where(eq(usersTable.id, req.user!.userId))
-          .limit(1);
+      // Send notifications — skip if concurrent checkout already confirmed + notified
+      if (!alreadyConfirmedConcurrently) {
+        try {
+          const [player] = await db
+            .select({ id: usersTable.id, name: usersTable.name })
+            .from(usersTable)
+            .where(eq(usersTable.id, req.user!.userId))
+            .limit(1);
 
-        await sendBookingConfirmedNotifications({
-          bookingId,
-          playerId: req.user!.userId,
-          playerName: player?.name ?? "Player",
-          ownerId: pitchRow.venueOwnerId,
-          venueName: pitchRow.venueName,
-          pitchName: pitchRow.name,
-          startAt: booking.startAt,
-        });
-      } catch (notifErr) {
-        console.warn("Notification dispatch failed (non-fatal):", notifErr);
+          await sendBookingConfirmedNotifications({
+            bookingId,
+            playerId: req.user!.userId,
+            playerName: player?.name ?? "Player",
+            ownerId: pitchRow.venueOwnerId,
+            venueName: pitchRow.venueName,
+            pitchName: pitchRow.name,
+            startAt: booking.startAt,
+          });
+        } catch (notifErr) {
+          console.warn("Notification dispatch failed (non-fatal):", notifErr);
+        }
       }
 
       // Fetch updated payment record
