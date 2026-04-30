@@ -5,7 +5,10 @@
  * FutsalCY API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { UserRole } from "./userRole";
 
-export interface HealthStatus {
-  status: string;
-}
+export type MeResponseUser = {
+  userId: string;
+  email: string;
+  role: UserRole;
+};

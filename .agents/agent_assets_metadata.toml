@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "MQSjxluRh2mpqSyanerdB"
+uri = "file://artifacts/futsalcy/assets/images/icon.png"
+type = "image"
+title = "futsalcy app icon"

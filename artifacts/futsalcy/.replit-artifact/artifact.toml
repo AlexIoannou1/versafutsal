@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/"
+title = "FutsalCY"
+version = "1.0.0"
+id = "artifacts/futsalcy"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/" ]
+localPort = 20728
+
+[services.development]
+run = "pnpm --filter @workspace/futsalcy run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/futsalcy", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/futsalcy", "run", "serve" ]
+
+[services.env]
+PORT = "20728"
+BASE_PATH = "/"

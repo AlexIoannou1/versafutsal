@@ -1,0 +1,86 @@
+# FutsalCY — Futsal Booking Platform
+
+A premium mobile futsal booking platform for Cyprus. Two-sided marketplace connecting players with venues for live availability, secure payments, and professional venue management.
+
+## Architecture
+
+- **Mobile App**: Expo (React Native) — Player, Venue Owner, and Admin roles
+- **Backend API**: Express (TypeScript) on the shared api-server
+- **Database**: PostgreSQL via Drizzle ORM
+- **Auth**: JWT (email/password)
+
+## Getting Started
+
+### Prerequisites
+- Node.js 24+
+- pnpm
+- PostgreSQL database (set `DATABASE_URL` env var)
+
+### Install dependencies
+```bash
+pnpm install
+```
+
+### Push database schema
+```bash
+pnpm --filter @workspace/db run push
+```
+
+### Seed demo data
+```bash
+pnpm --filter @workspace/api-server run seed
+```
+
+### Start the API server
+```bash
+pnpm --filter @workspace/api-server run dev
+```
+
+### Start the mobile app
+```bash
+pnpm --filter @workspace/futsalcy run dev
+```
+
+---
+
+## Seeded Demo Credentials
+
+| Role | Email | Password |
+|------|-------|----------|
+| Player | player@futsalcy.com | Demo1234! |
+| Venue Owner | owner@futsalcy.com | Demo1234! |
+| Admin | admin@futsalcy.com | Demo1234! |
+
+### Seeded Venues
+1. **Nicosia Futsal Center** — 3 pitches (5v5 x2, 7v7 x1) — **APPROVED**
+2. **Limassol Sports Arena** — 2 pitches (5v5 x2) — **PENDING approval**
+
+---
+
+## Key Commands
+
+| Command | Description |
+|---------|-------------|
+| `pnpm --filter @workspace/api-spec run codegen` | Regenerate API hooks from OpenAPI spec |
+| `pnpm --filter @workspace/db run push` | Push schema changes to DB |
+| `pnpm --filter @workspace/api-server run seed` | Seed demo data |
+| `pnpm run typecheck` | Full TypeScript typecheck |
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `JWT_SECRET` | No | JWT signing secret (defaults to dev secret) |
+| `PORT` | Yes | Server port (injected by Replit) |
+| `EXPO_PUBLIC_DOMAIN` | Yes | Domain for Expo → API communication |
+
+---
+
+## Roles
+
+- **PLAYER** — Discovers venues, books pitches, manages bookings
+- **VENUE_OWNER** — Manages venues/pitches, views bookings calendar, receives payments
+- **ADMIN** — Approves venues, manages users/bookings/payments, controls fee settings

@@ -1,0 +1,68 @@
+import {
+  pgTable,
+  text,
+  timestamp,
+  pgEnum,
+  uuid,
+  boolean,
+  jsonb,
+  numeric,
+} from "drizzle-orm/pg-core";
+import { usersTable } from "./users";
+import { relations } from "drizzle-orm";
+
+// ─── Admin Settings ────────────────────────────────────────────────────────
+
+export const adminSettingsTable = pgTable("admin_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  feeEnabled: boolean("fee_enabled").notNull().default(true),
+  feeAmount: numeric("fee_amount", { precision: 10, scale: 2 })
+    .notNull()
+    .default("1.00"),
+  // JSON: { [venueId: string]: boolean } — venue-level fee overrides
+  perVenueOverrides: jsonb("per_venue_overrides")
+    .$type<Record<string, boolean>>()
+    .notNull()
+    .default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ─── Audit Log ─────────────────────────────────────────────────────────────
+
+export const auditActionEnum = pgEnum("audit_action", [
+  "BOOKING_CREATED",
+  "BOOKING_CONFIRMED",
+  "BOOKING_CANCELLED",
+  "BOOKING_REFUNDED",
+  "PAYMENT_CREATED",
+  "PAYMENT_SUCCEEDED",
+  "PAYMENT_FAILED",
+  "REFUND_ISSUED",
+  "VENUE_APPROVED",
+  "VENUE_REJECTED",
+  "FEE_WAIVED",
+  "USER_CREATED",
+]);
+
+export const auditLogTable = pgTable("audit_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  actorUserId: uuid("actor_user_id").references(() => usersTable.id, {
+    onDelete: "set null",
+  }),
+  entityType: text("entity_type").notNull(), // "BOOKING" | "PAYMENT" | "VENUE" | etc.
+  entityId: uuid("entity_id").notNull(),
+  action: auditActionEnum("action").notNull(),
+  metadata: jsonb("metadata").notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const auditLogRelations = relations(auditLogTable, ({ one }) => ({
+  actor: one(usersTable, {
+    fields: [auditLogTable.actorUserId],
+    references: [usersTable.id],
+  }),
+}));
+
+export type AuditLog = typeof auditLogTable.$inferSelect;
+export type AdminSettings = typeof adminSettingsTable.$inferSelect;
