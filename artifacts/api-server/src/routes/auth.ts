@@ -41,8 +41,12 @@ router.post("/auth/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+
+    // Public registration only allows PLAYER or VENUE_OWNER.
+    // ADMIN accounts must be seeded directly or promoted via a protected admin API.
+    const ALLOWED_PUBLIC_ROLES: UserRole[] = ["PLAYER", "VENUE_OWNER"];
     const userRole: UserRole =
-      role === "VENUE_OWNER" ? "VENUE_OWNER" : role === "ADMIN" ? "ADMIN" : "PLAYER";
+      role && ALLOWED_PUBLIC_ROLES.includes(role) ? role : "PLAYER";
 
     const [user] = await db
       .insert(usersTable)

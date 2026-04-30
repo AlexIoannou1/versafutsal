@@ -91,7 +91,7 @@ async function seed() {
       .insert(venuesTable)
       .values({
         ownerId,
-        status: "APPROVED",
+        status: "PENDING",
         name: "Nicosia Futsal Center",
         district: "Nicosia",
         address: "25 Makarios Avenue, Nicosia 1065",
@@ -103,7 +103,7 @@ async function seed() {
       .returning();
 
     venue1Id = venue1.id;
-    console.log(`✅ Created venue: ${venue1.name}`);
+    console.log(`✅ Created venue (PENDING): ${venue1.name}`);
 
     // Pitches for venue 1
     const pitchDefs1 = [

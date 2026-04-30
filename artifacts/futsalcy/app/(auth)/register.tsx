@@ -16,12 +16,18 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { registerUser } from "@workspace/api-client-react";
+import type { AppMode } from "@/context/AuthContext";
 
 const MODE_LABELS: Record<string, string> = {
   PLAYER: "Player",
   VENUE_OWNER: "Venue Owner",
   ADMIN: "Admin",
 };
+
+const VALID_ROLES: AppMode[] = ["PLAYER", "VENUE_OWNER", "ADMIN"];
+function toAppMode(role: string): AppMode {
+  return VALID_ROLES.includes(role as AppMode) ? (role as AppMode) : "PLAYER";
+}
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -59,7 +65,7 @@ export default function RegisterScreen() {
           id: data.user.id,
           email: data.user.email,
           name: data.user.name,
-          role: data.user.role as any,
+          role: toAppMode(data.user.role),
         },
         data.token,
       );
