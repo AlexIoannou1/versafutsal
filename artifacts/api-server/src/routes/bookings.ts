@@ -724,8 +724,12 @@ router.post<{ id: string }>(
           return;
         }
       }
-      // Owners can always cancel, but refund eligibility is still policy-driven:
-      // refund is only issued if the booking is still within the cancellation window.
+      // Owners can always cancel regardless of the time window — there is no window
+      // restriction on owner-initiated cancellations (e.g. venue closed, emergency).
+      // Refund eligibility is still policy-driven: a refund is only issued automatically
+      // if the booking is still within the player's cancellation window. Outside that
+      // window the booking is cancelled but no automatic refund is processed (the admin
+      // can issue a manual refund if warranted).
       const refundEligible = withinWindow;
 
       // ── Find succeeded payment (if any) ───────────────────────────────────
@@ -740,7 +744,11 @@ router.post<{ id: string }>(
         )
         .limit(1);
 
-      // ── Call payment provider first (outside tx — always-succeed in mock) ──
+      // ── Call payment provider first (outside tx) ──────────────────────────
+      // The mock provider always succeeds and does not write to DB, so calling
+      // it before the transaction is safe for development. For a real provider,
+      // use an idempotency key + outbox/compensation pattern to guard against
+      // external-refund-success + DB-transaction-failure divergence.
       let refundId: string | null = null;
       if (payment && refundEligible) {
         const refundResult = await paymentProvider.refundPayment({

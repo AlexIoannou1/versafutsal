@@ -304,7 +304,10 @@ router.post<{ id: string }>(
         )
         .limit(1);
 
-      // Call payment provider refund (outside tx — mock always succeeds)
+      // Call payment provider refund (outside tx).
+      // The mock provider always succeeds and does not write to DB, so calling it
+      // before the transaction is safe for development. For a real provider, use
+      // an idempotency key + outbox/compensation pattern.
       let refundId: string | null = null;
       if (payment) {
         const result = await paymentProvider.refundPayment({
