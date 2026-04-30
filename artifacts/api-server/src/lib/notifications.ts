@@ -45,19 +45,22 @@ async function sendExpoPush(token: string, title: string, body: string, data?: R
 export async function sendNotification(opts: SendNotifOpts): Promise<void> {
   const { userId, type, title, body, entityType, entityId, scheduledAt } = opts;
 
-  // Store in-app notification
-  await db.insert(notificationsTable).values({
-    userId,
-    type,
-    title,
-    body,
-    entityType: entityType ?? null,
-    entityId: entityId ?? null,
-    scheduledAt: scheduledAt ?? null,
-  });
+  // Store in-app notification and get its ID
+  const [inserted] = await db
+    .insert(notificationsTable)
+    .values({
+      userId,
+      type,
+      title,
+      body,
+      entityType: entityType ?? null,
+      entityId: entityId ?? null,
+      scheduledAt: scheduledAt ?? null,
+    })
+    .returning({ id: notificationsTable.id });
 
   // Send push notification if immediate (no scheduledAt)
-  if (!scheduledAt) {
+  if (!scheduledAt && inserted) {
     const [user] = await db
       .select({ pushToken: usersTable.pushToken })
       .from(usersTable)
@@ -66,14 +69,11 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
 
     if (user?.pushToken) {
       await sendExpoPush(user.pushToken, title, body, { type, entityId: entityId ?? "" });
-      // Mark push as sent
+      // Mark exactly this notification row as pushed (by its PK)
       await db
         .update(notificationsTable)
         .set({ pushSent: true })
-        .where(
-          // Only update the latest notification for this user+type+entityId
-          eq(notificationsTable.userId, userId),
-        );
+        .where(eq(notificationsTable.id, inserted.id));
     }
   }
 }

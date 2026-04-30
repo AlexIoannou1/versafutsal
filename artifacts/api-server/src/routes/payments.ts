@@ -57,12 +57,32 @@ router.post<{ bookingId: string }>(
         .limit(1);
 
       if (existingPayment?.status === "SUCCEEDED") {
+        // Fetch the booking so the response matches CheckoutResponse contract
+        const [alreadyBooking] = await db
+          .select()
+          .from(bookingsTable)
+          .where(eq(bookingsTable.id, bookingId))
+          .limit(1);
+
         res.json({
           alreadyProcessed: true,
+          booking: alreadyBooking
+            ? {
+                id: alreadyBooking.id,
+                status: alreadyBooking.status,
+                startAt: alreadyBooking.startAt.toISOString(),
+                endAt: alreadyBooking.endAt.toISOString(),
+              }
+            : { id: bookingId, status: "CONFIRMED" },
           payment: {
-            ...existingPayment,
+            id: existingPayment.id,
             amount: existingPayment.amount,
             feeAmount: existingPayment.feeAmount,
+            feeWaived: existingPayment.feeWaived,
+            paymentType: existingPayment.paymentType,
+            currency: existingPayment.currency,
+            status: existingPayment.status,
+            provider: existingPayment.provider,
             createdAt: existingPayment.createdAt.toISOString(),
             updatedAt: existingPayment.updatedAt.toISOString(),
           },
