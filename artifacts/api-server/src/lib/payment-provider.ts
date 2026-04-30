@@ -128,11 +128,9 @@ export class MockPaymentProvider implements PaymentProvider {
     amount: string;
     reason?: string;
   }): Promise<{ success: boolean; refundId: string }> {
-    await db
-      .update(paymentsTable)
-      .set({ status: "REFUNDED", updatedAt: new Date() })
-      .where(eq(paymentsTable.providerPaymentId, opts.providerPaymentId));
-
+    // NOTE: intentionally does NOT write to DB here.
+    // Callers are responsible for updating payment.status inside their own transaction
+    // so that the refund is atomic with booking/refund-record/audit writes.
     return { success: true, refundId: `mock_re_${randomUUID().replace(/-/g, "").slice(0, 20)}` };
   }
 }

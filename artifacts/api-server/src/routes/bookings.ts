@@ -691,9 +691,16 @@ router.post<{ id: string }>(
       }
 
       // ── Status check ──────────────────────────────────────────────────────
-      if (booking.status !== "CONFIRMED" && booking.status !== "PENDING") {
+      // Players may only cancel CONFIRMED bookings (PENDING bookings have no payment).
+      // Owners may cancel both CONFIRMED and PENDING bookings at their venue.
+      const allowedStatuses =
+        actorRole === "PLAYER" ? ["CONFIRMED"] : ["CONFIRMED", "PENDING"];
+      if (!allowedStatuses.includes(booking.status)) {
         res.status(400).json({
-          error: `Cannot cancel a booking with status ${booking.status}`,
+          error:
+            actorRole === "PLAYER"
+              ? "Only confirmed bookings can be cancelled. Contact support for pending bookings."
+              : `Cannot cancel a booking with status ${booking.status}`,
         });
         return;
       }
@@ -764,6 +771,12 @@ router.post<{ id: string }>(
           .where(eq(bookingsTable.id, bookingId));
 
         if (payment && refundEligible) {
+          // Mark payment as refunded atomically with booking/refund/audit writes
+          await tx
+            .update(paymentsTable)
+            .set({ status: "REFUNDED", updatedAt: new Date() })
+            .where(eq(paymentsTable.id, payment.id));
+
           // Insert refund record
           await tx.insert(refundsTable).values({
             paymentId: payment.id,

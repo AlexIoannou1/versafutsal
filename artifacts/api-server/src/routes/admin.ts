@@ -334,6 +334,12 @@ router.post<{ id: string }>(
           .where(eq(bookingsTable.id, bookingId));
 
         if (payment) {
+          // Mark payment as refunded atomically with booking/refund/audit writes
+          await tx
+            .update(paymentsTable)
+            .set({ status: "REFUNDED", updatedAt: new Date() })
+            .where(eq(paymentsTable.id, payment.id));
+
           await tx.insert(refundsTable).values({
             paymentId: payment.id,
             amount: payment.amount,
