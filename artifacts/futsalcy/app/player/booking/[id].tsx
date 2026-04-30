@@ -67,8 +67,15 @@ function canCancelBooking(booking: {
   startAt: string;
   policySnapshot?: unknown;
 }): { allowed: boolean; reason?: string } {
-  if (booking.status !== "CONFIRMED" && booking.status !== "PENDING") {
-    return { allowed: false, reason: "Booking is already " + booking.status.toLowerCase() };
+  // Players may only cancel CONFIRMED bookings (backend enforces the same rule)
+  if (booking.status !== "CONFIRMED") {
+    return {
+      allowed: false,
+      reason:
+        booking.status === "PENDING"
+          ? "Your booking is still pending confirmation. Only confirmed bookings can be cancelled — contact support if needed."
+          : "Booking is already " + booking.status.toLowerCase(),
+    };
   }
   const snapshot = (booking.policySnapshot ?? {}) as { cancellationWindowHours?: number };
   const windowHours = snapshot.cancellationWindowHours ?? 24;
