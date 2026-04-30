@@ -90,9 +90,12 @@ export default function LoginScreen() {
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as Record<string, unknown> | null;
       const message =
-        err?.data?.error || err?.message || "Login failed. Please try again.";
+        (e?.data as Record<string, unknown>)?.error as string ||
+        (e?.message as string) ||
+        "Login failed. Please try again.";
       Alert.alert("Login failed", message);
     } finally {
       setLoading(false);

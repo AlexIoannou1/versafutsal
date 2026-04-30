@@ -71,9 +71,12 @@ export default function RegisterScreen() {
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/");
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as Record<string, unknown> | null;
       const message =
-        err?.data?.error || err?.message || "Registration failed. Please try again.";
+        (e?.data as Record<string, unknown>)?.error as string ||
+        (e?.message as string) ||
+        "Registration failed. Please try again.";
       Alert.alert("Error", message);
     } finally {
       setLoading(false);
