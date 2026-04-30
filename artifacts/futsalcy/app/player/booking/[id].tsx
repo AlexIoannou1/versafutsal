@@ -30,6 +30,14 @@ const STATUS_LABELS: Record<string, string> = {
   NO_SHOW: "No Show",
 };
 
+const STATUS_TITLES: Record<string, string> = {
+  PENDING: "Booking Requested",
+  CONFIRMED: "Booking Confirmed",
+  CANCELLED: "Booking Cancelled",
+  REFUNDED: "Booking Refunded",
+  NO_SHOW: "No Show",
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "long",
@@ -212,7 +220,7 @@ export default function PlayerBookingDetailScreen() {
           <View style={[s.successIcon, { backgroundColor: statusColor + "20" }]}>
             <Feather name="check-circle" size={36} color={statusColor} />
           </View>
-          <Text style={s.successTitle}>Booking Confirmed</Text>
+          <Text style={s.successTitle}>{STATUS_TITLES[booking.status] ?? "Booking"}</Text>
           <Text style={s.bookingId}>#{booking.id.slice(0, 8).toUpperCase()}</Text>
         </View>
 

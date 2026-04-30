@@ -642,6 +642,7 @@ router.delete<{ venueId: string; pitchId: string; blockId: string }>(
     try {
       const { venueId, pitchId, blockId } = req.params;
 
+      // Verify venueId exists and belongs to this owner
       const [venue] = await db
         .select({ ownerId: venuesTable.ownerId })
         .from(venuesTable)
@@ -654,6 +655,18 @@ router.delete<{ venueId: string; pitchId: string; blockId: string }>(
       }
       if (venue.ownerId !== req.user!.userId) {
         res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+
+      // Verify pitchId belongs to this venue (prevents IDOR across venues)
+      const [pitch] = await db
+        .select({ id: pitchesTable.id })
+        .from(pitchesTable)
+        .where(and(eq(pitchesTable.id, pitchId), eq(pitchesTable.venueId, venueId)))
+        .limit(1);
+
+      if (!pitch) {
+        res.status(404).json({ error: "Pitch not found in this venue" });
         return;
       }
 
