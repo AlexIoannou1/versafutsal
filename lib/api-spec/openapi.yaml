@@ -12,13 +12,16 @@ tags:
     description: Health operations
   - name: auth
     description: Authentication operations
+  - name: venues
+    description: Venue discovery and management
+  - name: admin
+    description: Admin operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -27,6 +30,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  # ── Auth ──────────────────────────────────────────────────────────────────
   /auth/register:
     post:
       operationId: registerUser
@@ -87,9 +91,9 @@ paths:
     get:
       operationId: getMe
       tags: [auth]
-      summary: Get current user
       security:
         - bearerAuth: []
+      summary: Get current user
       responses:
         "200":
           description: Current user info
@@ -99,6 +103,591 @@ paths:
                 $ref: "#/components/schemas/MeResponse"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Public Venue Discovery ────────────────────────────────────────────────
+  /venues:
+    get:
+      operationId: listVenues
+      tags: [venues]
+      summary: List approved venues
+      parameters:
+        - name: district
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [INDOOR, OUTDOOR, HYBRID]
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: List of approved venues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venues:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VenueSummary"
+                required: [venues]
+
+  /venues/{id}:
+    get:
+      operationId: getVenue
+      tags: [venues]
+      summary: Get approved venue detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Venue detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueDetail"
+                required: [venue]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Owner Venue Management ────────────────────────────────────────────────
+  /owner/venues:
+    get:
+      operationId: listOwnerVenues
+      tags: [venues]
+      summary: List venues owned by current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Owner's venues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venues:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OwnerVenueSummary"
+                required: [venues]
+
+    post:
+      operationId: createVenue
+      tags: [venues]
+      summary: Create a new venue
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVenueRequest"
+      responses:
+        "201":
+          description: Venue created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueRecord"
+                required: [venue]
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /owner/venues/{id}:
+    get:
+      operationId: getOwnerVenue
+      tags: [venues]
+      summary: Get owner venue detail (including pitches, hours, pricing)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Venue detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueDetail"
+                required: [venue]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+    put:
+      operationId: updateVenue
+      tags: [venues]
+      summary: Update a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVenueRequest"
+      responses:
+        "200":
+          description: Venue updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueRecord"
+                required: [venue]
+
+    delete:
+      operationId: deleteVenue
+      tags: [venues]
+      summary: Delete a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Venue deleted
+
+  /owner/venues/{id}/submit:
+    post:
+      operationId: submitVenueForApproval
+      tags: [venues]
+      summary: Submit venue for admin approval
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Venue submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueRecord"
+                required: [venue]
+        "400":
+          description: Venue has no pitches
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /owner/venues/{id}/photos:
+    post:
+      operationId: addVenuePhoto
+      tags: [venues]
+      summary: Add a photo URL to a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddVenuePhotoRequest"
+      responses:
+        "201":
+          description: Photo added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photo:
+                    $ref: "#/components/schemas/VenuePhoto"
+                required: [photo]
+
+  /owner/venues/{venueId}/photos/{photoId}:
+    delete:
+      operationId: deleteVenuePhoto
+      tags: [venues]
+      summary: Remove a photo from a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Photo deleted
+
+  /owner/venues/{id}/pitches:
+    post:
+      operationId: createPitch
+      tags: [venues]
+      summary: Add a pitch to a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePitchRequest"
+      responses:
+        "201":
+          description: Pitch created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pitch:
+                    $ref: "#/components/schemas/PitchRecord"
+                required: [pitch]
+
+  /owner/venues/{id}/pitches/{pitchId}:
+    put:
+      operationId: updatePitch
+      tags: [venues]
+      summary: Update a pitch
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pitchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePitchRequest"
+      responses:
+        "200":
+          description: Pitch updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pitch:
+                    $ref: "#/components/schemas/PitchRecord"
+                required: [pitch]
+
+    delete:
+      operationId: deletePitch
+      tags: [venues]
+      summary: Delete a pitch
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pitchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Pitch deleted
+
+  /owner/venues/{id}/opening-hours:
+    put:
+      operationId: setOpeningHours
+      tags: [venues]
+      summary: Replace all opening hours for a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetOpeningHoursRequest"
+      responses:
+        "200":
+          description: Opening hours updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  openingHours:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OpeningHoursRecord"
+                required: [openingHours]
+
+  /owner/venues/{id}/pitches/{pitchId}/pricing:
+    put:
+      operationId: setPricingRules
+      tags: [venues]
+      summary: Replace pricing rules for a pitch
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pitchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetPricingRulesRequest"
+      responses:
+        "200":
+          description: Pricing rules updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pricingRules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PricingRuleRecord"
+                required: [pricingRules]
+
+  # ── Admin Endpoints ───────────────────────────────────────────────────────
+  /admin/venues:
+    get:
+      operationId: adminListVenues
+      tags: [admin]
+      summary: List all venues (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+      responses:
+        "200":
+          description: All venues
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venues:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminVenueSummary"
+                required: [venues]
+
+  /admin/venues/{id}:
+    get:
+      operationId: adminGetVenue
+      tags: [admin]
+      summary: Get full venue detail (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Venue detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/AdminVenueSummary"
+                required: [venue]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/venues/{id}/approve:
+    put:
+      operationId: approveVenue
+      tags: [admin]
+      summary: Approve a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Venue approved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueRecord"
+                required: [venue]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/venues/{id}/reject:
+    put:
+      operationId: rejectVenue
+      tags: [admin]
+      summary: Reject a venue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectVenueRequest"
+      responses:
+        "200":
+          description: Venue rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueRecord"
+                required: [venue]
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
@@ -117,20 +706,30 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     ApiError:
       type: object
       properties:
         error:
           type: string
-      required:
-        - error
+      required: [error]
 
     UserRole:
       type: string
       enum: [PLAYER, VENUE_OWNER, ADMIN]
+
+    VenueStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+
+    PitchType:
+      type: string
+      enum: [INDOOR, OUTDOOR, HYBRID]
+
+    DayType:
+      type: string
+      enum: [WEEKDAY, WEEKEND, ALL]
 
     UserProfile:
       type: object
@@ -148,12 +747,7 @@ components:
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - email
-        - name
-        - role
-        - createdAt
+      required: [id, email, name, role, createdAt]
 
     RegisterRequest:
       type: object
@@ -172,10 +766,7 @@ components:
           description: >
             Public registration only allows PLAYER or VENUE_OWNER.
             ADMIN accounts must be created via seed or a protected admin API.
-      required:
-        - email
-        - password
-        - name
+      required: [email, password, name]
 
     LoginRequest:
       type: object
@@ -185,9 +776,7 @@ components:
           format: email
         password:
           type: string
-      required:
-        - email
-        - password
+      required: [email, password]
 
     AuthResponse:
       type: object
@@ -196,9 +785,7 @@ components:
           $ref: "#/components/schemas/UserProfile"
         token:
           type: string
-      required:
-        - user
-        - token
+      required: [user, token]
 
     MeResponse:
       type: object
@@ -212,9 +799,343 @@ components:
               type: string
             role:
               $ref: "#/components/schemas/UserRole"
-          required:
-            - userId
-            - email
-            - role
-      required:
-        - user
+          required: [userId, email, role]
+      required: [user]
+
+    VenueRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/VenueStatus"
+        name:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+        description:
+          type: string
+          nullable: true
+        amenities:
+          type: array
+          items:
+            type: string
+        cancellationWindowHours:
+          type: integer
+        rejectionReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, ownerId, status, name, district, address, amenities, cancellationWindowHours, createdAt, updatedAt]
+
+    VenuePhoto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        venueId:
+          type: string
+          format: uuid
+        url:
+          type: string
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, venueId, url, sortOrder, createdAt]
+
+    PitchRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        venueId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        size:
+          type: string
+        type:
+          $ref: "#/components/schemas/PitchType"
+        slotDurationMinutes:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, venueId, name, size, type, slotDurationMinutes, createdAt]
+
+    PricingRuleRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pitchId:
+          type: string
+          format: uuid
+        dayType:
+          $ref: "#/components/schemas/DayType"
+        pricePerHour:
+          type: string
+        depositType:
+          type: string
+        depositAmount:
+          type: string
+          nullable: true
+      required: [id, pitchId, dayType, pricePerHour, depositType]
+
+    PitchWithPricing:
+      allOf:
+        - $ref: "#/components/schemas/PitchRecord"
+        - type: object
+          properties:
+            pricingRules:
+              type: array
+              items:
+                $ref: "#/components/schemas/PricingRuleRecord"
+          required: [pricingRules]
+
+    OpeningHoursRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        venueId:
+          type: string
+          format: uuid
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        openTime:
+          type: string
+        closeTime:
+          type: string
+        isClosed:
+          type: boolean
+      required: [id, venueId, dayOfWeek, openTime, closeTime, isClosed]
+
+    OpeningHoursInput:
+      type: object
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 0
+          maximum: 6
+        openTime:
+          type: string
+        closeTime:
+          type: string
+        isClosed:
+          type: boolean
+      required: [dayOfWeek, openTime, closeTime, isClosed]
+
+    PricingRuleInput:
+      type: object
+      properties:
+        dayType:
+          $ref: "#/components/schemas/DayType"
+        pricePerHour:
+          type: string
+        depositType:
+          type: string
+        depositAmount:
+          type: string
+          nullable: true
+      required: [dayType, pricePerHour, depositType]
+
+    VenueSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+        amenities:
+          type: array
+          items:
+            type: string
+        coverPhoto:
+          type: string
+          nullable: true
+        minPrice:
+          type: number
+          nullable: true
+        maxPrice:
+          type: number
+          nullable: true
+        status:
+          $ref: "#/components/schemas/VenueStatus"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, district, address, amenities, status, createdAt]
+
+    OwnerVenueSummary:
+      allOf:
+        - $ref: "#/components/schemas/VenueSummary"
+        - type: object
+          properties:
+            pitchCount:
+              type: integer
+            rejectionReason:
+              type: string
+              nullable: true
+          required: [pitchCount]
+
+    VenueDetail:
+      allOf:
+        - $ref: "#/components/schemas/VenueRecord"
+        - type: object
+          properties:
+            photos:
+              type: array
+              items:
+                $ref: "#/components/schemas/VenuePhoto"
+            pitches:
+              type: array
+              items:
+                $ref: "#/components/schemas/PitchWithPricing"
+            openingHours:
+              type: array
+              items:
+                $ref: "#/components/schemas/OpeningHoursRecord"
+          required: [photos, pitches, openingHours]
+
+    AdminVenueSummary:
+      allOf:
+        - $ref: "#/components/schemas/VenueRecord"
+        - type: object
+          properties:
+            owner:
+              type: object
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+              nullable: true
+          required: []
+
+    CreateVenueRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+        description:
+          type: string
+        amenities:
+          type: array
+          items:
+            type: string
+        cancellationWindowHours:
+          type: integer
+          default: 24
+      required: [name, district, address]
+
+    UpdateVenueRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+        description:
+          type: string
+        amenities:
+          type: array
+          items:
+            type: string
+        cancellationWindowHours:
+          type: integer
+
+    CreatePitchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: string
+        type:
+          $ref: "#/components/schemas/PitchType"
+        slotDurationMinutes:
+          type: integer
+          default: 60
+      required: [name, size]
+
+    UpdatePitchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: string
+        type:
+          $ref: "#/components/schemas/PitchType"
+        slotDurationMinutes:
+          type: integer
+
+    AddVenuePhotoRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        sortOrder:
+          type: integer
+      required: [url]
+
+    SetOpeningHoursRequest:
+      type: object
+      properties:
+        hours:
+          type: array
+          items:
+            $ref: "#/components/schemas/OpeningHoursInput"
+      required: [hours]
+
+    SetPricingRulesRequest:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingRuleInput"
+      required: [rules]
+
+    RejectVenueRequest:
+      type: object
+      properties:
+        reason:
+          type: string

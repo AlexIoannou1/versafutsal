@@ -8,7 +8,6 @@
 import * as zod from "zod";
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -59,5 +58,573 @@ export const GetMeResponse = zod.object({
     userId: zod.string(),
     email: zod.string(),
     role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
+  }),
+});
+
+/**
+ * @summary List approved venues
+ */
+export const ListVenuesQueryParams = zod.object({
+  district: zod.coerce.string().optional(),
+  type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]).optional(),
+  minPrice: zod.coerce.number().optional(),
+  maxPrice: zod.coerce.number().optional(),
+});
+
+export const ListVenuesResponse = zod.object({
+  venues: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      name: zod.string(),
+      district: zod.string(),
+      address: zod.string(),
+      amenities: zod.array(zod.string()),
+      coverPhoto: zod.string().nullish(),
+      minPrice: zod.number().nullish(),
+      maxPrice: zod.number().nullish(),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get approved venue detail
+ */
+export const GetVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const getVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin = 0;
+export const getVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax = 6;
+
+export const GetVenueResponse = zod.object({
+  venue: zod
+    .object({
+      id: zod.string().uuid(),
+      ownerId: zod.string().uuid(),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      name: zod.string(),
+      district: zod.string(),
+      address: zod.string(),
+      description: zod.string().nullish(),
+      amenities: zod.array(zod.string()),
+      cancellationWindowHours: zod.number(),
+      rejectionReason: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .and(
+      zod.object({
+        photos: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            url: zod.string(),
+            sortOrder: zod.number(),
+            createdAt: zod.coerce.date(),
+          }),
+        ),
+        pitches: zod.array(
+          zod
+            .object({
+              id: zod.string().uuid(),
+              venueId: zod.string().uuid(),
+              name: zod.string(),
+              size: zod.string(),
+              type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+              slotDurationMinutes: zod.number(),
+              createdAt: zod.coerce.date(),
+            })
+            .and(
+              zod.object({
+                pricingRules: zod.array(
+                  zod.object({
+                    id: zod.string().uuid(),
+                    pitchId: zod.string().uuid(),
+                    dayType: zod.enum(["WEEKDAY", "WEEKEND", "ALL"]),
+                    pricePerHour: zod.string(),
+                    depositType: zod.string(),
+                    depositAmount: zod.string().nullish(),
+                  }),
+                ),
+              }),
+            ),
+        ),
+        openingHours: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            dayOfWeek: zod
+              .number()
+              .min(getVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin)
+              .max(getVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax),
+            openTime: zod.string(),
+            closeTime: zod.string(),
+            isClosed: zod.boolean(),
+          }),
+        ),
+      }),
+    ),
+});
+
+/**
+ * @summary List venues owned by current user
+ */
+export const ListOwnerVenuesResponse = zod.object({
+  venues: zod.array(
+    zod
+      .object({
+        id: zod.string().uuid(),
+        name: zod.string(),
+        district: zod.string(),
+        address: zod.string(),
+        amenities: zod.array(zod.string()),
+        coverPhoto: zod.string().nullish(),
+        minPrice: zod.number().nullish(),
+        maxPrice: zod.number().nullish(),
+        status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+        createdAt: zod.coerce.date(),
+      })
+      .and(
+        zod.object({
+          pitchCount: zod.number(),
+          rejectionReason: zod.string().nullish(),
+        }),
+      ),
+  ),
+});
+
+/**
+ * @summary Create a new venue
+ */
+export const createVenueBodyCancellationWindowHoursDefault = 24;
+
+export const CreateVenueBody = zod.object({
+  name: zod.string(),
+  district: zod.string(),
+  address: zod.string(),
+  description: zod.string().optional(),
+  amenities: zod.array(zod.string()).optional(),
+  cancellationWindowHours: zod
+    .number()
+    .default(createVenueBodyCancellationWindowHoursDefault),
+});
+
+/**
+ * @summary Get owner venue detail (including pitches, hours, pricing)
+ */
+export const GetOwnerVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const getOwnerVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin = 0;
+export const getOwnerVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax = 6;
+
+export const GetOwnerVenueResponse = zod.object({
+  venue: zod
+    .object({
+      id: zod.string().uuid(),
+      ownerId: zod.string().uuid(),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      name: zod.string(),
+      district: zod.string(),
+      address: zod.string(),
+      description: zod.string().nullish(),
+      amenities: zod.array(zod.string()),
+      cancellationWindowHours: zod.number(),
+      rejectionReason: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .and(
+      zod.object({
+        photos: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            url: zod.string(),
+            sortOrder: zod.number(),
+            createdAt: zod.coerce.date(),
+          }),
+        ),
+        pitches: zod.array(
+          zod
+            .object({
+              id: zod.string().uuid(),
+              venueId: zod.string().uuid(),
+              name: zod.string(),
+              size: zod.string(),
+              type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+              slotDurationMinutes: zod.number(),
+              createdAt: zod.coerce.date(),
+            })
+            .and(
+              zod.object({
+                pricingRules: zod.array(
+                  zod.object({
+                    id: zod.string().uuid(),
+                    pitchId: zod.string().uuid(),
+                    dayType: zod.enum(["WEEKDAY", "WEEKEND", "ALL"]),
+                    pricePerHour: zod.string(),
+                    depositType: zod.string(),
+                    depositAmount: zod.string().nullish(),
+                  }),
+                ),
+              }),
+            ),
+        ),
+        openingHours: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            dayOfWeek: zod
+              .number()
+              .min(getOwnerVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin)
+              .max(getOwnerVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax),
+            openTime: zod.string(),
+            closeTime: zod.string(),
+            isClosed: zod.boolean(),
+          }),
+        ),
+      }),
+    ),
+});
+
+/**
+ * @summary Update a venue
+ */
+export const UpdateVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const UpdateVenueBody = zod.object({
+  name: zod.string().optional(),
+  district: zod.string().optional(),
+  address: zod.string().optional(),
+  description: zod.string().optional(),
+  amenities: zod.array(zod.string()).optional(),
+  cancellationWindowHours: zod.number().optional(),
+});
+
+export const UpdateVenueResponse = zod.object({
+  venue: zod.object({
+    id: zod.string().uuid(),
+    ownerId: zod.string().uuid(),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    name: zod.string(),
+    district: zod.string(),
+    address: zod.string(),
+    description: zod.string().nullish(),
+    amenities: zod.array(zod.string()),
+    cancellationWindowHours: zod.number(),
+    rejectionReason: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Delete a venue
+ */
+export const DeleteVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Submit venue for admin approval
+ */
+export const SubmitVenueForApprovalParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const SubmitVenueForApprovalResponse = zod.object({
+  venue: zod.object({
+    id: zod.string().uuid(),
+    ownerId: zod.string().uuid(),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    name: zod.string(),
+    district: zod.string(),
+    address: zod.string(),
+    description: zod.string().nullish(),
+    amenities: zod.array(zod.string()),
+    cancellationWindowHours: zod.number(),
+    rejectionReason: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Add a photo URL to a venue
+ */
+export const AddVenuePhotoParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AddVenuePhotoBody = zod.object({
+  url: zod.string().url(),
+  sortOrder: zod.number().optional(),
+});
+
+/**
+ * @summary Remove a photo from a venue
+ */
+export const DeleteVenuePhotoParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+  photoId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Add a pitch to a venue
+ */
+export const CreatePitchParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const createPitchBodySlotDurationMinutesDefault = 60;
+
+export const CreatePitchBody = zod.object({
+  name: zod.string(),
+  size: zod.string(),
+  type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]).optional(),
+  slotDurationMinutes: zod
+    .number()
+    .default(createPitchBodySlotDurationMinutesDefault),
+});
+
+/**
+ * @summary Update a pitch
+ */
+export const UpdatePitchParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  pitchId: zod.coerce.string().uuid(),
+});
+
+export const UpdatePitchBody = zod.object({
+  name: zod.string().optional(),
+  size: zod.string().optional(),
+  type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]).optional(),
+  slotDurationMinutes: zod.number().optional(),
+});
+
+export const UpdatePitchResponse = zod.object({
+  pitch: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    name: zod.string(),
+    size: zod.string(),
+    type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+    slotDurationMinutes: zod.number(),
+    createdAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Delete a pitch
+ */
+export const DeletePitchParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  pitchId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Replace all opening hours for a venue
+ */
+export const SetOpeningHoursParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const setOpeningHoursBodyHoursItemDayOfWeekMin = 0;
+export const setOpeningHoursBodyHoursItemDayOfWeekMax = 6;
+
+export const SetOpeningHoursBody = zod.object({
+  hours: zod.array(
+    zod.object({
+      dayOfWeek: zod
+        .number()
+        .min(setOpeningHoursBodyHoursItemDayOfWeekMin)
+        .max(setOpeningHoursBodyHoursItemDayOfWeekMax),
+      openTime: zod.string(),
+      closeTime: zod.string(),
+      isClosed: zod.boolean(),
+    }),
+  ),
+});
+
+export const setOpeningHoursResponseOpeningHoursItemDayOfWeekMin = 0;
+export const setOpeningHoursResponseOpeningHoursItemDayOfWeekMax = 6;
+
+export const SetOpeningHoursResponse = zod.object({
+  openingHours: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      dayOfWeek: zod
+        .number()
+        .min(setOpeningHoursResponseOpeningHoursItemDayOfWeekMin)
+        .max(setOpeningHoursResponseOpeningHoursItemDayOfWeekMax),
+      openTime: zod.string(),
+      closeTime: zod.string(),
+      isClosed: zod.boolean(),
+    }),
+  ),
+});
+
+/**
+ * @summary Replace pricing rules for a pitch
+ */
+export const SetPricingRulesParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  pitchId: zod.coerce.string().uuid(),
+});
+
+export const SetPricingRulesBody = zod.object({
+  rules: zod.array(
+    zod.object({
+      dayType: zod.enum(["WEEKDAY", "WEEKEND", "ALL"]),
+      pricePerHour: zod.string(),
+      depositType: zod.string(),
+      depositAmount: zod.string().nullish(),
+    }),
+  ),
+});
+
+export const SetPricingRulesResponse = zod.object({
+  pricingRules: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      pitchId: zod.string().uuid(),
+      dayType: zod.enum(["WEEKDAY", "WEEKEND", "ALL"]),
+      pricePerHour: zod.string(),
+      depositType: zod.string(),
+      depositAmount: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * @summary List all venues (admin)
+ */
+export const AdminListVenuesQueryParams = zod.object({
+  status: zod.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+});
+
+export const AdminListVenuesResponse = zod.object({
+  venues: zod.array(
+    zod
+      .object({
+        id: zod.string().uuid(),
+        ownerId: zod.string().uuid(),
+        status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+        name: zod.string(),
+        district: zod.string(),
+        address: zod.string(),
+        description: zod.string().nullish(),
+        amenities: zod.array(zod.string()),
+        cancellationWindowHours: zod.number(),
+        rejectionReason: zod.string().nullish(),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      })
+      .and(
+        zod.object({
+          owner: zod
+            .object({
+              id: zod.string().uuid().optional(),
+              name: zod.string().optional(),
+              email: zod.string().email().optional(),
+            })
+            .nullish(),
+        }),
+      ),
+  ),
+});
+
+/**
+ * @summary Get full venue detail (admin)
+ */
+export const AdminGetVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AdminGetVenueResponse = zod.object({
+  venue: zod
+    .object({
+      id: zod.string().uuid(),
+      ownerId: zod.string().uuid(),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      name: zod.string(),
+      district: zod.string(),
+      address: zod.string(),
+      description: zod.string().nullish(),
+      amenities: zod.array(zod.string()),
+      cancellationWindowHours: zod.number(),
+      rejectionReason: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    })
+    .and(
+      zod.object({
+        owner: zod
+          .object({
+            id: zod.string().uuid().optional(),
+            name: zod.string().optional(),
+            email: zod.string().email().optional(),
+          })
+          .nullish(),
+      }),
+    ),
+});
+
+/**
+ * @summary Approve a venue
+ */
+export const ApproveVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ApproveVenueResponse = zod.object({
+  venue: zod.object({
+    id: zod.string().uuid(),
+    ownerId: zod.string().uuid(),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    name: zod.string(),
+    district: zod.string(),
+    address: zod.string(),
+    description: zod.string().nullish(),
+    amenities: zod.array(zod.string()),
+    cancellationWindowHours: zod.number(),
+    rejectionReason: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary Reject a venue
+ */
+export const RejectVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const RejectVenueBody = zod.object({
+  reason: zod.string().optional(),
+});
+
+export const RejectVenueResponse = zod.object({
+  venue: zod.object({
+    id: zod.string().uuid(),
+    ownerId: zod.string().uuid(),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    name: zod.string(),
+    district: zod.string(),
+    address: zod.string(),
+    description: zod.string().nullish(),
+    amenities: zod.array(zod.string()),
+    cancellationWindowHours: zod.number(),
+    rejectionReason: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
   }),
 });

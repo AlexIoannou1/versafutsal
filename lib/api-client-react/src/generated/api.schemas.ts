@@ -21,6 +21,30 @@ export const UserRole = {
   ADMIN: "ADMIN",
 } as const;
 
+export type VenueStatus = (typeof VenueStatus)[keyof typeof VenueStatus];
+
+export const VenueStatus = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type PitchType = (typeof PitchType)[keyof typeof PitchType];
+
+export const PitchType = {
+  INDOOR: "INDOOR",
+  OUTDOOR: "OUTDOOR",
+  HYBRID: "HYBRID",
+} as const;
+
+export type DayType = (typeof DayType)[keyof typeof DayType];
+
+export const DayType = {
+  WEEKDAY: "WEEKDAY",
+  WEEKEND: "WEEKEND",
+  ALL: "ALL",
+} as const;
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -70,3 +94,256 @@ export type MeResponseUser = {
 export interface MeResponse {
   user: MeResponseUser;
 }
+
+export interface VenueRecord {
+  id: string;
+  ownerId: string;
+  status: VenueStatus;
+  name: string;
+  district: string;
+  address: string;
+  description?: string | null;
+  amenities: string[];
+  cancellationWindowHours: number;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VenuePhoto {
+  id: string;
+  venueId: string;
+  url: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface PitchRecord {
+  id: string;
+  venueId: string;
+  name: string;
+  size: string;
+  type: PitchType;
+  slotDurationMinutes: number;
+  createdAt: string;
+}
+
+export interface PricingRuleRecord {
+  id: string;
+  pitchId: string;
+  dayType: DayType;
+  pricePerHour: string;
+  depositType: string;
+  depositAmount?: string | null;
+}
+
+export type PitchWithPricing = PitchRecord & {
+  pricingRules: PricingRuleRecord[];
+};
+
+export interface OpeningHoursRecord {
+  id: string;
+  venueId: string;
+  /**
+   * @minimum 0
+   * @maximum 6
+   */
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+  isClosed: boolean;
+}
+
+export interface OpeningHoursInput {
+  /**
+   * @minimum 0
+   * @maximum 6
+   */
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+  isClosed: boolean;
+}
+
+export interface PricingRuleInput {
+  dayType: DayType;
+  pricePerHour: string;
+  depositType: string;
+  depositAmount?: string | null;
+}
+
+export interface VenueSummary {
+  id: string;
+  name: string;
+  district: string;
+  address: string;
+  amenities: string[];
+  coverPhoto?: string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  status: VenueStatus;
+  createdAt: string;
+}
+
+export type OwnerVenueSummary = VenueSummary & {
+  pitchCount: number;
+  rejectionReason?: string | null;
+};
+
+export type VenueDetail = VenueRecord & {
+  photos: VenuePhoto[];
+  pitches: PitchWithPricing[];
+  openingHours: OpeningHoursRecord[];
+};
+
+export type AdminVenueSummaryOwner = {
+  id?: string;
+  name?: string;
+  email?: string;
+} | null;
+
+export type AdminVenueSummary = VenueRecord & {
+  owner?: AdminVenueSummaryOwner;
+};
+
+export interface CreateVenueRequest {
+  name: string;
+  district: string;
+  address: string;
+  description?: string;
+  amenities?: string[];
+  cancellationWindowHours?: number;
+}
+
+export interface UpdateVenueRequest {
+  name?: string;
+  district?: string;
+  address?: string;
+  description?: string;
+  amenities?: string[];
+  cancellationWindowHours?: number;
+}
+
+export interface CreatePitchRequest {
+  name: string;
+  size: string;
+  type?: PitchType;
+  slotDurationMinutes?: number;
+}
+
+export interface UpdatePitchRequest {
+  name?: string;
+  size?: string;
+  type?: PitchType;
+  slotDurationMinutes?: number;
+}
+
+export interface AddVenuePhotoRequest {
+  url: string;
+  sortOrder?: number;
+}
+
+export interface SetOpeningHoursRequest {
+  hours: OpeningHoursInput[];
+}
+
+export interface SetPricingRulesRequest {
+  rules: PricingRuleInput[];
+}
+
+export interface RejectVenueRequest {
+  reason?: string;
+}
+
+export type ListVenuesParams = {
+  district?: string;
+  type?: ListVenuesType;
+  minPrice?: number;
+  maxPrice?: number;
+};
+
+export type ListVenuesType =
+  (typeof ListVenuesType)[keyof typeof ListVenuesType];
+
+export const ListVenuesType = {
+  INDOOR: "INDOOR",
+  OUTDOOR: "OUTDOOR",
+  HYBRID: "HYBRID",
+} as const;
+
+export type ListVenues200 = {
+  venues: VenueSummary[];
+};
+
+export type GetVenue200 = {
+  venue: VenueDetail;
+};
+
+export type ListOwnerVenues200 = {
+  venues: OwnerVenueSummary[];
+};
+
+export type CreateVenue201 = {
+  venue: VenueRecord;
+};
+
+export type GetOwnerVenue200 = {
+  venue: VenueDetail;
+};
+
+export type UpdateVenue200 = {
+  venue: VenueRecord;
+};
+
+export type SubmitVenueForApproval200 = {
+  venue: VenueRecord;
+};
+
+export type AddVenuePhoto201 = {
+  photo: VenuePhoto;
+};
+
+export type CreatePitch201 = {
+  pitch: PitchRecord;
+};
+
+export type UpdatePitch200 = {
+  pitch: PitchRecord;
+};
+
+export type SetOpeningHours200 = {
+  openingHours: OpeningHoursRecord[];
+};
+
+export type SetPricingRules200 = {
+  pricingRules: PricingRuleRecord[];
+};
+
+export type AdminListVenuesParams = {
+  status?: AdminListVenuesStatus;
+};
+
+export type AdminListVenuesStatus =
+  (typeof AdminListVenuesStatus)[keyof typeof AdminListVenuesStatus];
+
+export const AdminListVenuesStatus = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type AdminListVenues200 = {
+  venues: AdminVenueSummary[];
+};
+
+export type AdminGetVenue200 = {
+  venue: AdminVenueSummary;
+};
+
+export type ApproveVenue200 = {
+  venue: VenueRecord;
+};
+
+export type RejectVenue200 = {
+  venue: VenueRecord;
+};

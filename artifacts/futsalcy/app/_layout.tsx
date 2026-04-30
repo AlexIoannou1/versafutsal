@@ -15,6 +15,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
+import { useColors } from "@/hooks/useColors";
 import { setBaseUrl } from "@workspace/api-client-react";
 
 // Set API base URL for Expo (mobile needs absolute URL)
@@ -28,13 +29,33 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const colors = useColors();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.foreground,
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+      }}
+    >
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(player)" />
       <Stack.Screen name="(owner)" />
       <Stack.Screen name="(admin)" />
+      <Stack.Screen
+        name="owner/venue-new"
+        options={{ headerShown: true, title: "New Venue", presentation: "modal" }}
+      />
+      <Stack.Screen
+        name="owner/venue/[id]"
+        options={{ headerShown: true, title: "Manage Venue" }}
+      />
+      <Stack.Screen
+        name="player/venue/[id]"
+        options={{ headerShown: true, title: "Venue Details" }}
+      />
       <Stack.Screen name="+not-found" />
     </Stack>
   );
