@@ -279,95 +279,105 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
 
     const endDate = new Date(startDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
 
-    // Check maintenance blocks (exclusive boundaries to avoid blocking adjacent slots)
-    const conflictingBlock = await db
-      .select({ id: maintenanceBlocksTable.id })
-      .from(maintenanceBlocksTable)
-      .where(
-        and(
-          eq(maintenanceBlocksTable.pitchId, pitchId),
-          lt(maintenanceBlocksTable.startAt, endDate),
-          gt(maintenanceBlocksTable.endAt, startDate),
-        ),
-      )
-      .limit(1);
-
-    if (conflictingBlock.length > 0) {
-      res.status(409).json({
-        error: "This slot is blocked for maintenance. Please choose another time.",
-      });
-      return;
-    }
-
-    const pricingRules = await db
-      .select()
-      .from(pricingRulesTable)
-      .where(eq(pricingRulesTable.pitchId, pitchId));
-
-    const policySnapshot = {
-      pricePerHour: pricingRules[0]?.pricePerHour ?? null,
-      cancellationWindowHours: pitchRow.venueCancellationWindowHours,
-      slotDurationMinutes: pitchRow.slotDurationMinutes,
-      capturedAt: new Date().toISOString(),
-    };
-
+    // ── Atomic transaction: conflict check + policy snapshot + insert ─────────
+    // Running these steps inside a transaction prevents a maintenance block
+    // added between the check and the insert from being silently ignored.
+    let booking: typeof bookingsTable.$inferSelect;
+    let player: { id: string; name: string; email: string } | undefined;
     try {
-      const [booking] = await db
-        .insert(bookingsTable)
-        .values({
-          venueId: pitchRow.venueId,
-          pitchId,
-          playerId: req.user!.userId,
-          startAt: startDate,
-          endAt: endDate,
-          status: "PENDING",
-          policySnapshot,
-        })
-        .returning();
+      const result = await db.transaction(async (tx) => {
+        // Check maintenance blocks (exclusive boundaries to avoid blocking adjacent slots)
+        const conflictingBlock = await tx
+          .select({ id: maintenanceBlocksTable.id })
+          .from(maintenanceBlocksTable)
+          .where(
+            and(
+              eq(maintenanceBlocksTable.pitchId, pitchId),
+              lt(maintenanceBlocksTable.startAt, endDate),
+              gt(maintenanceBlocksTable.endAt, startDate),
+            ),
+          )
+          .limit(1);
 
-      const [player] = await db
+        if (conflictingBlock.length > 0) {
+          throw Object.assign(new Error("maintenance_blocked"), { _type: "maintenance_blocked" });
+        }
+
+        const pricingRules = await tx
+          .select()
+          .from(pricingRulesTable)
+          .where(eq(pricingRulesTable.pitchId, pitchId));
+
+        const policySnapshot = {
+          pricePerHour: pricingRules[0]?.pricePerHour ?? null,
+          cancellationWindowHours: pitchRow.venueCancellationWindowHours,
+          slotDurationMinutes: pitchRow.slotDurationMinutes,
+          capturedAt: new Date().toISOString(),
+        };
+
+        const [inserted] = await tx
+          .insert(bookingsTable)
+          .values({
+            venueId: pitchRow.venueId,
+            pitchId,
+            playerId: req.user!.userId,
+            startAt: startDate,
+            endAt: endDate,
+            status: "PENDING",
+            policySnapshot,
+          })
+          .returning();
+
+        return inserted!;
+      });
+
+      booking = result;
+      [player] = await db
         .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
         .from(usersTable)
         .where(eq(usersTable.id, req.user!.userId))
         .limit(1);
-
-      res.status(201).json({
-        booking: {
-          ...booking!,
-          startAt: booking!.startAt.toISOString(),
-          endAt: booking!.endAt.toISOString(),
-          createdAt: booking!.createdAt.toISOString(),
-          updatedAt: booking!.updatedAt.toISOString(),
-          venue: {
-            id: pitchRow.venueId,
-            name: pitchRow.venueName,
-            district: pitchRow.venueDistrict,
-            address: pitchRow.venueAddress,
-          },
-          pitch: {
-            id: pitchRow.id,
-            name: pitchRow.name,
-            type: pitchRow.type,
-            size: pitchRow.size,
-            slotDurationMinutes: pitchRow.slotDurationMinutes,
-          },
-          player: player ?? { id: req.user!.userId, name: "", email: req.user!.email ?? "" },
-        },
-      });
     } catch (err: unknown) {
+      // Maintenance conflict flagged inside transaction
+      if ((err as { _type?: string })?._type === "maintenance_blocked") {
+        res.status(409).json({ error: "This slot is blocked for maintenance. Please choose another time." });
+        return;
+      }
       // PostgreSQL unique constraint violation = double-booking
       // Drizzle wraps the pg error: check both err.code and err.cause?.code
       const pgCode =
         (err as { code?: string })?.code ??
         (err as { cause?: { code?: string } })?.cause?.code;
       if (pgCode === "23505") {
-        res
-          .status(409)
-          .json({ error: "This slot is no longer available. Please choose another time." });
+        res.status(409).json({ error: "This slot is no longer available. Please choose another time." });
         return;
       }
       throw err;
     }
+
+    res.status(201).json({
+      booking: {
+        ...booking,
+        startAt: booking.startAt.toISOString(),
+        endAt: booking.endAt.toISOString(),
+        createdAt: booking.createdAt.toISOString(),
+        updatedAt: booking.updatedAt.toISOString(),
+        venue: {
+          id: pitchRow.venueId,
+          name: pitchRow.venueName,
+          district: pitchRow.venueDistrict,
+          address: pitchRow.venueAddress,
+        },
+        pitch: {
+          id: pitchRow.id,
+          name: pitchRow.name,
+          type: pitchRow.type,
+          size: pitchRow.size,
+          slotDurationMinutes: pitchRow.slotDurationMinutes,
+        },
+        player: player ?? { id: req.user!.userId, name: "", email: req.user!.email ?? "" },
+      },
+    });
   } catch (err) {
     console.error("POST /bookings error:", err);
     res.status(500).json({ error: "Internal server error" });

@@ -137,8 +137,18 @@ export interface PricingRuleRecord {
   depositAmount?: string | null;
 }
 
+export interface MaintenanceBlock {
+  id: string;
+  pitchId: string;
+  startAt: string;
+  endAt: string;
+  reason?: string | null;
+  createdAt: string;
+}
+
 export type PitchWithPricing = PitchRecord & {
   pricingRules: PricingRuleRecord[];
+  maintenanceBlocks: MaintenanceBlock[];
 };
 
 export interface OpeningHoursRecord {
@@ -316,15 +326,6 @@ export type BookingWithDetails = BookingRecord & {
   pitch: BookingPitchSummary;
   player: BookingPlayerSummary;
 };
-
-export interface MaintenanceBlock {
-  id: string;
-  pitchId: string;
-  startAt: string;
-  endAt: string;
-  reason?: string | null;
-  createdAt: string;
-}
 
 export interface CreateBookingRequest {
   pitchId: string;

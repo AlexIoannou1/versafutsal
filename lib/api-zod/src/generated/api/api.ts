@@ -149,6 +149,16 @@ export const GetVenueResponse = zod.object({
                     depositAmount: zod.string().nullish(),
                   }),
                 ),
+                maintenanceBlocks: zod.array(
+                  zod.object({
+                    id: zod.string().uuid(),
+                    pitchId: zod.string().uuid(),
+                    startAt: zod.coerce.date(),
+                    endAt: zod.coerce.date(),
+                    reason: zod.string().nullish(),
+                    createdAt: zod.coerce.date(),
+                  }),
+                ),
               }),
             ),
         ),
@@ -271,6 +281,16 @@ export const GetOwnerVenueResponse = zod.object({
                     pricePerHour: zod.string(),
                     depositType: zod.string(),
                     depositAmount: zod.string().nullish(),
+                  }),
+                ),
+                maintenanceBlocks: zod.array(
+                  zod.object({
+                    id: zod.string().uuid(),
+                    pitchId: zod.string().uuid(),
+                    startAt: zod.coerce.date(),
+                    endAt: zod.coerce.date(),
+                    reason: zod.string().nullish(),
+                    createdAt: zod.coerce.date(),
                   }),
                 ),
               }),
