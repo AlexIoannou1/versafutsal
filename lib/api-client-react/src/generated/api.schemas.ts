@@ -256,6 +256,88 @@ export interface RejectVenueRequest {
   reason?: string;
 }
 
+export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
+
+export const BookingStatus = {
+  PENDING: "PENDING",
+  CONFIRMED: "CONFIRMED",
+  CANCELLED: "CANCELLED",
+  REFUNDED: "REFUNDED",
+  NO_SHOW: "NO_SHOW",
+} as const;
+
+export interface SlotItem {
+  startAt: string;
+  endAt: string;
+  available: boolean;
+  /** Why the slot is unavailable (booked | maintenance) */
+  reason?: string | null;
+}
+
+export type BookingRecordPolicySnapshot = { [key: string]: unknown };
+
+export interface BookingRecord {
+  id: string;
+  venueId: string;
+  pitchId: string;
+  playerId: string;
+  startAt: string;
+  endAt: string;
+  status: BookingStatus;
+  policySnapshot: BookingRecordPolicySnapshot;
+  cancellationReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BookingVenueSummary {
+  id: string;
+  name: string;
+  district: string;
+  address: string;
+}
+
+export interface BookingPitchSummary {
+  id: string;
+  name: string;
+  type: PitchType;
+  size: string;
+  slotDurationMinutes: number;
+}
+
+export interface BookingPlayerSummary {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export type BookingWithDetails = BookingRecord & {
+  venue: BookingVenueSummary;
+  pitch: BookingPitchSummary;
+  player: BookingPlayerSummary;
+};
+
+export interface MaintenanceBlock {
+  id: string;
+  pitchId: string;
+  startAt: string;
+  endAt: string;
+  reason?: string | null;
+  createdAt: string;
+}
+
+export interface CreateBookingRequest {
+  pitchId: string;
+  /** ISO 8601 UTC timestamp for the slot start */
+  startAt: string;
+}
+
+export interface CreateMaintenanceBlockRequest {
+  startAt: string;
+  endAt: string;
+  reason?: string;
+}
+
 export type ListVenuesParams = {
   district?: string;
   type?: ListVenuesType;
@@ -318,6 +400,45 @@ export type SetOpeningHours200 = {
 
 export type SetPricingRules200 = {
   pricingRules: PricingRuleRecord[];
+};
+
+export type GetPitchAvailabilityParams = {
+  /**
+   * Date in YYYY-MM-DD format
+   */
+  date: string;
+};
+
+export type GetPitchAvailability200 = {
+  slots: SlotItem[];
+};
+
+export type CreateBooking201 = {
+  booking: BookingWithDetails;
+};
+
+export type ListPlayerBookingsParams = {
+  status?: BookingStatus;
+};
+
+export type ListPlayerBookings200 = {
+  bookings: BookingWithDetails[];
+};
+
+export type GetPlayerBooking200 = {
+  booking: BookingWithDetails;
+};
+
+export type ListOwnerBookingsParams = {
+  status?: BookingStatus;
+};
+
+export type ListOwnerBookings200 = {
+  bookings: BookingWithDetails[];
+};
+
+export type CreateMaintenanceBlock201 = {
+  block: MaintenanceBlock;
 };
 
 export type AdminListVenuesParams = {

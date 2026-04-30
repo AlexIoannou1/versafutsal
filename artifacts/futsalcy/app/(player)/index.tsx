@@ -143,7 +143,7 @@ export default function PlayerVenuesScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
     },
-    list: { padding: 16 },
+    list: { padding: 16, paddingBottom: insets.bottom + 100 },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     emptyIcon: {
       width: 64,
@@ -399,7 +399,13 @@ export default function PlayerVenuesScreen() {
             />
           }
           renderItem={({ item }) => (
-            <View style={s.card}>
+            <TouchableOpacity
+              style={s.card}
+              onPress={() => router.push(`/player/venue/${item.id}`)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${item.name}`}
+            >
               {item.coverPhoto ? (
                 <Image
                   source={{ uri: item.coverPhoto }}
@@ -460,15 +466,12 @@ export default function PlayerVenuesScreen() {
                         : `€${item.minPrice}–€${item.maxPrice}/hr`
                       : "Price on request"}
                   </Text>
-                  <TouchableOpacity
-                    style={s.viewBtn}
-                    onPress={() => router.push(`/player/venue/${item.id}`)}
-                  >
-                    <Text style={s.viewBtnText}>View</Text>
-                  </TouchableOpacity>
+                  <View style={s.viewBtn}>
+                    <Text style={s.viewBtnText}>View →</Text>
+                  </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}

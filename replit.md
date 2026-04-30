@@ -38,9 +38,24 @@ Cyprus futsal booking platform (two-sided marketplace).
 - `artifacts/futsalcy/app/(player)/` — Player tab group (Venues, Bookings, Profile)
 - `artifacts/futsalcy/app/(owner)/` — Owner tab group (Dashboard, Venues, Profile)
 - `artifacts/futsalcy/app/(admin)/` — Admin tab group (Overview, Venue Approvals, Profile)
+- `artifacts/futsalcy/app/player/venue/[id]/book.tsx` — Booking screen (date strip + slot grid + confirm CTA)
+- `artifacts/futsalcy/app/player/booking/[id].tsx` — Booking confirmation / detail screen
+- `artifacts/futsalcy/app/(player)/bookings.tsx` — Player booking history list
+- `artifacts/futsalcy/app/(owner)/index.tsx` — Owner dashboard (booking stats + upcoming/past lists)
+- `artifacts/api-server/src/routes/bookings.ts` — Availability engine + booking CRUD routes
 - `artifacts/api-server/src/routes/auth.ts` — /auth/register, /auth/login, /auth/me
-- `lib/db/src/schema/` — Drizzle schema (users, venues, pitches, bookings, payments, …)
+- `lib/db/src/schema/` — Drizzle schema (users, venues, pitches, bookings, maintenanceBlocks, …)
 - `lib/api-spec/openapi.yaml` — OpenAPI spec (source of truth for codegen)
+
+### Booking API Endpoints (Task #3)
+- `GET /api/venues/:venueId/pitches/:pitchId/availability?date=YYYY-MM-DD` — slot grid (open hours - maintenance blocks - existing bookings)
+- `POST /api/bookings` — create booking (concurrency-safe via PG unique constraint `unique_pitch_slot`)
+- `GET /api/player/bookings` / `GET /api/player/bookings/:id` — player booking history
+- `GET /api/owner/bookings` — owner booking list with player/venue/pitch details
+- `POST/DELETE /api/owner/venues/:venueId/pitches/:pitchId/blocks` — maintenance block CRUD
+
+Booking unique constraint: `(pitch_id, start_at)` prevents double-booking.  
+Drizzle wraps PG errors — check `err.cause?.code === "23505"` for unique constraint violations.
 
 ### Colors (FutsalCY brand)
 - Primary green: `#00C851`

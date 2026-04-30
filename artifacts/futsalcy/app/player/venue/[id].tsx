@@ -9,7 +9,7 @@ import {
   Image,
   Linking,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
@@ -42,6 +42,7 @@ const TYPE_LABELS: Record<string, string> = {
 export default function PlayerVenueDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [photoIndex, setPhotoIndex] = useState(0);
 
@@ -87,7 +88,7 @@ export default function PlayerVenueDetailScreen() {
     },
     body: {
       padding: 20,
-      paddingBottom: insets.bottom + 100,
+      paddingBottom: insets.bottom + 24,
     },
     venueName: {
       fontSize: 22,
@@ -140,7 +141,7 @@ export default function PlayerVenueDetailScreen() {
       backgroundColor: colors.card,
       borderRadius: 10,
       padding: 14,
-      marginBottom: 8,
+      marginBottom: 10,
       borderWidth: 1,
       borderColor: colors.border,
     },
@@ -179,6 +180,21 @@ export default function PlayerVenueDetailScreen() {
       fontFamily: "Inter_600SemiBold",
       color: colors.primary,
     },
+    bookPitchBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      paddingVertical: 10,
+      marginTop: 12,
+    },
+    bookPitchBtnText: {
+      fontSize: 14,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.primaryForeground,
+    },
     hoursGrid: { gap: 6 },
     hourRow: {
       flexDirection: "row",
@@ -204,37 +220,6 @@ export default function PlayerVenueDetailScreen() {
       fontSize: 14,
       fontFamily: "Inter_400Regular",
       color: colors.destructive,
-    },
-    bottomBar: {
-      position: "absolute",
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: colors.background,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      padding: 16,
-      paddingBottom: insets.bottom + 12,
-    },
-    bookBtn: {
-      backgroundColor: colors.primary,
-      borderRadius: 12,
-      height: 52,
-      alignItems: "center",
-      justifyContent: "center",
-      flexDirection: "row",
-      gap: 8,
-    },
-    bookBtnDisabled: {
-      backgroundColor: colors.muted,
-    },
-    bookBtnText: {
-      fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.primaryForeground,
-    },
-    bookBtnDisabledText: {
-      color: colors.mutedForeground,
     },
     divider: {
       height: 1,
@@ -277,7 +262,9 @@ export default function PlayerVenueDetailScreen() {
   const amenities = (venue.amenities as string[]) ?? [];
   const currentPhoto = photos[photoIndex];
 
-  const mapQuery = encodeURIComponent(String(venue.name) + " " + String(venue.address) + " " + String(venue.district) + " Cyprus");
+  const mapQuery = encodeURIComponent(
+    String(venue.name) + " " + String(venue.address) + " " + String(venue.district) + " Cyprus",
+  );
   const mapUrl = `https://maps.google.com/?q=${mapQuery}`;
 
   return (
@@ -290,7 +277,9 @@ export default function PlayerVenueDetailScreen() {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={(e) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
+                const idx = Math.round(
+                  e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width,
+                );
                 setPhotoIndex(idx);
               }}
             >
@@ -373,7 +362,9 @@ export default function PlayerVenueDetailScreen() {
                     <Text style={s.pitchTypeText}>{TYPE_LABELS[pitch.type] ?? pitch.type}</Text>
                   </View>
                 </View>
-                <Text style={s.pitchSize}>{pitch.size} · {pitch.slotDurationMinutes} min slots</Text>
+                <Text style={s.pitchSize}>
+                  {pitch.size} · {pitch.slotDurationMinutes} min slots
+                </Text>
                 {prices.length > 0 && (
                   <View style={s.priceRow}>
                     {prices.map((r, i) => (
@@ -387,6 +378,17 @@ export default function PlayerVenueDetailScreen() {
                     ))}
                   </View>
                 )}
+                <TouchableOpacity
+                  style={s.bookPitchBtn}
+                  onPress={() =>
+                    router.push(
+                      `/player/venue/${id}/book?pitchId=${pitch.id}&pitchName=${encodeURIComponent(pitch.name)}&slotMins=${pitch.slotDurationMinutes}`,
+                    )
+                  }
+                >
+                  <Feather name="calendar" size={16} color={colors.primaryForeground} />
+                  <Text style={s.bookPitchBtnText}>Book Slot</Text>
+                </TouchableOpacity>
               </View>
             );
           })}
@@ -416,13 +418,6 @@ export default function PlayerVenueDetailScreen() {
           )}
         </View>
       </ScrollView>
-
-      <View style={s.bottomBar}>
-        <TouchableOpacity style={[s.bookBtn, s.bookBtnDisabled]} disabled>
-          <Feather name="calendar" size={20} color={colors.mutedForeground} />
-          <Text style={[s.bookBtnText, s.bookBtnDisabledText]}>Book Now — Coming Soon</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }

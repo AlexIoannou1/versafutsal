@@ -25,14 +25,25 @@ import type {
   ApiError,
   ApproveVenue200,
   AuthResponse,
+  CreateBooking201,
+  CreateBookingRequest,
+  CreateMaintenanceBlock201,
+  CreateMaintenanceBlockRequest,
   CreatePitch201,
   CreatePitchRequest,
   CreateVenue201,
   CreateVenueRequest,
   GetOwnerVenue200,
+  GetPitchAvailability200,
+  GetPitchAvailabilityParams,
+  GetPlayerBooking200,
   GetVenue200,
   HealthStatus,
+  ListOwnerBookings200,
+  ListOwnerBookingsParams,
   ListOwnerVenues200,
+  ListPlayerBookings200,
+  ListPlayerBookingsParams,
   ListVenues200,
   ListVenuesParams,
   LoginRequest,
@@ -1660,6 +1671,711 @@ export const useSetPricingRules = <
   TContext
 > => {
   return useMutation(getSetPricingRulesMutationOptions(options));
+};
+
+/**
+ * @summary Get available time slots for a pitch on a given date
+ */
+export const getGetPitchAvailabilityUrl = (
+  venueId: string,
+  pitchId: string,
+  params: GetPitchAvailabilityParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/venues/${venueId}/pitches/${pitchId}/availability?${stringifiedParams}`
+    : `/api/venues/${venueId}/pitches/${pitchId}/availability`;
+};
+
+export const getPitchAvailability = async (
+  venueId: string,
+  pitchId: string,
+  params: GetPitchAvailabilityParams,
+  options?: RequestInit,
+): Promise<GetPitchAvailability200> => {
+  return customFetch<GetPitchAvailability200>(
+    getGetPitchAvailabilityUrl(venueId, pitchId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPitchAvailabilityQueryKey = (
+  venueId: string,
+  pitchId: string,
+  params?: GetPitchAvailabilityParams,
+) => {
+  return [
+    `/api/venues/${venueId}/pitches/${pitchId}/availability`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetPitchAvailabilityQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPitchAvailability>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  pitchId: string,
+  params: GetPitchAvailabilityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPitchAvailability>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetPitchAvailabilityQueryKey(venueId, pitchId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPitchAvailability>>
+  > = ({ signal }) =>
+    getPitchAvailability(venueId, pitchId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(venueId && pitchId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPitchAvailability>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPitchAvailabilityQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPitchAvailability>>
+>;
+export type GetPitchAvailabilityQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get available time slots for a pitch on a given date
+ */
+
+export function useGetPitchAvailability<
+  TData = Awaited<ReturnType<typeof getPitchAvailability>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  pitchId: string,
+  params: GetPitchAvailabilityParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPitchAvailability>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPitchAvailabilityQueryOptions(
+    venueId,
+    pitchId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a booking for a pitch slot
+ */
+export const getCreateBookingUrl = () => {
+  return `/api/bookings`;
+};
+
+export const createBooking = async (
+  createBookingRequest: CreateBookingRequest,
+  options?: RequestInit,
+): Promise<CreateBooking201> => {
+  return customFetch<CreateBooking201>(getCreateBookingUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createBookingRequest),
+  });
+};
+
+export const getCreateBookingMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBooking>>,
+    TError,
+    { data: BodyType<CreateBookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createBooking>>,
+  TError,
+  { data: BodyType<CreateBookingRequest> },
+  TContext
+> => {
+  const mutationKey = ["createBooking"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createBooking>>,
+    { data: BodyType<CreateBookingRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createBooking(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateBookingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createBooking>>
+>;
+export type CreateBookingMutationBody = BodyType<CreateBookingRequest>;
+export type CreateBookingMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Create a booking for a pitch slot
+ */
+export const useCreateBooking = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createBooking>>,
+    TError,
+    { data: BodyType<CreateBookingRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createBooking>>,
+  TError,
+  { data: BodyType<CreateBookingRequest> },
+  TContext
+> => {
+  return useMutation(getCreateBookingMutationOptions(options));
+};
+
+/**
+ * @summary List bookings for the logged-in player
+ */
+export const getListPlayerBookingsUrl = (params?: ListPlayerBookingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/player/bookings?${stringifiedParams}`
+    : `/api/player/bookings`;
+};
+
+export const listPlayerBookings = async (
+  params?: ListPlayerBookingsParams,
+  options?: RequestInit,
+): Promise<ListPlayerBookings200> => {
+  return customFetch<ListPlayerBookings200>(getListPlayerBookingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPlayerBookingsQueryKey = (
+  params?: ListPlayerBookingsParams,
+) => {
+  return [`/api/player/bookings`, ...(params ? [params] : [])] as const;
+};
+
+export const getListPlayerBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPlayerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPlayerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPlayerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPlayerBookingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listPlayerBookings>>
+  > = ({ signal }) => listPlayerBookings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPlayerBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPlayerBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPlayerBookings>>
+>;
+export type ListPlayerBookingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List bookings for the logged-in player
+ */
+
+export function useListPlayerBookings<
+  TData = Awaited<ReturnType<typeof listPlayerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListPlayerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listPlayerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPlayerBookingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a specific booking for the logged-in player
+ */
+export const getGetPlayerBookingUrl = (id: string) => {
+  return `/api/player/bookings/${id}`;
+};
+
+export const getPlayerBooking = async (
+  id: string,
+  options?: RequestInit,
+): Promise<GetPlayerBooking200> => {
+  return customFetch<GetPlayerBooking200>(getGetPlayerBookingUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPlayerBookingQueryKey = (id: string) => {
+  return [`/api/player/bookings/${id}`] as const;
+};
+
+export const getGetPlayerBookingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPlayerBooking>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerBooking>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPlayerBookingQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPlayerBooking>>
+  > = ({ signal }) => getPlayerBooking(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPlayerBooking>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPlayerBookingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPlayerBooking>>
+>;
+export type GetPlayerBookingQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get a specific booking for the logged-in player
+ */
+
+export function useGetPlayerBooking<
+  TData = Awaited<ReturnType<typeof getPlayerBooking>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerBooking>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPlayerBookingQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List bookings across all venues owned by the current user
+ */
+export const getListOwnerBookingsUrl = (params?: ListOwnerBookingsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/owner/bookings?${stringifiedParams}`
+    : `/api/owner/bookings`;
+};
+
+export const listOwnerBookings = async (
+  params?: ListOwnerBookingsParams,
+  options?: RequestInit,
+): Promise<ListOwnerBookings200> => {
+  return customFetch<ListOwnerBookings200>(getListOwnerBookingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListOwnerBookingsQueryKey = (
+  params?: ListOwnerBookingsParams,
+) => {
+  return [`/api/owner/bookings`, ...(params ? [params] : [])] as const;
+};
+
+export const getListOwnerBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOwnerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOwnerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOwnerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListOwnerBookingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOwnerBookings>>
+  > = ({ signal }) => listOwnerBookings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOwnerBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOwnerBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOwnerBookings>>
+>;
+export type ListOwnerBookingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List bookings across all venues owned by the current user
+ */
+
+export function useListOwnerBookings<
+  TData = Awaited<ReturnType<typeof listOwnerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOwnerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOwnerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOwnerBookingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Block a pitch slot for maintenance
+ */
+export const getCreateMaintenanceBlockUrl = (
+  venueId: string,
+  pitchId: string,
+) => {
+  return `/api/owner/venues/${venueId}/pitches/${pitchId}/blocks`;
+};
+
+export const createMaintenanceBlock = async (
+  venueId: string,
+  pitchId: string,
+  createMaintenanceBlockRequest: CreateMaintenanceBlockRequest,
+  options?: RequestInit,
+): Promise<CreateMaintenanceBlock201> => {
+  return customFetch<CreateMaintenanceBlock201>(
+    getCreateMaintenanceBlockUrl(venueId, pitchId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createMaintenanceBlockRequest),
+    },
+  );
+};
+
+export const getCreateMaintenanceBlockMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMaintenanceBlock>>,
+    TError,
+    {
+      venueId: string;
+      pitchId: string;
+      data: BodyType<CreateMaintenanceBlockRequest>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createMaintenanceBlock>>,
+  TError,
+  {
+    venueId: string;
+    pitchId: string;
+    data: BodyType<CreateMaintenanceBlockRequest>;
+  },
+  TContext
+> => {
+  const mutationKey = ["createMaintenanceBlock"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createMaintenanceBlock>>,
+    {
+      venueId: string;
+      pitchId: string;
+      data: BodyType<CreateMaintenanceBlockRequest>;
+    }
+  > = (props) => {
+    const { venueId, pitchId, data } = props ?? {};
+
+    return createMaintenanceBlock(venueId, pitchId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateMaintenanceBlockMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createMaintenanceBlock>>
+>;
+export type CreateMaintenanceBlockMutationBody =
+  BodyType<CreateMaintenanceBlockRequest>;
+export type CreateMaintenanceBlockMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Block a pitch slot for maintenance
+ */
+export const useCreateMaintenanceBlock = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createMaintenanceBlock>>,
+    TError,
+    {
+      venueId: string;
+      pitchId: string;
+      data: BodyType<CreateMaintenanceBlockRequest>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createMaintenanceBlock>>,
+  TError,
+  {
+    venueId: string;
+    pitchId: string;
+    data: BodyType<CreateMaintenanceBlockRequest>;
+  },
+  TContext
+> => {
+  return useMutation(getCreateMaintenanceBlockMutationOptions(options));
+};
+
+/**
+ * @summary Remove a maintenance block
+ */
+export const getDeleteMaintenanceBlockUrl = (
+  venueId: string,
+  pitchId: string,
+  blockId: string,
+) => {
+  return `/api/owner/venues/${venueId}/pitches/${pitchId}/blocks/${blockId}`;
+};
+
+export const deleteMaintenanceBlock = async (
+  venueId: string,
+  pitchId: string,
+  blockId: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(
+    getDeleteMaintenanceBlockUrl(venueId, pitchId, blockId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteMaintenanceBlockMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMaintenanceBlock>>,
+    TError,
+    { venueId: string; pitchId: string; blockId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteMaintenanceBlock>>,
+  TError,
+  { venueId: string; pitchId: string; blockId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteMaintenanceBlock"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteMaintenanceBlock>>,
+    { venueId: string; pitchId: string; blockId: string }
+  > = (props) => {
+    const { venueId, pitchId, blockId } = props ?? {};
+
+    return deleteMaintenanceBlock(venueId, pitchId, blockId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteMaintenanceBlockMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteMaintenanceBlock>>
+>;
+
+export type DeleteMaintenanceBlockMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove a maintenance block
+ */
+export const useDeleteMaintenanceBlock = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteMaintenanceBlock>>,
+    TError,
+    { venueId: string; pitchId: string; blockId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteMaintenanceBlock>>,
+  TError,
+  { venueId: string; pitchId: string; blockId: string },
+  TContext
+> => {
+  return useMutation(getDeleteMaintenanceBlockMutationOptions(options));
 };
 
 /**

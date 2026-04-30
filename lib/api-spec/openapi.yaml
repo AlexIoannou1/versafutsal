@@ -14,6 +14,8 @@ tags:
     description: Authentication operations
   - name: venues
     description: Venue discovery and management
+  - name: bookings
+    description: Booking and availability operations
   - name: admin
     description: Admin operations
 paths:
@@ -562,6 +564,247 @@ paths:
                     items:
                       $ref: "#/components/schemas/PricingRuleRecord"
                 required: [pricingRules]
+
+  # ── Availability ──────────────────────────────────────────────────────────
+  /venues/{venueId}/pitches/{pitchId}/availability:
+    get:
+      operationId: getPitchAvailability
+      tags: [venues]
+      summary: Get available time slots for a pitch on a given date
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pitchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Date in YYYY-MM-DD format
+      responses:
+        "200":
+          description: Slot availability for the date
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  slots:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SlotItem"
+                required: [slots]
+        "400":
+          description: Invalid date
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Pitch not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  # ── Bookings ──────────────────────────────────────────────────────────────
+  /bookings:
+    post:
+      operationId: createBooking
+      tags: [bookings]
+      summary: Create a booking for a pitch slot
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBookingRequest"
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking:
+                    $ref: "#/components/schemas/BookingWithDetails"
+                required: [booking]
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Slot no longer available (double-booking prevented)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /player/bookings:
+    get:
+      operationId: listPlayerBookings
+      tags: [bookings]
+      summary: List bookings for the logged-in player
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+      responses:
+        "200":
+          description: Player's bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookingWithDetails"
+                required: [bookings]
+
+  /player/bookings/{id}:
+    get:
+      operationId: getPlayerBooking
+      tags: [bookings]
+      summary: Get a specific booking for the logged-in player
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Booking detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking:
+                    $ref: "#/components/schemas/BookingWithDetails"
+                required: [booking]
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /owner/bookings:
+    get:
+      operationId: listOwnerBookings
+      tags: [bookings]
+      summary: List bookings across all venues owned by the current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+      responses:
+        "200":
+          description: Owner's bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookingWithDetails"
+                required: [bookings]
+
+  /owner/venues/{venueId}/pitches/{pitchId}/blocks:
+    post:
+      operationId: createMaintenanceBlock
+      tags: [bookings]
+      summary: Block a pitch slot for maintenance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pitchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaintenanceBlockRequest"
+      responses:
+        "201":
+          description: Maintenance block created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  block:
+                    $ref: "#/components/schemas/MaintenanceBlock"
+                required: [block]
+
+  /owner/venues/{venueId}/pitches/{pitchId}/blocks/{blockId}:
+    delete:
+      operationId: deleteMaintenanceBlock
+      tags: [bookings]
+      summary: Remove a maintenance block
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: pitchId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: blockId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Block deleted
 
   # ── Admin Endpoints ───────────────────────────────────────────────────────
   /admin/venues:
@@ -1143,3 +1386,164 @@ components:
       properties:
         reason:
           type: string
+
+    BookingStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, CANCELLED, REFUNDED, NO_SHOW]
+
+    SlotItem:
+      type: object
+      properties:
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        available:
+          type: boolean
+        reason:
+          type: string
+          nullable: true
+          description: Why the slot is unavailable (booked | maintenance)
+      required: [startAt, endAt, available]
+
+    BookingRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        venueId:
+          type: string
+          format: uuid
+        pitchId:
+          type: string
+          format: uuid
+        playerId:
+          type: string
+          format: uuid
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/BookingStatus"
+        policySnapshot:
+          type: object
+        cancellationReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, venueId, pitchId, playerId, startAt, endAt, status, policySnapshot, createdAt, updatedAt]
+
+    BookingVenueSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+      required: [id, name, district, address]
+
+    BookingPitchSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/PitchType"
+        size:
+          type: string
+        slotDurationMinutes:
+          type: integer
+      required: [id, name, type, size, slotDurationMinutes]
+
+    BookingPlayerSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [id, name, email]
+
+    BookingWithDetails:
+      allOf:
+        - $ref: "#/components/schemas/BookingRecord"
+        - type: object
+          properties:
+            venue:
+              $ref: "#/components/schemas/BookingVenueSummary"
+            pitch:
+              $ref: "#/components/schemas/BookingPitchSummary"
+            player:
+              $ref: "#/components/schemas/BookingPlayerSummary"
+          required: [venue, pitch, player]
+
+    MaintenanceBlock:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pitchId:
+          type: string
+          format: uuid
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, pitchId, startAt, endAt, createdAt]
+
+    CreateBookingRequest:
+      type: object
+      properties:
+        pitchId:
+          type: string
+          format: uuid
+        startAt:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC timestamp for the slot start
+      required: [pitchId, startAt]
+
+    CreateMaintenanceBlockRequest:
+      type: object
+      properties:
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+      required: [startAt, endAt]

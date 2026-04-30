@@ -11,7 +11,9 @@ import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
-import { venuesTable, pitchesTable } from "./venues";
+import { venuesTable, pitchesTable, maintenanceBlocksTable } from "./venues";
+
+export { maintenanceBlocksTable };
 
 export const bookingStatusEnum = pgEnum("booking_status", [
   "PENDING",
@@ -81,3 +83,4 @@ export type BookingStatus =
   | "CANCELLED"
   | "REFUNDED"
   | "NO_SHOW";
+export type MaintenanceBlock = typeof maintenanceBlocksTable.$inferSelect;
