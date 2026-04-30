@@ -125,7 +125,10 @@ export default function VenueNewScreen() {
           address: address.trim(),
           description: description.trim() || undefined,
           amenities: selectedAmenities,
-          cancellationWindowHours: parseInt(cancellationWindowHours, 10) || 24,
+          cancellationWindowHours: (() => {
+            const v = parseInt(cancellationWindowHours, 10);
+            return isNaN(v) ? 24 : v;
+          })(),
         });
         const id = result?.venue?.id;
         if (!id) throw new Error("No venue ID returned");
