@@ -479,9 +479,11 @@ export default function PlayerBookingDetailScreen() {
           </TouchableOpacity>
         )}
 
-        {!cancelCheck.allowed && booking.status === "CONFIRMED" && cancelCheck.reason && (
-          <Text style={s.policyNote}>{cancelCheck.reason}</Text>
-        )}
+        {!cancelCheck.allowed &&
+          (booking.status === "CONFIRMED" || booking.status === "PENDING") &&
+          cancelCheck.reason && (
+            <Text style={s.policyNote}>{cancelCheck.reason}</Text>
+          )}
 
         <TouchableOpacity
           style={s.secondaryBtn}
