@@ -181,8 +181,14 @@ router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res
       .select({
         booking: bookingsTable,
         player: { id: usersTable.id, name: usersTable.name, email: usersTable.email },
-        venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district },
-        pitch: { id: pitchesTable.id, name: pitchesTable.name, type: pitchesTable.type, size: pitchesTable.size },
+        venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district, address: venuesTable.address },
+        pitch: {
+          id: pitchesTable.id,
+          name: pitchesTable.name,
+          type: pitchesTable.type,
+          size: pitchesTable.size,
+          slotDurationMinutes: pitchesTable.slotDurationMinutes,
+        },
       })
       .from(bookingsTable)
       .leftJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
@@ -198,9 +204,9 @@ router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res
         endAt: r.booking.endAt.toISOString(),
         createdAt: r.booking.createdAt.toISOString(),
         updatedAt: r.booking.updatedAt.toISOString(),
-        player: r.player,
-        venue: r.venue,
-        pitch: r.pitch,
+        player: r.player ?? { id: "", name: "Unknown", email: "" },
+        venue: r.venue ?? { id: "", name: "Unknown", district: "", address: "" },
+        pitch: r.pitch ?? { id: "", name: "Unknown", type: "OUTDOOR", size: "", slotDurationMinutes: 60 },
       })),
     });
   } catch (err) {
@@ -219,7 +225,13 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
         booking: bookingsTable,
         player: { id: usersTable.id, name: usersTable.name, email: usersTable.email },
         venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district, address: venuesTable.address },
-        pitch: { id: pitchesTable.id, name: pitchesTable.name, type: pitchesTable.type, size: pitchesTable.size },
+        pitch: {
+          id: pitchesTable.id,
+          name: pitchesTable.name,
+          type: pitchesTable.type,
+          size: pitchesTable.size,
+          slotDurationMinutes: pitchesTable.slotDurationMinutes,
+        },
       })
       .from(bookingsTable)
       .leftJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
@@ -240,9 +252,9 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
         endAt: row.booking.endAt.toISOString(),
         createdAt: row.booking.createdAt.toISOString(),
         updatedAt: row.booking.updatedAt.toISOString(),
-        player: row.player,
-        venue: row.venue,
-        pitch: row.pitch,
+        player: row.player ?? { id: "", name: "Unknown", email: "" },
+        venue: row.venue ?? { id: "", name: "Unknown", district: "", address: "" },
+        pitch: row.pitch ?? { id: "", name: "Unknown", type: "OUTDOOR", size: "", slotDurationMinutes: 60 },
       },
     });
   } catch (err) {

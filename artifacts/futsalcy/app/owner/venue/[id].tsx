@@ -113,6 +113,7 @@ export default function OwnerVenueDetailScreen() {
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editCancellationWindowHours, setEditCancellationWindowHours] = useState("24");
   const [editSaving, setEditSaving] = useState(false);
 
   // ─── Photo state ──────────────────────────────────────────────────────────
@@ -255,6 +256,7 @@ export default function OwnerVenueDetailScreen() {
     setEditName(venue.name);
     setEditAddress(venue.address);
     setEditDescription(venue.description ?? "");
+    setEditCancellationWindowHours(String(venue.cancellationWindowHours ?? 24));
     setEditModalVisible(true);
   };
 
@@ -263,12 +265,18 @@ export default function OwnerVenueDetailScreen() {
       Alert.alert("Error", "Venue name is required.");
       return;
     }
+    const windowHours = parseInt(editCancellationWindowHours, 10);
+    if (isNaN(windowHours) || windowHours < 0) {
+      Alert.alert("Error", "Cancellation window must be a non-negative number of hours.");
+      return;
+    }
     setEditSaving(true);
     try {
       await updateVenue(id!, {
         name: editName.trim(),
         address: editAddress.trim(),
         description: editDescription.trim() || undefined,
+        cancellationWindowHours: windowHours,
       });
       setEditModalVisible(false);
       invalidate();
@@ -777,6 +785,12 @@ export default function OwnerVenueDetailScreen() {
               <Text style={s.infoValue}>{venue.amenities.join(", ")}</Text>
             </View>
           )}
+          <View style={s.infoRow}>
+            <Text style={s.infoLabel}>Cancel by</Text>
+            <Text style={s.infoValue}>
+              {venue.cancellationWindowHours}h before start
+            </Text>
+          </View>
         </View>
 
         {/* Photos Section */}
@@ -950,6 +964,20 @@ export default function OwnerVenueDetailScreen() {
                 multiline
                 numberOfLines={3}
               />
+            </View>
+            <View style={s.mField}>
+              <Text style={s.mLabel}>Cancellation Window (hours)</Text>
+              <TextInput
+                style={s.mInput}
+                value={editCancellationWindowHours}
+                onChangeText={setEditCancellationWindowHours}
+                keyboardType="numeric"
+                placeholder="24"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
+                Players can cancel up to this many hours before the booking starts.
+              </Text>
             </View>
             <View style={s.mActions}>
               <TouchableOpacity style={s.mCancelBtn} onPress={() => setEditModalVisible(false)}>

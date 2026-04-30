@@ -82,6 +82,7 @@ export default function VenueNewScreen() {
   const [district, setDistrict] = useState("");
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
+  const [cancellationWindowHours, setCancellationWindowHours] = useState("24");
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
   // Created venue ID after step 0 succeeds
@@ -124,6 +125,7 @@ export default function VenueNewScreen() {
           address: address.trim(),
           description: description.trim() || undefined,
           amenities: selectedAmenities,
+          cancellationWindowHours: parseInt(cancellationWindowHours, 10) || 24,
         });
         const id = result?.venue?.id;
         if (!id) throw new Error("No venue ID returned");
@@ -462,6 +464,21 @@ export default function VenueNewScreen() {
                 multiline
                 numberOfLines={3}
               />
+            </View>
+
+            <View style={s.field}>
+              <Text style={s.label}>Cancellation Window (hours)</Text>
+              <TextInput
+                style={s.input}
+                value={cancellationWindowHours}
+                onChangeText={setCancellationWindowHours}
+                keyboardType="numeric"
+                placeholder="24"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
+                Players can cancel up to this many hours before their booking starts. Default: 24h.
+              </Text>
             </View>
 
             <View style={s.field}>
