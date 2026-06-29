@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,7 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useListOwnerBookings } from "@workspace/api-client-react";
 
-type ViewMode = "day" | "grid" | "month" | "list";
+type ViewMode = "day" | "month" | "list";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -38,13 +37,6 @@ const MONTH_NAMES = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
 ];
-
-// Grid constants
-const HOUR_ROW_HEIGHT = 56;
-const PITCH_COL_WIDTH = 100;
-const TIME_GUTTER_WIDTH = 44;
-const GRID_START_HOUR = 7;
-const GRID_END_HOUR = 23;
 
 function startOfWeek(date: Date) {
   const d = new Date(date);
@@ -99,17 +91,12 @@ function buildMonthGrid(year: number, month: number): Array<Date | null> {
   return cells;
 }
 
-/** Returns minutes from midnight for an ISO timestamp */
-function toMinutes(iso: string): number {
-  const d = new Date(iso);
-  return d.getHours() * 60 + d.getMinutes();
-}
-
 type Booking = {
   id: string;
   startAt: string;
   endAt: string;
   status: string;
+  createdAt?: string;
   pitch?: { id?: string; name?: string } | null;
   venue?: { name: string } | null;
   player?: { name: string; email: string } | null;
@@ -180,7 +167,6 @@ export default function OwnerCalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const screenWidth = Dimensions.get("window").width;
 
   const today = useMemo(() => {
     const d = new Date();
@@ -223,15 +209,26 @@ export default function OwnerCalendarScreen() {
   }
 
   // ─── List helpers ─────────────────────────────────────────────────────────
-  const sortedBookings = useMemo(
-    () => [...bookings].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+  const todayBookings = useMemo(
+    () =>
+      bookings
+        .filter((b) => isSameDay(new Date(b.startAt), today))
+        .sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    [bookings],
+  );
+
+  const otherBookings = useMemo(
+    () =>
+      bookings
+        .filter((b) => !isSameDay(new Date(b.startAt), today))
+        .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")),
     [bookings],
   );
 
   // ─── Navigation ──────────────────────────────────────────────────────────
   function navigate(dir: 1 | -1) {
     const d = new Date(currentDate);
-    if (viewMode === "day" || viewMode === "grid") {
+    if (viewMode === "day") {
       d.setDate(d.getDate() + dir);
     } else if (viewMode === "month") {
       d.setMonth(d.getMonth() + dir);
@@ -245,7 +242,7 @@ export default function OwnerCalendarScreen() {
   function goToday() { setCurrentDate(today); }
 
   function navLabel() {
-    if (viewMode === "day" || viewMode === "grid") return formatDateLong(currentDate);
+    if (viewMode === "day") return formatDateLong(currentDate);
     if (viewMode === "month") return `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
     return "All Bookings";
   }
@@ -312,47 +309,6 @@ export default function OwnerCalendarScreen() {
     bookingPitch: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
     bookingPlayer: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
 
-    // Grid view
-    gridWrapper: { flex: 1 },
-    gridHeader: {
-      flexDirection: "row",
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      backgroundColor: colors.card,
-    },
-    gridTimeGutter: { width: TIME_GUTTER_WIDTH },
-    gridPitchHead: {
-      width: PITCH_COL_WIDTH,
-      paddingVertical: 8,
-      paddingHorizontal: 4,
-      borderLeftWidth: 1,
-      borderLeftColor: colors.border,
-      alignItems: "center",
-    },
-    gridPitchHeadText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.foreground, textAlign: "center" },
-    gridScrollContainer: { flex: 1 },
-    gridBody: { flexDirection: "row" },
-    gridTimeCol: { width: TIME_GUTTER_WIDTH },
-    gridTimeCell: { height: HOUR_ROW_HEIGHT, justifyContent: "flex-start", alignItems: "flex-end", paddingRight: 6, paddingTop: 2 },
-    gridTimeLabel: { fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
-    gridPitchCol: { width: PITCH_COL_WIDTH, borderLeftWidth: 1, borderLeftColor: colors.border },
-    gridHourCell: { height: HOUR_ROW_HEIGHT, borderBottomWidth: 1, borderBottomColor: colors.border + "40" },
-    gridBookingBlock: {
-      position: "absolute",
-      left: 2,
-      right: 2,
-      borderRadius: 4,
-      paddingHorizontal: 4,
-      paddingTop: 2,
-      overflow: "hidden",
-    },
-    gridBlockText: { fontSize: 9, fontFamily: "Inter_600SemiBold", color: "#fff" },
-    gridBlockSub: { fontSize: 8, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.85)" },
-    gridNoPitches: {
-      flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 8,
-    },
-    gridNoPitchesText: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" },
-
     // Month view
     monthDayNamesRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border },
     monthDayName: {
@@ -379,15 +335,22 @@ export default function OwnerCalendarScreen() {
     // List view
     listScroll: { flex: 1 },
     listContent: { padding: 16, paddingBottom: insets.bottom + 80 },
-    listDateHeader: {
-      fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
-      marginTop: 12, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5,
+    listSectionHeader: {
+      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
+      marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.6,
+    },
+    listDivider: {
+      flexDirection: "row", alignItems: "center", gap: 10,
+      marginTop: 8, marginBottom: 16,
+    },
+    listDividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+    listDividerText: {
+      fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground,
     },
   });
 
   const VIEW_MODES: { key: ViewMode; label: string }[] = [
     { key: "day", label: "Day" },
-    { key: "grid", label: "Grid" },
     { key: "month", label: "Month" },
     { key: "list", label: "List" },
   ];
@@ -423,130 +386,6 @@ export default function OwnerCalendarScreen() {
           ))
         )}
       </ScrollView>
-    );
-  };
-
-  // ─── Pitch × Time Grid View ───────────────────────────────────────────────
-  const GridView = () => {
-    const dayBookings = getBookingsForDay(currentDate)
-      .filter((b) => b.status !== "CANCELLED");
-
-    // Derive unique pitches from all bookings (not just today) so columns are stable
-    const allPitches = useMemo(() => {
-      const seen = new Map<string, string>(); // id → name
-      for (const b of bookings) {
-        const p = b.pitch as { id?: string; name?: string } | undefined;
-        if (p?.id && !seen.has(p.id)) seen.set(p.id, p.name ?? p.id);
-      }
-      return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
-    }, [bookings]);
-
-    const hours = Array.from(
-      { length: GRID_END_HOUR - GRID_START_HOUR },
-      (_, i) => GRID_START_HOUR + i,
-    );
-
-    const gridTotalWidth = allPitches.length * PITCH_COL_WIDTH + TIME_GUTTER_WIDTH;
-    const needsHScroll = gridTotalWidth > screenWidth;
-
-    if (allPitches.length === 0) {
-      return (
-        <View style={s.gridNoPitches}>
-          <Feather name="grid" size={32} color={colors.mutedForeground} />
-          <Text style={s.gridNoPitchesText}>
-            No pitches found. Bookings will appear here once you have pitches configured.
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={s.gridWrapper}>
-        {/* Pitch column headers */}
-        <ScrollView horizontal scrollEnabled={needsHScroll} showsHorizontalScrollIndicator={false}>
-          <View>
-            {/* Header row */}
-            <View style={s.gridHeader}>
-              <View style={s.gridTimeGutter} />
-              {allPitches.map((p) => (
-                <View key={p.id} style={s.gridPitchHead}>
-                  <Text style={s.gridPitchHeadText} numberOfLines={2}>{p.name}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Scrollable body */}
-            <ScrollView
-              style={s.gridScrollContainer}
-              showsVerticalScrollIndicator
-              contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-            >
-              <View style={s.gridBody}>
-                {/* Time gutter */}
-                <View style={s.gridTimeCol}>
-                  {hours.map((h) => (
-                    <View key={h} style={s.gridTimeCell}>
-                      <Text style={s.gridTimeLabel}>{formatTimeHH(h)}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Pitch columns */}
-                {allPitches.map((pitch) => {
-                  const pitchBookings = dayBookings.filter(
-                    (b) => (b.pitch as { id?: string } | undefined)?.id === pitch.id,
-                  );
-
-                  return (
-                    <View key={pitch.id} style={[s.gridPitchCol, { height: hours.length * HOUR_ROW_HEIGHT }]}>
-                      {/* Hour grid lines */}
-                      {hours.map((h) => (
-                        <View key={h} style={s.gridHourCell} />
-                      ))}
-
-                      {/* Booking blocks overlaid */}
-                      {pitchBookings.map((b) => {
-                        const startMin = toMinutes(b.startAt);
-                        const endMin = toMinutes(b.endAt);
-                        const offsetMin = startMin - GRID_START_HOUR * 60;
-                        const durationMin = endMin - startMin;
-
-                        if (offsetMin < 0 || durationMin <= 0) return null;
-
-                        const top = (offsetMin / 60) * HOUR_ROW_HEIGHT;
-                        const height = Math.max((durationMin / 60) * HOUR_ROW_HEIGHT, 20);
-                        const sc = STATUS_COLORS[b.status] ?? colors.primary;
-                        const player = b.player as { name: string } | undefined;
-
-                        return (
-                          <TouchableOpacity
-                            key={b.id}
-                            style={[
-                              s.gridBookingBlock,
-                              { top, height, backgroundColor: sc },
-                            ]}
-                            onPress={() => router.push(`/owner/booking/${b.id}`)}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={s.gridBlockText} numberOfLines={1}>
-                              {formatTime(b.startAt)}
-                            </Text>
-                            {height >= 36 && player?.name && (
-                              <Text style={s.gridBlockSub} numberOfLines={1}>
-                                {player.name}
-                              </Text>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  );
-                })}
-              </View>
-            </ScrollView>
-          </View>
-        </ScrollView>
-      </View>
     );
   };
 
@@ -625,17 +464,7 @@ export default function OwnerCalendarScreen() {
 
   // ─── List View ────────────────────────────────────────────────────────────
   const ListView = () => {
-    const grouped: { date: string; bookings: Booking[] }[] = [];
-    let lastDate = "";
-    for (const b of sortedBookings) {
-      const d = b.startAt.slice(0, 10);
-      if (d !== lastDate) {
-        lastDate = d;
-        grouped.push({ date: d, bookings: [b] });
-      } else {
-        grouped[grouped.length - 1].bookings.push(b);
-      }
-    }
+    const isEmpty = bookings.length === 0;
     return (
       <ScrollView
         style={s.listScroll}
@@ -644,27 +473,55 @@ export default function OwnerCalendarScreen() {
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
         }
       >
-        {sortedBookings.length === 0 ? (
+        {isEmpty ? (
           <View style={{ alignItems: "center", paddingVertical: 48, gap: 8 }}>
             <Feather name="calendar" size={32} color={colors.mutedForeground} />
             <Text style={s.noBookings}>No bookings yet.</Text>
           </View>
         ) : (
-          grouped.map(({ date, bookings: groupBookings }) => {
-            const d = new Date(date + "T00:00:00");
-            const label = isSameDay(d, today)
-              ? "Today"
-              : d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" });
-            return (
-              <View key={date}>
-                <Text style={s.listDateHeader}>{label}</Text>
-                {groupBookings.map((b) => (
-                  <BookingRow key={b.id} booking={b} colors={colors}
-                    onPress={() => router.push(`/owner/booking/${b.id}`)} />
-                ))}
-              </View>
-            );
-          })
+          <>
+            {/* ── Today ── */}
+            <Text style={s.listSectionHeader}>Today</Text>
+            {todayBookings.length === 0 ? (
+              <Text style={[s.noBookings, { paddingVertical: 12, textAlign: "left" }]}>
+                No bookings today.
+              </Text>
+            ) : (
+              todayBookings.map((b) => (
+                <BookingRow key={b.id} booking={b} colors={colors}
+                  onPress={() => router.push(`/owner/booking/${b.id}`)} />
+              ))
+            )}
+
+            {/* ── Divider ── */}
+            <View style={s.listDivider}>
+              <View style={s.listDividerLine} />
+              <Text style={s.listDividerText}>Other bookings</Text>
+              <View style={s.listDividerLine} />
+            </View>
+
+            {/* ── Rest — newest created first ── */}
+            {otherBookings.length === 0 ? (
+              <Text style={[s.noBookings, { paddingVertical: 12, textAlign: "left" }]}>
+                No other bookings.
+              </Text>
+            ) : (
+              otherBookings.map((b) => {
+                const dateLabel = new Date(b.startAt).toLocaleDateString("en-GB", {
+                  weekday: "short", day: "numeric", month: "short", year: "numeric",
+                });
+                return (
+                  <View key={b.id} style={{ marginBottom: 2 }}>
+                    <Text style={[s.listSectionHeader, { marginBottom: 4, marginTop: 0 }]}>
+                      {dateLabel}
+                    </Text>
+                    <BookingRow booking={b} colors={colors}
+                      onPress={() => router.push(`/owner/booking/${b.id}`)} />
+                  </View>
+                );
+              })
+            )}
+          </>
         )}
       </ScrollView>
     );
@@ -705,7 +562,6 @@ export default function OwnerCalendarScreen() {
       </View>
 
       {viewMode === "day" && <DayView />}
-      {viewMode === "grid" && <GridView />}
       {viewMode === "month" && <MonthView />}
       {viewMode === "list" && <ListView />}
     </View>
