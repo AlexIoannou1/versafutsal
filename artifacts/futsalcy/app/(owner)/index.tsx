@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Platform,
 } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -49,8 +51,14 @@ function formatTimeRange(startIso: string, endIso: string) {
   return `${fmt(new Date(startIso))} – ${fmt(new Date(endIso))}`;
 }
 
-function toDateOnlyStr(iso: string) {
-  return iso.slice(0, 10);
+function formatPickerDate(d: Date) {
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function startOfDay(d: Date) {
+  const c = new Date(d);
+  c.setHours(0, 0, 0, 0);
+  return c;
 }
 
 export default function OwnerDashboardScreen() {
@@ -62,17 +70,27 @@ export default function OwnerDashboardScreen() {
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
   const bookings = data?.bookings ?? [];
 
-  // Filter/search state
+  const todayStart = useMemo(() => startOfDay(new Date()), []);
+
+  // Only today + upcoming bookings (base filter — no past dates)
+  const currentAndUpcoming = useMemo(
+    () => bookings.filter((b) => new Date(b.startAt) >= todayStart),
+    [bookings, todayStart],
+  );
+
+  // Filter / search state
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("All");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
+  const [showFromPicker, setShowFromPicker] = useState(false);
+  const [showToPicker, setShowToPicker] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const venues = useMemo(() => {
     const seen = new Set<string>();
     const result: { id: string; name: string }[] = [];
-    for (const b of bookings) {
+    for (const b of currentAndUpcoming) {
       const v = b.venue as { id: string; name: string } | undefined;
       if (v && !seen.has(v.id)) {
         seen.add(v.id);
@@ -80,20 +98,20 @@ export default function OwnerDashboardScreen() {
       }
     }
     return result;
-  }, [bookings]);
+  }, [currentAndUpcoming]);
 
   const [selectedVenueId, setSelectedVenueId] = useState<string | "ALL">("ALL");
 
   const filtered = useMemo(() => {
-    return bookings.filter((b) => {
+    return currentAndUpcoming.filter((b) => {
       const player = b.player as { name: string; email: string } | undefined;
       const venue = b.venue as { id: string; name: string } | undefined;
-      const bDate = toDateOnlyStr(b.startAt);
+      const bDate = startOfDay(new Date(b.startAt));
 
       if (selectedStatus !== "All" && b.status !== selectedStatus) return false;
       if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
-      if (dateFrom && bDate < dateFrom) return false;
-      if (dateTo && bDate > dateTo) return false;
+      if (dateFrom && bDate < startOfDay(dateFrom)) return false;
+      if (dateTo && bDate > startOfDay(dateTo)) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
         const matchPlayer = player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
@@ -102,18 +120,26 @@ export default function OwnerDashboardScreen() {
       }
       return true;
     });
-  }, [bookings, selectedStatus, selectedVenueId, dateFrom, dateTo, search]);
+  }, [currentAndUpcoming, selectedStatus, selectedVenueId, dateFrom, dateTo, search]);
 
   const hasActiveFilters =
     selectedStatus !== "All" ||
     selectedVenueId !== "ALL" ||
-    dateFrom !== "" ||
-    dateTo !== "" ||
+    dateFrom !== null ||
+    dateTo !== null ||
     search !== "";
 
   const upcoming = bookings.filter(
     (b) => new Date(b.startAt) >= new Date() && (b.status === "PENDING" || b.status === "CONFIRMED"),
   );
+
+  const clearAllFilters = () => {
+    setSelectedStatus("All");
+    setSelectedVenueId("ALL");
+    setDateFrom(null);
+    setDateTo(null);
+    setSearch("");
+  };
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -176,7 +202,6 @@ export default function OwnerDashboardScreen() {
       textTransform: "uppercase",
       letterSpacing: 0.6,
     },
-    // Search & filter
     searchRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -236,16 +261,30 @@ export default function OwnerDashboardScreen() {
     chipTextActive: { color: "#fff" },
     dateRow: { flexDirection: "row", gap: 8 },
     dateField: { flex: 1 },
-    dateInput: {
+    datePickerBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 8,
       paddingHorizontal: 10,
-      paddingVertical: 7,
+      paddingVertical: 8,
+    },
+    datePickerBtnActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + "10",
+    },
+    datePickerText: {
+      flex: 1,
       fontSize: 12,
       fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+    },
+    datePickerTextActive: {
       color: colors.foreground,
+      fontFamily: "Inter_500Medium",
     },
     clearBtn: { alignSelf: "flex-end" },
     clearBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.destructive },
@@ -355,6 +394,62 @@ export default function OwnerDashboardScreen() {
       </TouchableOpacity>
     );
   };
+
+  const DatePickerField = ({
+    label,
+    value,
+    onChange,
+    onClear,
+    show,
+    onOpen,
+    onClose,
+    minimumDate,
+    maximumDate,
+  }: {
+    label: string;
+    value: Date | null;
+    onChange: (d: Date) => void;
+    onClear: () => void;
+    show: boolean;
+    onOpen: () => void;
+    onClose: () => void;
+    minimumDate?: Date;
+    maximumDate?: Date;
+  }) => (
+    <View style={s.dateField}>
+      <TouchableOpacity
+        style={[s.datePickerBtn, value !== null && s.datePickerBtnActive]}
+        onPress={onOpen}
+        activeOpacity={0.7}
+      >
+        <Feather name="calendar" size={12} color={value ? colors.primary : colors.mutedForeground} />
+        <Text style={[s.datePickerText, value !== null && s.datePickerTextActive]} numberOfLines={1}>
+          {value ? formatPickerDate(value) : label}
+        </Text>
+        {value !== null && (
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); onClear(); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="x" size={12} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+      {show && (
+        <DateTimePicker
+          value={value ?? new Date()}
+          mode="date"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          minimumDate={minimumDate}
+          maximumDate={maximumDate}
+          onChange={(_event: DateTimePickerEvent, selected?: Date) => {
+            if (Platform.OS === "android") onClose();
+            if (selected) onChange(selected);
+          }}
+        />
+      )}
+    </View>
+  );
 
   const allSections = [
     {
@@ -486,40 +581,36 @@ export default function OwnerDashboardScreen() {
                 )}
 
                 <View>
-                  <Text style={s.filterLabel}>Date Range (YYYY-MM-DD)</Text>
+                  <Text style={s.filterLabel}>Date Range</Text>
                   <View style={s.dateRow}>
-                    <View style={s.dateField}>
-                      <TextInput
-                        style={s.dateInput}
-                        value={dateFrom}
-                        onChangeText={setDateFrom}
-                        placeholder="From"
-                        placeholderTextColor={colors.mutedForeground}
-                      />
-                    </View>
-                    <View style={s.dateField}>
-                      <TextInput
-                        style={s.dateInput}
-                        value={dateTo}
-                        onChangeText={setDateTo}
-                        placeholder="To"
-                        placeholderTextColor={colors.mutedForeground}
-                      />
-                    </View>
+                    <DatePickerField
+                      label="From"
+                      value={dateFrom}
+                      onChange={(d) => {
+                        setDateFrom(d);
+                        if (dateTo && d > dateTo) setDateTo(null);
+                      }}
+                      onClear={() => setDateFrom(null)}
+                      show={showFromPicker}
+                      onOpen={() => { setShowToPicker(false); setShowFromPicker(true); }}
+                      onClose={() => setShowFromPicker(false)}
+                      minimumDate={todayStart}
+                    />
+                    <DatePickerField
+                      label="To"
+                      value={dateTo}
+                      onChange={(d) => setDateTo(d)}
+                      onClear={() => setDateTo(null)}
+                      show={showToPicker}
+                      onOpen={() => { setShowFromPicker(false); setShowToPicker(true); }}
+                      onClose={() => setShowToPicker(false)}
+                      minimumDate={dateFrom ?? todayStart}
+                    />
                   </View>
                 </View>
 
                 {hasActiveFilters && (
-                  <TouchableOpacity
-                    style={s.clearBtn}
-                    onPress={() => {
-                      setSelectedStatus("All");
-                      setSelectedVenueId("ALL");
-                      setDateFrom("");
-                      setDateTo("");
-                      setSearch("");
-                    }}
-                  >
+                  <TouchableOpacity style={s.clearBtn} onPress={clearAllFilters}>
                     <Text style={s.clearBtnText}>Clear all filters</Text>
                   </TouchableOpacity>
                 )}
@@ -536,7 +627,7 @@ export default function OwnerDashboardScreen() {
               <View style={s.emptyWrap}>
                 <Feather name="calendar" size={28} color={colors.mutedForeground} />
                 <Text style={s.emptyText}>
-                  {hasActiveFilters ? "No bookings match your filters" : "No bookings yet"}
+                  {hasActiveFilters ? "No bookings match your filters" : "No upcoming bookings"}
                 </Text>
               </View>
             ),
