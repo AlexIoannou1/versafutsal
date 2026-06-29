@@ -46,6 +46,7 @@ export default function PlayerVenuesScreen() {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [minPriceText, setMinPriceText] = useState("");
@@ -53,6 +54,12 @@ export default function PlayerVenuesScreen() {
 
   const minPrice = minPriceText.trim() !== "" ? parseFloat(minPriceText) : undefined;
   const maxPrice = maxPriceText.trim() !== "" ? parseFloat(maxPriceText) : undefined;
+
+  const activeFilterCount =
+    (selectedDistrict ? 1 : 0) +
+    (selectedType ? 1 : 0) +
+    (minPriceText.trim() ? 1 : 0) +
+    (maxPriceText.trim() ? 1 : 0);
 
   const params: Record<string, string | number> = {};
   if (selectedDistrict) params.district = selectedDistrict;
@@ -93,20 +100,61 @@ export default function PlayerVenuesScreen() {
     searchRow: {
       flexDirection: "row",
       alignItems: "center",
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
       backgroundColor: colors.card,
       borderRadius: 10,
       borderWidth: 1,
       borderColor: colors.border,
       paddingHorizontal: 12,
-      marginBottom: 10,
       height: 44,
+      gap: 8,
     },
-    searchInput: {
+    searchTextField: {
       flex: 1,
       fontSize: 14,
       fontFamily: "Inter_400Regular",
       color: colors.foreground,
-      marginLeft: 8,
+    },
+    filterToggleBtn: {
+      height: 44,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: activeFilterCount > 0 ? colors.primary : colors.border,
+      backgroundColor: activeFilterCount > 0 ? colors.primary + "12" : colors.card,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    filterToggleBtnText: {
+      fontSize: 13,
+      fontFamily: "Inter_500Medium",
+      color: activeFilterCount > 0 ? colors.primary : colors.foreground,
+    },
+    filterBadge: {
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 4,
+    },
+    filterBadgeText: {
+      fontSize: 10,
+      fontFamily: "Inter_700Bold",
+      color: colors.primaryForeground,
+    },
+    filtersPanel: {
+      marginTop: 10,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
     },
     filterLabel: {
       fontSize: 11,
@@ -115,6 +163,15 @@ export default function PlayerVenuesScreen() {
       textTransform: "uppercase",
       letterSpacing: 0.5,
       marginBottom: 6,
+    },
+    clearFiltersBtn: {
+      alignSelf: "flex-end",
+      marginTop: 8,
+    },
+    clearFiltersBtnText: {
+      fontSize: 12,
+      fontFamily: "Inter_500Medium",
+      color: colors.destructive,
     },
     filterSection: { marginBottom: 10 },
     filterRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
@@ -262,108 +319,148 @@ export default function PlayerVenuesScreen() {
       <View style={s.headerArea}>
         <Text style={s.headerTitle}>Find a Venue</Text>
 
+        {/* Search bar + filter toggle always visible */}
         <View style={s.searchRow}>
-          <Feather name="search" size={16} color={colors.mutedForeground} />
-          <TextInput
-            style={s.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search venues or districts…"
-            placeholderTextColor={colors.mutedForeground}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")}>
-              <Feather name="x" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={s.filterSection}>
-          <Text style={s.filterLabel}>District</Text>
-          <View style={s.filterRow}>
-            {DISTRICTS.map((opt) => {
-              const active = selectedDistrict === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    s.filterChip,
-                    {
-                      backgroundColor: active ? colors.primary : "transparent",
-                      borderColor: active ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => setSelectedDistrict(opt.key)}
-                >
-                  <Text
-                    style={[
-                      s.filterChipText,
-                      { color: active ? colors.primaryForeground : colors.mutedForeground },
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={s.filterSection}>
-          <Text style={s.filterLabel}>Pitch Type</Text>
-          <View style={s.filterRow}>
-            {TYPES.map((opt) => {
-              const active = selectedType === opt.key;
-              return (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[
-                    s.filterChip,
-                    {
-                      backgroundColor: active ? colors.primary : "transparent",
-                      borderColor: active ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => setSelectedType(opt.key)}
-                >
-                  <Text
-                    style={[
-                      s.filterChipText,
-                      { color: active ? colors.primaryForeground : colors.mutedForeground },
-                    ]}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={s.filterSection}>
-          <Text style={s.filterLabel}>Price Range (€/hr)</Text>
-          <View style={s.priceRow}>
+          <View style={s.searchInput}>
+            <Feather name="search" size={16} color={colors.mutedForeground} />
             <TextInput
-              style={s.priceInput}
-              value={minPriceText}
-              onChangeText={setMinPriceText}
-              placeholder="Min"
+              style={s.searchTextField}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search venues or districts…"
               placeholderTextColor={colors.mutedForeground}
-              keyboardType="numeric"
-              returnKeyType="done"
             />
-            <Text style={s.priceSep}>–</Text>
-            <TextInput
-              style={s.priceInput}
-              value={maxPriceText}
-              onChangeText={setMaxPriceText}
-              placeholder="Max"
-              placeholderTextColor={colors.mutedForeground}
-              keyboardType="numeric"
-              returnKeyType="done"
-            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch("")}>
+                <Feather name="x" size={16} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
           </View>
+
+          <TouchableOpacity
+            style={s.filterToggleBtn}
+            onPress={() => setShowFilters((v) => !v)}
+          >
+            <Feather
+              name="sliders"
+              size={16}
+              color={activeFilterCount > 0 ? colors.primary : colors.foreground}
+            />
+            {activeFilterCount > 0 ? (
+              <View style={s.filterBadge}>
+                <Text style={s.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            ) : (
+              <Text style={s.filterToggleBtnText}>Filters</Text>
+            )}
+          </TouchableOpacity>
         </View>
+
+        {/* Collapsible advanced filters */}
+        {showFilters && (
+          <View style={s.filtersPanel}>
+            <View style={s.filterSection}>
+              <Text style={s.filterLabel}>District</Text>
+              <View style={s.filterRow}>
+                {DISTRICTS.map((opt) => {
+                  const active = selectedDistrict === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        s.filterChip,
+                        {
+                          backgroundColor: active ? colors.primary : "transparent",
+                          borderColor: active ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => setSelectedDistrict(opt.key)}
+                    >
+                      <Text
+                        style={[
+                          s.filterChipText,
+                          { color: active ? colors.primaryForeground : colors.mutedForeground },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={s.filterSection}>
+              <Text style={s.filterLabel}>Pitch Type</Text>
+              <View style={s.filterRow}>
+                {TYPES.map((opt) => {
+                  const active = selectedType === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        s.filterChip,
+                        {
+                          backgroundColor: active ? colors.primary : "transparent",
+                          borderColor: active ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => setSelectedType(opt.key)}
+                    >
+                      <Text
+                        style={[
+                          s.filterChipText,
+                          { color: active ? colors.primaryForeground : colors.mutedForeground },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={s.filterSection}>
+              <Text style={s.filterLabel}>Price Range (€/hr)</Text>
+              <View style={s.priceRow}>
+                <TextInput
+                  style={s.priceInput}
+                  value={minPriceText}
+                  onChangeText={setMinPriceText}
+                  placeholder="Min"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                />
+                <Text style={s.priceSep}>–</Text>
+                <TextInput
+                  style={s.priceInput}
+                  value={maxPriceText}
+                  onChangeText={setMaxPriceText}
+                  placeholder="Max"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                />
+              </View>
+            </View>
+
+            {activeFilterCount > 0 && (
+              <TouchableOpacity
+                style={s.clearFiltersBtn}
+                onPress={() => {
+                  setSelectedDistrict("");
+                  setSelectedType("");
+                  setMinPriceText("");
+                  setMaxPriceText("");
+                }}
+              >
+                <Text style={s.clearFiltersBtnText}>Clear all filters</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
       {isLoading ? (
