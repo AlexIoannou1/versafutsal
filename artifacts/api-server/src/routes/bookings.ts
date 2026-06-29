@@ -521,6 +521,212 @@ router.get<{ id: string }>(
   },
 );
 
+// ─── Owner Manual Booking ─────────────────────────────────────────────────────
+
+// POST /owner/bookings/manual — create a walk-in / phone booking (no payment)
+router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+  try {
+    const { pitchId, startAt, guestName, guestPhone } = req.body as {
+      pitchId?: string;
+      startAt?: string;
+      guestName?: string;
+      guestPhone?: string;
+    };
+
+    if (!pitchId || !startAt || !guestName?.trim() || !guestPhone?.trim()) {
+      res.status(400).json({ error: "pitchId, startAt, guestName, and guestPhone are required" });
+      return;
+    }
+
+    const startDate = new Date(startAt);
+    if (isNaN(startDate.getTime())) {
+      res.status(400).json({ error: "startAt must be a valid ISO 8601 timestamp" });
+      return;
+    }
+
+    // Verify this pitch belongs to one of the owner's venues
+    const ownerCheck = await assertOwnerOfPitch(pitchId, req.user!.userId, res);
+    if (!ownerCheck) return;
+    const { venueId } = ownerCheck;
+
+    // Load pitch + venue details
+    const [pitchRow] = await db
+      .select({
+        id: pitchesTable.id,
+        venueId: pitchesTable.venueId,
+        slotDurationMinutes: pitchesTable.slotDurationMinutes,
+        name: pitchesTable.name,
+        type: pitchesTable.type,
+        size: pitchesTable.size,
+        venueStatus: venuesTable.status,
+        venueName: venuesTable.name,
+        venueDistrict: venuesTable.district,
+        venueAddress: venuesTable.address,
+        venueCancellationWindowHours: venuesTable.cancellationWindowHours,
+      })
+      .from(pitchesTable)
+      .innerJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+      .where(eq(pitchesTable.id, pitchId))
+      .limit(1);
+
+    if (!pitchRow) {
+      res.status(404).json({ error: "Pitch not found" });
+      return;
+    }
+
+    if (pitchRow.venueStatus !== "APPROVED") {
+      res.status(400).json({ error: "Venue is not open for booking" });
+      return;
+    }
+
+    // Validate startAt falls on a valid slot boundary
+    const dateStr = startDate.toISOString().slice(0, 10);
+    const dayOfWeek = startDate.getUTCDay();
+
+    const [hoursRow] = await db
+      .select()
+      .from(openingHoursTable)
+      .where(
+        and(
+          eq(openingHoursTable.venueId, venueId),
+          eq(openingHoursTable.dayOfWeek, dayOfWeek),
+        ),
+      )
+      .limit(1);
+
+    if (!hoursRow || hoursRow.isClosed) {
+      res.status(400).json({ error: "The venue is closed on this day" });
+      return;
+    }
+
+    const validSlots = generateSlots(dateStr, hoursRow.openTime, hoursRow.closeTime, pitchRow.slotDurationMinutes);
+    const validStartTimes = new Set(validSlots.map((s) => s.startAt));
+
+    if (!validStartTimes.has(startDate.toISOString())) {
+      res.status(400).json({
+        error: "The selected time is not a valid slot for this pitch.",
+      });
+      return;
+    }
+
+    const endDate = new Date(startDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
+
+    // Atomic transaction: conflict check + insert as CONFIRMED
+    let booking: typeof bookingsTable.$inferSelect;
+    try {
+      const result = await db.transaction(async (tx) => {
+        // Maintenance block check
+        const conflictingBlock = await tx
+          .select({ id: maintenanceBlocksTable.id })
+          .from(maintenanceBlocksTable)
+          .where(
+            and(
+              eq(maintenanceBlocksTable.pitchId, pitchId),
+              lt(maintenanceBlocksTable.startAt, endDate),
+              gt(maintenanceBlocksTable.endAt, startDate),
+            ),
+          )
+          .limit(1);
+
+        if (conflictingBlock.length > 0) {
+          throw Object.assign(new Error("maintenance_blocked"), { _type: "maintenance_blocked" });
+        }
+
+        // Active booking conflict check
+        const conflictingBooking = await tx
+          .select({ id: bookingsTable.id })
+          .from(bookingsTable)
+          .where(
+            and(
+              eq(bookingsTable.pitchId, pitchId),
+              eq(bookingsTable.startAt, startDate),
+              inArray(bookingsTable.status, ["PENDING", "CONFIRMED"]),
+            ),
+          )
+          .limit(1);
+
+        if (conflictingBooking.length > 0) {
+          throw Object.assign(new Error("slot_taken"), { _type: "slot_taken" });
+        }
+
+        const pricingRules = await tx
+          .select()
+          .from(pricingRulesTable)
+          .where(eq(pricingRulesTable.pitchId, pitchId));
+
+        const policySnapshot = {
+          pricePerHour: pricingRules[0]?.pricePerHour ?? null,
+          cancellationWindowHours: pitchRow.venueCancellationWindowHours,
+          slotDurationMinutes: pitchRow.slotDurationMinutes,
+          capturedAt: new Date().toISOString(),
+        };
+
+        const [inserted] = await tx
+          .insert(bookingsTable)
+          .values({
+            venueId: pitchRow.venueId,
+            pitchId,
+            playerId: req.user!.userId,
+            startAt: startDate,
+            endAt: endDate,
+            status: "CONFIRMED",
+            policySnapshot,
+            guestName: guestName.trim(),
+            guestPhone: guestPhone.trim(),
+          })
+          .returning();
+
+        return inserted!;
+      });
+
+      booking = result;
+    } catch (err: unknown) {
+      if ((err as { _type?: string })?._type === "maintenance_blocked") {
+        res.status(409).json({ error: "This slot is blocked for maintenance. Please choose another time." });
+        return;
+      }
+      if ((err as { _type?: string })?._type === "slot_taken") {
+        res.status(409).json({ error: "Slot no longer available. Please choose another time." });
+        return;
+      }
+      const pgCode =
+        (err as { code?: string })?.code ??
+        (err as { cause?: { code?: string } })?.cause?.code;
+      if (pgCode === "23505") {
+        res.status(409).json({ error: "Slot no longer available. Please choose another time." });
+        return;
+      }
+      throw err;
+    }
+
+    res.status(201).json({
+      booking: {
+        ...booking,
+        startAt: booking.startAt.toISOString(),
+        endAt: booking.endAt.toISOString(),
+        createdAt: booking.createdAt.toISOString(),
+        updatedAt: booking.updatedAt.toISOString(),
+        venue: {
+          id: pitchRow.venueId,
+          name: pitchRow.venueName,
+          district: pitchRow.venueDistrict,
+          address: pitchRow.venueAddress,
+        },
+        pitch: {
+          id: pitchRow.id,
+          name: pitchRow.name,
+          type: pitchRow.type,
+          size: pitchRow.size,
+          slotDurationMinutes: pitchRow.slotDurationMinutes,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("POST /owner/bookings/manual error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── Owner Bookings ───────────────────────────────────────────────────────────
 
 // GET /owner/bookings?status=&from=&to=&pitchId=

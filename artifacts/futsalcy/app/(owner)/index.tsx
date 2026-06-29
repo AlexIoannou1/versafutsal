@@ -609,6 +609,30 @@ export default function OwnerDashboardScreen() {
         renderItem={({ item }) => item.render()}
       />
 
+      {/* Floating Action Button: New Booking */}
+      <TouchableOpacity
+        onPress={() => router.push("/owner/booking-new")}
+        activeOpacity={0.85}
+        style={{
+          position: "absolute",
+          bottom: insets.bottom + 90,
+          right: 20,
+          backgroundColor: colors.primary,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 6,
+          elevation: 6,
+        }}
+      >
+        <Feather name="plus" size={26} color={colors.primaryForeground} />
+      </TouchableOpacity>
+
       {/* Android: DateTimePicker renders as a native dialog when visible */}
       {Platform.OS === "android" && activePicker !== null && (
         <DateTimePicker

@@ -277,6 +277,9 @@ export default function OwnerBookingDetailScreen() {
   const player = booking.player as { name: string; email: string } | undefined;
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
+  const isManual = !!(booking as { guestName?: string | null }).guestName;
+  const guestName = (booking as { guestName?: string | null }).guestName ?? null;
+  const guestPhone = (booking as { guestPhone?: string | null }).guestPhone ?? null;
 
   const windowHours =
     (booking.policySnapshot as { cancellationWindowHours?: number } | undefined)
@@ -338,17 +341,36 @@ export default function OwnerBookingDetailScreen() {
           </View>
         )}
 
-        <View style={s.card}>
-          <Text style={s.cardTitle}>Player</Text>
-          <View style={[s.row, s.rowFirst]}>
-            <Text style={s.rowLabel}>Name</Text>
-            <Text style={s.rowValue}>{player?.name ?? "—"}</Text>
+        {isManual ? (
+          <View style={s.card}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
+              <Text style={[s.cardTitle, { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 }]}>Walk-in / Phone Booking</Text>
+              <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>MANUAL</Text>
+              </View>
+            </View>
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={s.rowLabel}>Name</Text>
+              <Text style={s.rowValue}>{guestName ?? "—"}</Text>
+            </View>
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Phone</Text>
+              <Text style={s.rowValue}>{guestPhone ?? "—"}</Text>
+            </View>
           </View>
-          <View style={s.row}>
-            <Text style={s.rowLabel}>Email</Text>
-            <Text style={s.rowValue}>{player?.email ?? "—"}</Text>
+        ) : (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Player</Text>
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={s.rowLabel}>Name</Text>
+              <Text style={s.rowValue}>{player?.name ?? "—"}</Text>
+            </View>
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Email</Text>
+              <Text style={s.rowValue}>{player?.email ?? "—"}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={s.card}>
           <Text style={s.cardTitle}>Venue & Pitch</Text>

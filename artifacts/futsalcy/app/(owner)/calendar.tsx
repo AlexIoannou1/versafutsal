@@ -430,6 +430,31 @@ export default function OwnerCalendarScreen() {
 
   return (
     <View style={s.container}>
+      {/* Floating Action Button: New Booking */}
+      <TouchableOpacity
+        onPress={() => router.push("/owner/booking-new")}
+        activeOpacity={0.85}
+        style={{
+          position: "absolute",
+          bottom: insets.bottom + 90,
+          right: 20,
+          backgroundColor: colors.primary,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 6,
+          elevation: 6,
+          zIndex: 10,
+        }}
+      >
+        <Feather name="plus" size={26} color="#fff" />
+      </TouchableOpacity>
+
       {/* Toolbar */}
       <View style={s.toolbar}>
         <View style={s.viewModeRow}>

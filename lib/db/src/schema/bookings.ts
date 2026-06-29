@@ -41,6 +41,8 @@ export const bookingsTable = pgTable(
     status: bookingStatusEnum("status").notNull().default("PENDING"),
     policySnapshot: jsonb("policy_snapshot").notNull().default({}),
     cancellationReason: text("cancellation_reason"),
+    guestName: text("guest_name"),
+    guestPhone: text("guest_phone"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
