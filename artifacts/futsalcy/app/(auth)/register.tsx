@@ -124,7 +124,7 @@ export default function RegisterScreen() {
         name: name.trim(),
         role: selectedMode || "PLAYER",
         phoneNumber: phoneNumber.trim() || undefined,
-      } as Parameters<typeof registerUser>[0] & { phoneNumber?: string });
+      });
 
       await login(
         {

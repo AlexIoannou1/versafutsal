@@ -32,8 +32,6 @@ const STATUS_LABELS: Record<string, string> = {
   NO_SHOW: "No Show",
 };
 
-const AREAS = ["All Areas", "Nicosia", "Limassol", "Larnaca", "Paphos", "Famagusta"];
-
 function formatDateShort(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
@@ -57,26 +55,43 @@ export default function PlayerBookingsScreen() {
   const { data, isLoading, refetch, isRefetching } = useListPlayerBookings();
   const bookings = data?.bookings ?? [];
 
+  // Derive available areas from actual booking/venue data
+  const areas = useMemo(() => {
+    const seen = new Set<string>();
+    const result: string[] = ["All Areas"];
+    for (const b of bookings) {
+      const venue = b.venue as { district?: string } | undefined;
+      if (venue?.district && !seen.has(venue.district)) {
+        seen.add(venue.district);
+        result.push(venue.district);
+      }
+    }
+    return result;
+  }, [bookings]);
+
   // Filter state
   const [selectedArea, setSelectedArea] = useState("All Areas");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
+  // Reset area if it disappears from derived list
+  const effectiveArea = areas.includes(selectedArea) ? selectedArea : "All Areas";
+
   const filtered = useMemo(() => {
     return bookings.filter((b) => {
       const venue = b.venue as { name: string; district: string } | undefined;
       const bDate = toDateOnlyStr(b.startAt);
 
-      if (selectedArea !== "All Areas" && venue?.district !== selectedArea) return false;
+      if (effectiveArea !== "All Areas" && venue?.district !== effectiveArea) return false;
       if (dateFrom && bDate < dateFrom) return false;
       if (dateTo && bDate > dateTo) return false;
       return true;
     });
-  }, [bookings, selectedArea, dateFrom, dateTo]);
+  }, [bookings, effectiveArea, dateFrom, dateTo]);
 
   const hasActiveFilters =
-    selectedArea !== "All Areas" || dateFrom !== "" || dateTo !== "";
+    effectiveArea !== "All Areas" || dateFrom !== "" || dateTo !== "";
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -242,6 +257,11 @@ export default function PlayerBookingsScreen() {
     );
   }
 
+  const activeFilterCount =
+    (effectiveArea !== "All Areas" ? 1 : 0) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0);
+
   return (
     <View style={s.container}>
       {/* Filter Bar */}
@@ -253,10 +273,8 @@ export default function PlayerBookingsScreen() {
           >
             <Feather name="filter" size={14} color={hasActiveFilters ? colors.primary : colors.foreground} />
             <Text style={s.filterToggleText}>Filters</Text>
-            {hasActiveFilters && (
-              <Text style={s.filterCount}>
-                {(selectedArea !== "All Areas" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)}
-              </Text>
+            {activeFilterCount > 0 && (
+              <Text style={s.filterCount}>{activeFilterCount}</Text>
             )}
           </TouchableOpacity>
           <Text style={s.resultCount}>
@@ -266,18 +284,18 @@ export default function PlayerBookingsScreen() {
 
         {filtersExpanded && (
           <View style={s.filterPanel}>
-            {/* Area filter */}
+            {/* Area filter — derived from actual booking data */}
             <View>
               <Text style={s.filterLabel}>AREA</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={s.areaScroll}>
-                  {AREAS.map((area) => (
+                  {areas.map((area) => (
                     <TouchableOpacity
                       key={area}
-                      style={[s.areaChip, selectedArea === area && s.areaChipActive]}
+                      style={[s.areaChip, effectiveArea === area && s.areaChipActive]}
                       onPress={() => setSelectedArea(area)}
                     >
-                      <Text style={[s.areaChipText, selectedArea === area && s.areaChipTextActive]}>
+                      <Text style={[s.areaChipText, effectiveArea === area && s.areaChipTextActive]}>
                         {area}
                       </Text>
                     </TouchableOpacity>

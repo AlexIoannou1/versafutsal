@@ -75,23 +75,50 @@ export default function AdminBookingsScreen() {
   const { data, isLoading, refetch, isRefetching } = useAdminListBookings(params);
   const bookings = data?.bookings ?? [];
 
+  // Derive unique venues and players for explicit filter dropdowns
+  const venues = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { id: string; name: string }[] = [];
+    for (const b of bookings) {
+      const v = b.venue as { id?: string; name?: string } | undefined;
+      if (v?.id && !seen.has(v.id)) {
+        seen.add(v.id);
+        result.push({ id: v.id, name: v.name ?? v.id });
+      }
+    }
+    return result;
+  }, [bookings]);
+
+  const [selectedVenueId, setSelectedVenueId] = useState<string | "ALL">("ALL");
+  const [selectedPlayerSearch, setSelectedPlayerSearch] = useState("");
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return bookings;
-    const q = search.toLowerCase();
     return bookings.filter((b) => {
-      const venue = b.venue as { name: string; district: string } | undefined;
-      const player = b.player as { name: string; email: string } | undefined;
-      return (
-        venue?.name?.toLowerCase().includes(q) ||
-        venue?.district?.toLowerCase().includes(q) ||
-        player?.name?.toLowerCase().includes(q) ||
-        player?.email?.toLowerCase().includes(q)
-      );
+      const venue = b.venue as { id?: string; name?: string; district?: string } | undefined;
+      const player = b.player as { name?: string; email?: string } | undefined;
+
+      if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
+
+      if (search.trim() || selectedPlayerSearch.trim()) {
+        const q = (search + " " + selectedPlayerSearch).toLowerCase().trim();
+        const matchPlayer =
+          player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
+        const matchVenue =
+          venue?.name?.toLowerCase().includes(q) ||
+          venue?.district?.toLowerCase().includes(q);
+        if (!matchPlayer && !matchVenue) return false;
+      }
+      return true;
     });
-  }, [bookings, search]);
+  }, [bookings, selectedVenueId, search, selectedPlayerSearch]);
 
   const hasActiveFilters =
-    selectedStatus !== "All" || dateFrom !== "" || dateTo !== "" || search !== "";
+    selectedStatus !== "All" ||
+    dateFrom !== "" ||
+    dateTo !== "" ||
+    selectedVenueId !== "ALL" ||
+    search !== "" ||
+    selectedPlayerSearch !== "";
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -176,6 +203,23 @@ export default function AdminBookingsScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.foreground,
     },
+    playerSearchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      gap: 6,
+    },
+    playerSearchText: {
+      flex: 1,
+      height: 36,
+      fontSize: 13,
+      fontFamily: "Inter_400Regular",
+      color: colors.foreground,
+    },
     clearBtn: {
       alignSelf: "flex-end",
     },
@@ -249,7 +293,7 @@ export default function AdminBookingsScreen() {
 
   return (
     <View style={s.container}>
-      {/* Search + Filter toggle */}
+      {/* Search row + filter toggle */}
       <View style={s.searchRow}>
         <View style={s.searchInput}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
@@ -257,7 +301,7 @@ export default function AdminBookingsScreen() {
             style={s.searchText}
             value={search}
             onChangeText={setSearch}
-            placeholder="Player, venue, district…"
+            placeholder="Venue, district…"
             placeholderTextColor={colors.mutedForeground}
           />
           {search !== "" && (
@@ -277,6 +321,7 @@ export default function AdminBookingsScreen() {
       {/* Filter Panel */}
       {filtersExpanded && (
         <View style={s.filterPanel}>
+          {/* Status filter */}
           <View>
             <Text style={s.filterLabel}>Status</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -296,6 +341,57 @@ export default function AdminBookingsScreen() {
             </ScrollView>
           </View>
 
+          {/* Venue filter — derived from actual data */}
+          {venues.length > 0 && (
+            <View>
+              <Text style={s.filterLabel}>Venue</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={s.chipRow}>
+                  <TouchableOpacity
+                    style={[s.chip, selectedVenueId === "ALL" && s.chipActive]}
+                    onPress={() => setSelectedVenueId("ALL")}
+                  >
+                    <Text style={[s.chipText, selectedVenueId === "ALL" && s.chipTextActive]}>
+                      All Venues
+                    </Text>
+                  </TouchableOpacity>
+                  {venues.map((v) => (
+                    <TouchableOpacity
+                      key={v.id}
+                      style={[s.chip, selectedVenueId === v.id && s.chipActive]}
+                      onPress={() => setSelectedVenueId(v.id)}
+                    >
+                      <Text style={[s.chipText, selectedVenueId === v.id && s.chipTextActive]}>
+                        {v.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Player search filter */}
+          <View>
+            <Text style={s.filterLabel}>Player Name / Email</Text>
+            <View style={s.playerSearchRow}>
+              <Feather name="user" size={14} color={colors.mutedForeground} />
+              <TextInput
+                style={s.playerSearchText}
+                value={selectedPlayerSearch}
+                onChangeText={setSelectedPlayerSearch}
+                placeholder="Search player…"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              {selectedPlayerSearch !== "" && (
+                <TouchableOpacity onPress={() => setSelectedPlayerSearch("")}>
+                  <Feather name="x" size={14} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Date range */}
           <View>
             <Text style={s.filterLabel}>Date Range (YYYY-MM-DD)</Text>
             <View style={s.dateRow}>
@@ -325,9 +421,11 @@ export default function AdminBookingsScreen() {
               style={s.clearBtn}
               onPress={() => {
                 setSelectedStatus("All");
+                setSelectedVenueId("ALL");
                 setDateFrom("");
                 setDateTo("");
                 setSearch("");
+                setSelectedPlayerSearch("");
               }}
             >
               <Text style={s.clearBtnText}>Clear all filters</Text>

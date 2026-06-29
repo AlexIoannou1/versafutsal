@@ -29,6 +29,12 @@ export const RegisterUserBody = zod.object({
     .describe(
       "Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.\n",
     ),
+  phoneNumber: zod
+    .string()
+    .nullish()
+    .describe(
+      "Required for VENUE_OWNER registrations so the platform can verify the business before approving venues. Optional for PLAYERs.\n",
+    ),
 });
 
 /**

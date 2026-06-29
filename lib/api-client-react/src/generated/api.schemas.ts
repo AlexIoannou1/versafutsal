@@ -73,6 +73,9 @@ export interface RegisterRequest {
   /** Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.
    */
   role?: RegisterRequestRole;
+  /** Required for VENUE_OWNER registrations so the platform can verify the business before approving venues. Optional for PLAYERs.
+   */
+  phoneNumber?: string | null;
 }
 
 export interface LoginRequest {

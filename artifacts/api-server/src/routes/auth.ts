@@ -29,6 +29,12 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
+    // Venue owners must provide a phone number for identity verification
+    if ((role === "VENUE_OWNER") && !phoneNumber?.trim()) {
+      res.status(400).json({ error: "Phone number is required for venue owner registration" });
+      return;
+    }
+
     // Check existing user
     const existing = await db
       .select()
