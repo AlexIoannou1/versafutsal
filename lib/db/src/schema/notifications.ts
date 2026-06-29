@@ -32,6 +32,7 @@ export const notificationsTable = pgTable("notifications", {
   entityId: uuid("entity_id"),
   read: boolean("read").notNull().default(false),
   pushSent: boolean("push_sent").notNull().default(false),
+  expoTicketId: text("expo_ticket_id"), // Expo push ticket ID; used for receipt polling
   scheduledAt: timestamp("scheduled_at"), // null = immediate
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

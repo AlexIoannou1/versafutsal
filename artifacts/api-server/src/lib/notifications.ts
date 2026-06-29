@@ -4,7 +4,7 @@ import {
   usersTable,
   type Notification,
 } from "@workspace/db/schema";
-import { and, eq, isNotNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, lt, lte } from "drizzle-orm";
 
 type NotifType =
   | "BOOKING_CONFIRMED"
@@ -27,16 +27,168 @@ interface SendNotifOpts {
 
 // ─── Expo Push API ─────────────────────────────────────────────────────────────
 
-async function sendExpoPush(token: string, title: string, body: string, data?: Record<string, string>) {
-  if (!token.startsWith("ExponentPushToken[")) return; // ignore invalid tokens
+type PushDeliveryStatus = "delivered" | "skipped (no token)" | "failed (token invalidated)";
+
+interface SendResult {
+  status: PushDeliveryStatus;
+  ticketId: string | null;
+}
+
+/**
+ * Sends a single Expo push notification.
+ * Returns the delivery status and, on success, the Expo ticket ID for later
+ * receipt polling.
+ *
+ * If the ticket immediately contains DeviceNotRegistered the token is cleared
+ * right away. Otherwise the ticket ID is stored and the receipt is checked
+ * asynchronously by checkPushReceipts().
+ */
+async function sendExpoPush(
+  userId: string,
+  token: string,
+  title: string,
+  body: string,
+  data?: Record<string, string>,
+): Promise<SendResult> {
+  if (!token.startsWith("ExponentPushToken[")) {
+    console.info(`[push] skipped (no token) — invalid token format for user ${userId}`);
+    return { status: "skipped (no token)", ticketId: null };
+  }
+
   try {
-    await fetch("https://exp.host/--/api/v2/push/send", {
+    const response = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ to: token, title, body, data: data ?? {}, sound: "default" }),
     });
-  } catch (_) {
-    // Non-fatal — continue if push fails
+
+    if (!response.ok) {
+      console.warn(`[push] HTTP ${response.status} from Expo for user ${userId} — non-fatal`);
+      return { status: "delivered", ticketId: null };
+    }
+
+    // Expo returns { data: Ticket }
+    // Ticket is either { status: "ok", id: "..." }
+    //               or { status: "error", message: "...", details?: { error: string } }
+    const json = (await response.json()) as {
+      data?: { status?: string; id?: string; details?: { error?: string }; message?: string };
+    };
+
+    const ticket = json.data;
+
+    if (ticket?.status === "error") {
+      const expoError = ticket.details?.error ?? "unknown";
+
+      if (expoError === "DeviceNotRegistered") {
+        console.info(
+          `[push] failed (token invalidated) — DeviceNotRegistered for user ${userId}; clearing push token`,
+        );
+        await db.update(usersTable).set({ pushToken: null }).where(eq(usersTable.id, userId));
+        return { status: "failed (token invalidated)", ticketId: null };
+      }
+
+      console.warn(
+        `[push] Expo ticket error "${expoError}" for user ${userId}: ${ticket.message ?? ""}`,
+      );
+      return { status: "delivered", ticketId: null };
+    }
+
+    const ticketId = ticket?.id ?? null;
+    console.info(`[push] delivered to user ${userId}${ticketId ? ` (ticket ${ticketId})` : ""}`);
+    return { status: "delivered", ticketId };
+  } catch (err) {
+    console.warn(`[push] network error for user ${userId} (non-fatal):`, err);
+    return { status: "delivered", ticketId: null };
+  }
+}
+
+// ─── Receipt polling ──────────────────────────────────────────────────────────
+
+/**
+ * Queries Expo push receipts for notifications that have a stored ticket ID.
+ * Expo guarantees receipts are available ~15 minutes after send; we call this
+ * from the reminder dispatcher so it runs every minute and naturally picks up
+ * receipts once they appear.
+ *
+ * When a receipt reports DeviceNotRegistered the user's pushToken is NULLed so
+ * the stale entry is removed and future sends are skipped early.
+ */
+async function checkPushReceipts(): Promise<void> {
+  // Only check tickets that are at least 1 minute old (Expo needs time to process).
+  const cutoff = new Date(Date.now() - 60_000);
+
+  const rows = await db
+    .select({
+      notifId: notificationsTable.id,
+      userId: notificationsTable.userId,
+      ticketId: notificationsTable.expoTicketId,
+    })
+    .from(notificationsTable)
+    .where(
+      and(
+        isNotNull(notificationsTable.expoTicketId),
+        lt(notificationsTable.createdAt, cutoff),
+      ),
+    )
+    .limit(100);
+
+  if (rows.length === 0) return;
+
+  const ticketIds = rows.map((r) => r.ticketId as string);
+
+  let receipts: Record<
+    string,
+    { status: string; details?: { error?: string }; message?: string }
+  > = {};
+
+  try {
+    const response = await fetch("https://exp.host/--/api/v2/push/getReceipts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ticketIds }),
+    });
+
+    if (!response.ok) {
+      console.warn(`[push] getReceipts HTTP ${response.status} — will retry next tick`);
+      return;
+    }
+
+    const json = (await response.json()) as { data?: typeof receipts };
+    receipts = json.data ?? {};
+  } catch (err) {
+    console.warn("[push] getReceipts network error (non-fatal):", err);
+    return;
+  }
+
+  // Process each receipt and clear the stored ticket ID so we don't re-check.
+  for (const row of rows) {
+    const receipt = receipts[row.ticketId as string];
+
+    if (!receipt) {
+      // Receipt not yet available — leave expoTicketId in place, retry next tick.
+      continue;
+    }
+
+    const expoError = receipt.details?.error;
+
+    if (receipt.status === "error" && expoError === "DeviceNotRegistered") {
+      console.info(
+        `[push] failed (token invalidated) — receipt DeviceNotRegistered for user ${row.userId}; clearing push token`,
+      );
+      await db.update(usersTable).set({ pushToken: null }).where(eq(usersTable.id, row.userId));
+    } else if (receipt.status === "error") {
+      console.warn(
+        `[push] receipt error "${expoError ?? "unknown"}" for user ${row.userId} (notif ${row.notifId})`,
+      );
+    } else {
+      console.info(`[push] receipt ok for user ${row.userId} (notif ${row.notifId})`);
+    }
+
+    // Mark ticket as processed by clearing the stored ID.
+    await db
+      .update(notificationsTable)
+      .set({ expoTicketId: null })
+      .where(eq(notificationsTable.id, row.notifId));
   }
 }
 
@@ -45,7 +197,7 @@ async function sendExpoPush(token: string, title: string, body: string, data?: R
 export async function sendNotification(opts: SendNotifOpts): Promise<void> {
   const { userId, type, title, body, entityType, entityId, scheduledAt } = opts;
 
-  // Store in-app notification and get its ID
+  // Store in-app notification and get its ID.
   const [inserted] = await db
     .insert(notificationsTable)
     .values({
@@ -59,7 +211,7 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
     })
     .returning({ id: notificationsTable.id });
 
-  // Send push notification if immediate (no scheduledAt)
+  // Send push notification if immediate (no scheduledAt).
   if (!scheduledAt && inserted) {
     const [user] = await db
       .select({ pushToken: usersTable.pushToken })
@@ -67,28 +219,41 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
       .where(eq(usersTable.id, userId))
       .limit(1);
 
-    if (user?.pushToken) {
-      await sendExpoPush(user.pushToken, title, body, { type, entityId: entityId ?? "" });
-      // Mark exactly this notification row as pushed (by its PK)
+    if (!user?.pushToken) {
+      console.info(`[push] skipped (no token) — user ${userId} has no push token`);
+      return;
+    }
+
+    const { status, ticketId } = await sendExpoPush(userId, user.pushToken, title, body, {
+      type,
+      entityId: entityId ?? "",
+    });
+
+    if (status === "delivered") {
       await db
         .update(notificationsTable)
-        .set({ pushSent: true })
+        .set({ pushSent: true, expoTicketId: ticketId })
         .where(eq(notificationsTable.id, inserted.id));
     }
+    // For "failed (token invalidated)" and "skipped" we intentionally leave
+    // pushSent=false so the record remains visible in the in-app feed only.
   }
 }
 
 // ─── Reminder Dispatcher ──────────────────────────────────────────────────────
-// Polls every minute for scheduled notification rows whose scheduledAt has
-// passed and haven't been delivered yet. Sends Expo push and marks pushSent.
+// Polls every minute for:
+//   1. Scheduled notification rows whose scheduledAt has passed — sends push.
+//   2. Stored Expo ticket IDs — checks receipts and clears stale tokens.
 
 export function startReminderDispatcher(intervalMs = 60_000): NodeJS.Timeout {
   return setInterval(async () => {
+    // ── Step 1: send due scheduled notifications ──
     try {
       const now = new Date();
       const dueRows = await db
         .select({
           notif: notificationsTable,
+          userId: usersTable.id,
           pushToken: usersTable.pushToken,
         })
         .from(notificationsTable)
@@ -103,19 +268,48 @@ export function startReminderDispatcher(intervalMs = 60_000): NodeJS.Timeout {
         .limit(50);
 
       for (const row of dueRows) {
-        if (row.pushToken) {
-          await sendExpoPush(row.pushToken, row.notif.title, row.notif.body, {
+        if (!row.pushToken) {
+          console.info(
+            `[push] skipped (no token) — user ${row.userId} has no push token (reminder notif ${row.notif.id})`,
+          );
+          // Mark as sent so the dispatcher doesn't retry indefinitely.
+          await db
+            .update(notificationsTable)
+            .set({ pushSent: true })
+            .where(eq(notificationsTable.id, row.notif.id));
+          continue;
+        }
+
+        const { status, ticketId } = await sendExpoPush(
+          row.userId,
+          row.pushToken,
+          row.notif.title,
+          row.notif.body,
+          {
             type: row.notif.type,
             entityId: row.notif.entityId ?? "",
-          });
-        }
+          },
+        );
+
+        // Always mark pushSent=true — token was cleared if invalidated.
         await db
           .update(notificationsTable)
-          .set({ pushSent: true })
+          .set({ pushSent: true, expoTicketId: ticketId })
           .where(eq(notificationsTable.id, row.notif.id));
+
+        console.info(
+          `[push] reminder notif ${row.notif.id} for user ${row.userId}: ${status}`,
+        );
       }
     } catch (err) {
-      console.warn("Reminder dispatcher error (non-fatal):", err);
+      console.warn("[push] reminder dispatcher send error (non-fatal):", err);
+    }
+
+    // ── Step 2: check Expo receipts for pending ticket IDs ──
+    try {
+      await checkPushReceipts();
+    } catch (err) {
+      console.warn("[push] receipt check error (non-fatal):", err);
     }
   }, intervalMs);
 }
