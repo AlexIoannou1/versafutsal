@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Modal,
   Platform,
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
@@ -55,10 +56,77 @@ function formatPickerDate(d: Date) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-function startOfDay(d: Date) {
+function startOfDay(d: Date): Date {
   const c = new Date(d);
   c.setHours(0, 0, 0, 0);
   return c;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// ─── Standalone picker button (no inline component definition) ───────────────
+type PickerFieldProps = {
+  label: string;
+  value: Date | null;
+  onClear: () => void;
+  onOpen: () => void;
+  primaryColor: string;
+  mutedColor: string;
+  foregroundColor: string;
+  borderColor: string;
+  cardColor: string;
+};
+
+function PickerButton({
+  label, value, onClear, onOpen,
+  primaryColor, mutedColor, foregroundColor, borderColor, cardColor,
+}: PickerFieldProps) {
+  const active = value !== null;
+  return (
+    <TouchableOpacity
+      onPress={onOpen}
+      activeOpacity={0.7}
+      style={{
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: active ? primaryColor + "10" : cardColor,
+        borderWidth: 1,
+        borderColor: active ? primaryColor : borderColor,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+      }}
+    >
+      <Feather name="calendar" size={12} color={active ? primaryColor : mutedColor} />
+      <Text
+        numberOfLines={1}
+        style={{
+          flex: 1,
+          fontSize: 12,
+          fontFamily: active ? "Inter_500Medium" : "Inter_400Regular",
+          color: active ? foregroundColor : mutedColor,
+        }}
+      >
+        {value ? formatPickerDate(value) : label}
+      </Text>
+      {active && (
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation(); onClear(); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Feather name="x" size={12} color={primaryColor} />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
 }
 
 export default function OwnerDashboardScreen() {
@@ -72,25 +140,19 @@ export default function OwnerDashboardScreen() {
 
   const todayStart = useMemo(() => startOfDay(new Date()), []);
 
-  // Only today + upcoming bookings (base filter — no past dates)
-  const currentAndUpcoming = useMemo(
-    () => bookings.filter((b) => new Date(b.startAt) >= todayStart),
-    [bookings, todayStart],
-  );
-
   // Filter / search state
   const [search, setSearch] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
-  const [showFromPicker, setShowFromPicker] = useState(false);
-  const [showToPicker, setShowToPicker] = useState(false);
+  const [activePicker, setActivePicker] = useState<"from" | "to" | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | "ALL">("ALL");
 
   const venues = useMemo(() => {
     const seen = new Set<string>();
     const result: { id: string; name: string }[] = [];
-    for (const b of currentAndUpcoming) {
+    for (const b of bookings) {
       const v = b.venue as { id: string; name: string } | undefined;
       if (v && !seen.has(v.id)) {
         seen.add(v.id);
@@ -98,29 +160,46 @@ export default function OwnerDashboardScreen() {
       }
     }
     return result;
-  }, [currentAndUpcoming]);
+  }, [bookings]);
 
-  const [selectedVenueId, setSelectedVenueId] = useState<string | "ALL">("ALL");
+  // Base: today + upcoming only (no past)
+  const currentAndUpcoming = useMemo(
+    () => bookings.filter((b) => new Date(b.startAt) >= todayStart),
+    [bookings, todayStart],
+  );
 
   const filtered = useMemo(() => {
     return currentAndUpcoming.filter((b) => {
       const player = b.player as { name: string; email: string } | undefined;
       const venue = b.venue as { id: string; name: string } | undefined;
-      const bDate = startOfDay(new Date(b.startAt));
+      const bDay = startOfDay(new Date(b.startAt));
 
       if (selectedStatus !== "All" && b.status !== selectedStatus) return false;
       if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
-      if (dateFrom && bDate < startOfDay(dateFrom)) return false;
-      if (dateTo && bDate > startOfDay(dateTo)) return false;
+      if (dateFrom && bDay < startOfDay(dateFrom)) return false;
+      if (dateTo && bDay > startOfDay(dateTo)) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
-        const matchPlayer = player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
-        const matchVenue = venue?.name?.toLowerCase().includes(q);
-        if (!matchPlayer && !matchVenue) return false;
+        const mp = player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
+        const mv = venue?.name?.toLowerCase().includes(q);
+        if (!mp && !mv) return false;
       }
       return true;
     });
   }, [currentAndUpcoming, selectedStatus, selectedVenueId, dateFrom, dateTo, search]);
+
+  // Split filtered into today vs upcoming (future)
+  const todayBookings = useMemo(
+    () => filtered.filter((b) => isSameDay(new Date(b.startAt), todayStart))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    [filtered, todayStart],
+  );
+
+  const upcomingBookings = useMemo(
+    () => filtered.filter((b) => !isSameDay(new Date(b.startAt), todayStart))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt)),
+    [filtered, todayStart],
+  );
 
   const hasActiveFilters =
     selectedStatus !== "All" ||
@@ -141,213 +220,116 @@ export default function OwnerDashboardScreen() {
     setSearch("");
   };
 
+  const handlePickerChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === "android") {
+      setActivePicker(null);
+    }
+    if (!selected) return;
+    if (activePicker === "from") {
+      setDateFrom(selected);
+      if (dateTo && selected > dateTo) setDateTo(null);
+    } else if (activePicker === "to") {
+      setDateTo(selected);
+    }
+  };
+
+  const pickerValue =
+    activePicker === "from" ? (dateFrom ?? todayStart) :
+    activePicker === "to" ? (dateTo ?? dateFrom ?? todayStart) :
+    todayStart;
+
+  const pickerMinDate =
+    activePicker === "to" ? (dateFrom ?? todayStart) : todayStart;
+
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-    greeting: {
-      paddingHorizontal: 16,
-      paddingTop: 20,
-      paddingBottom: 12,
-    },
-    greetingText: {
-      fontSize: 20,
-      fontFamily: "Inter_700Bold",
-      color: colors.foreground,
-    },
-    greetingSub: {
-      fontSize: 13,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-      marginTop: 2,
-    },
-    statsRow: {
-      flexDirection: "row",
-      gap: 10,
-      paddingHorizontal: 16,
-      marginBottom: 16,
-    },
+    greeting: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
+    greetingText: { fontSize: 20, fontFamily: "Inter_700Bold", color: colors.foreground },
+    greetingSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
+    statsRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, marginBottom: 16 },
     statCard: {
-      flex: 1,
-      backgroundColor: colors.card,
-      borderRadius: 10,
-      padding: 12,
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: colors.border,
+      flex: 1, backgroundColor: colors.card, borderRadius: 10, padding: 12,
+      alignItems: "center", borderWidth: 1, borderColor: colors.border,
     },
-    statNum: {
-      fontSize: 24,
-      fontFamily: "Inter_700Bold",
-      color: colors.primary,
-    },
-    statLabel: {
-      fontSize: 11,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-      marginTop: 2,
-      textAlign: "center",
-    },
+    statNum: { fontSize: 24, fontFamily: "Inter_700Bold", color: colors.primary },
+    statLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2, textAlign: "center" },
     sectionHeader: {
-      paddingHorizontal: 16,
-      paddingTop: 8,
-      paddingBottom: 6,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6,
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     },
     sectionTitle: {
-      fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.foreground,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
+      fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground,
+      textTransform: "uppercase", letterSpacing: 0.6,
     },
-    searchRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingBottom: 8,
-      gap: 8,
-    },
+    searchRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
     searchInput: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 10,
-      gap: 6,
+      flex: 1, flexDirection: "row", alignItems: "center",
+      backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
+      borderRadius: 10, paddingHorizontal: 10, gap: 6,
     },
-    searchText: {
-      flex: 1,
-      height: 38,
-      fontSize: 13,
-      fontFamily: "Inter_400Regular",
-      color: colors.foreground,
-    },
+    searchText: { flex: 1, height: 38, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground },
     filterBtn: {
-      padding: 8,
-      borderRadius: 8,
-      borderWidth: 1,
+      padding: 8, borderRadius: 8, borderWidth: 1,
       borderColor: hasActiveFilters ? colors.primary : colors.border,
       backgroundColor: hasActiveFilters ? colors.primary + "15" : colors.card,
     },
-    filterPanel: {
-      paddingHorizontal: 16,
-      paddingBottom: 10,
-      gap: 10,
-    },
+    filterPanel: { paddingHorizontal: 16, paddingBottom: 10, gap: 10 },
     filterLabel: {
-      fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.mutedForeground,
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-      marginBottom: 5,
+      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
+      textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 5,
     },
     chipRow: { flexDirection: "row", gap: 6 },
-    chip: {
-      borderRadius: 20,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-    },
+    chip: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     chipText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
     chipTextActive: { color: "#fff" },
     dateRow: { flexDirection: "row", gap: 8 },
-    dateField: { flex: 1 },
-    datePickerBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      backgroundColor: colors.card,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    datePickerBtnActive: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primary + "10",
-    },
-    datePickerText: {
-      flex: 1,
-      fontSize: 12,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-    },
-    datePickerTextActive: {
-      color: colors.foreground,
-      fontFamily: "Inter_500Medium",
-    },
     clearBtn: { alignSelf: "flex-end" },
     clearBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.destructive },
-    divider: {
-      height: 1,
-      backgroundColor: colors.border,
-      marginHorizontal: 16,
-      marginVertical: 8,
+    divider: { height: 1, backgroundColor: colors.border, marginHorizontal: 16, marginVertical: 8 },
+    sectionDivider: {
+      flexDirection: "row", alignItems: "center", gap: 10,
+      marginHorizontal: 16, marginTop: 4, marginBottom: 12,
+    },
+    sectionDividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+    sectionDividerText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    subHeader: {
+      paddingHorizontal: 16, paddingBottom: 6, paddingTop: 4,
+      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
+      textTransform: "uppercase", letterSpacing: 0.6,
     },
     list: { paddingHorizontal: 16, paddingBottom: insets.bottom + 100 },
     card: {
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.card, borderRadius: 12, padding: 14,
+      marginBottom: 10, borderWidth: 1, borderColor: colors.border,
     },
-    cardHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      marginBottom: 4,
-    },
-    playerName: {
-      fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
-      color: colors.foreground,
-      flex: 1,
-      marginRight: 8,
-    },
-    statusBadge: {
-      borderRadius: 6,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
+    cardHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 },
+    playerName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: colors.foreground, flex: 1, marginRight: 8 },
+    statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
     statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-    metaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      marginTop: 3,
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
+    metaText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    emptyWrap: { alignItems: "center", paddingVertical: 24, gap: 8 },
+    emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    resultCount: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    // iOS picker modal
+    pickerOverlay: {
+      flex: 1, backgroundColor: "rgba(0,0,0,0.4)",
+      justifyContent: "flex-end",
     },
-    metaText: {
-      fontSize: 12,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
+    pickerSheet: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 16, borderTopRightRadius: 16,
+      paddingBottom: insets.bottom + 8,
     },
-    emptyWrap: {
-      alignItems: "center",
-      paddingVertical: 32,
-      gap: 8,
+    pickerSheetHeader: {
+      flexDirection: "row", justifyContent: "space-between", alignItems: "center",
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: colors.border,
     },
-    emptyText: {
-      fontSize: 14,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-    },
-    resultCount: {
-      fontSize: 12,
-      fontFamily: "Inter_400Regular",
-      color: colors.mutedForeground,
-    },
+    pickerSheetLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground },
+    pickerDoneBtn: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.primary },
   });
 
   if (isLoading) {
@@ -381,77 +363,18 @@ export default function OwnerDashboardScreen() {
         </View>
         <View style={s.metaRow}>
           <Feather name="grid" size={12} color={colors.mutedForeground} />
-          <Text style={s.metaText}>
-            {venue?.name ?? ""} · {pitch?.name ?? ""}
-          </Text>
+          <Text style={s.metaText}>{venue?.name ?? ""} · {pitch?.name ?? ""}</Text>
         </View>
         <View style={s.metaRow}>
           <Feather name="calendar" size={12} color={colors.mutedForeground} />
-          <Text style={s.metaText}>
-            {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
-          </Text>
+          <Text style={s.metaText}>{formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  const DatePickerField = ({
-    label,
-    value,
-    onChange,
-    onClear,
-    show,
-    onOpen,
-    onClose,
-    minimumDate,
-    maximumDate,
-  }: {
-    label: string;
-    value: Date | null;
-    onChange: (d: Date) => void;
-    onClear: () => void;
-    show: boolean;
-    onOpen: () => void;
-    onClose: () => void;
-    minimumDate?: Date;
-    maximumDate?: Date;
-  }) => (
-    <View style={s.dateField}>
-      <TouchableOpacity
-        style={[s.datePickerBtn, value !== null && s.datePickerBtnActive]}
-        onPress={onOpen}
-        activeOpacity={0.7}
-      >
-        <Feather name="calendar" size={12} color={value ? colors.primary : colors.mutedForeground} />
-        <Text style={[s.datePickerText, value !== null && s.datePickerTextActive]} numberOfLines={1}>
-          {value ? formatPickerDate(value) : label}
-        </Text>
-        {value !== null && (
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onClear(); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="x" size={12} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-      {show && (
-        <DateTimePicker
-          value={value ?? new Date()}
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          minimumDate={minimumDate}
-          maximumDate={maximumDate}
-          onChange={(_event: DateTimePickerEvent, selected?: Date) => {
-            if (Platform.OS === "android") onClose();
-            if (selected) onChange(selected);
-          }}
-        />
-      )}
-    </View>
-  );
-
-  const allSections = [
+  // Build section list items
+  const allSections: { key: string; render: () => React.ReactElement | null }[] = [
     {
       key: "greeting",
       render: () => (
@@ -486,9 +409,7 @@ export default function OwnerDashboardScreen() {
       render: () => (
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Bookings</Text>
-          {hasActiveFilters && (
-            <Text style={s.resultCount}>{filtered.length} shown</Text>
-          )}
+          {hasActiveFilters && <Text style={s.resultCount}>{filtered.length} shown</Text>}
         </View>
       ),
     },
@@ -515,11 +436,7 @@ export default function OwnerDashboardScreen() {
             style={s.filterBtn}
             onPress={() => setFiltersExpanded((v) => !v)}
           >
-            <Feather
-              name="sliders"
-              size={16}
-              color={hasActiveFilters ? colors.primary : colors.foreground}
-            />
+            <Feather name="sliders" size={16} color={hasActiveFilters ? colors.primary : colors.foreground} />
           </TouchableOpacity>
         </View>
       ),
@@ -530,6 +447,7 @@ export default function OwnerDashboardScreen() {
             key: "filterPanel",
             render: () => (
               <View style={s.filterPanel}>
+                {/* Status chips */}
                 <View>
                   <Text style={s.filterLabel}>Status</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -549,6 +467,7 @@ export default function OwnerDashboardScreen() {
                   </ScrollView>
                 </View>
 
+                {/* Venue chips */}
                 {venues.length > 0 && (
                   <View>
                     <Text style={s.filterLabel}>Venue</Text>
@@ -558,9 +477,7 @@ export default function OwnerDashboardScreen() {
                           style={[s.chip, selectedVenueId === "ALL" && s.chipActive]}
                           onPress={() => setSelectedVenueId("ALL")}
                         >
-                          <Text style={[s.chipText, selectedVenueId === "ALL" && s.chipTextActive]}>
-                            All Venues
-                          </Text>
+                          <Text style={[s.chipText, selectedVenueId === "ALL" && s.chipTextActive]}>All Venues</Text>
                         </TouchableOpacity>
                         {venues.map((v) => (
                           <TouchableOpacity
@@ -568,11 +485,7 @@ export default function OwnerDashboardScreen() {
                             style={[s.chip, selectedVenueId === v.id && s.chipActive]}
                             onPress={() => setSelectedVenueId(v.id)}
                           >
-                            <Text
-                              style={[s.chipText, selectedVenueId === v.id && s.chipTextActive]}
-                            >
-                              {v.name}
-                            </Text>
+                            <Text style={[s.chipText, selectedVenueId === v.id && s.chipTextActive]}>{v.name}</Text>
                           </TouchableOpacity>
                         ))}
                       </View>
@@ -580,31 +493,31 @@ export default function OwnerDashboardScreen() {
                   </View>
                 )}
 
+                {/* Date range */}
                 <View>
                   <Text style={s.filterLabel}>Date Range</Text>
                   <View style={s.dateRow}>
-                    <DatePickerField
+                    <PickerButton
                       label="From"
                       value={dateFrom}
-                      onChange={(d) => {
-                        setDateFrom(d);
-                        if (dateTo && d > dateTo) setDateTo(null);
-                      }}
                       onClear={() => setDateFrom(null)}
-                      show={showFromPicker}
-                      onOpen={() => { setShowToPicker(false); setShowFromPicker(true); }}
-                      onClose={() => setShowFromPicker(false)}
-                      minimumDate={todayStart}
+                      onOpen={() => setActivePicker("from")}
+                      primaryColor={colors.primary}
+                      mutedColor={colors.mutedForeground}
+                      foregroundColor={colors.foreground}
+                      borderColor={colors.border}
+                      cardColor={colors.card}
                     />
-                    <DatePickerField
+                    <PickerButton
                       label="To"
                       value={dateTo}
-                      onChange={(d) => setDateTo(d)}
                       onClear={() => setDateTo(null)}
-                      show={showToPicker}
-                      onOpen={() => { setShowFromPicker(false); setShowToPicker(true); }}
-                      onClose={() => setShowToPicker(false)}
-                      minimumDate={dateFrom ?? todayStart}
+                      onOpen={() => setActivePicker("to")}
+                      primaryColor={colors.primary}
+                      mutedColor={colors.mutedForeground}
+                      foregroundColor={colors.foreground}
+                      borderColor={colors.border}
+                      cardColor={colors.card}
                     />
                   </View>
                 </View>
@@ -619,22 +532,70 @@ export default function OwnerDashboardScreen() {
           },
         ]
       : []),
-    ...(filtered.length === 0
-      ? [
-          {
-            key: "empty",
-            render: () => (
-              <View style={s.emptyWrap}>
-                <Feather name="calendar" size={28} color={colors.mutedForeground} />
-                <Text style={s.emptyText}>
-                  {hasActiveFilters ? "No bookings match your filters" : "No upcoming bookings"}
-                </Text>
-              </View>
-            ),
-          },
-        ]
-      : filtered.map((b) => ({ key: `booking-${b.id}`, render: () => <BookingCard item={b} /> }))),
   ];
+
+  // ── Booking rows: today first, then upcoming ──────────────────────────────
+  if (filtered.length === 0) {
+    allSections.push({
+      key: "empty",
+      render: () => (
+        <View style={s.emptyWrap}>
+          <Feather name="calendar" size={28} color={colors.mutedForeground} />
+          <Text style={s.emptyText}>
+            {hasActiveFilters ? "No bookings match your filters" : "No upcoming bookings"}
+          </Text>
+        </View>
+      ),
+    });
+  } else {
+    // Today section
+    allSections.push({
+      key: "todayHeader",
+      render: () => <Text style={s.subHeader}>Today</Text>,
+    });
+    if (todayBookings.length === 0) {
+      allSections.push({
+        key: "todayEmpty",
+        render: () => (
+          <View style={[s.emptyWrap, { paddingVertical: 12 }]}>
+            <Text style={s.emptyText}>No bookings today</Text>
+          </View>
+        ),
+      });
+    } else {
+      todayBookings.forEach((b) =>
+        allSections.push({ key: `booking-today-${b.id}`, render: () => <BookingCard item={b} /> }),
+      );
+    }
+
+    // Divider
+    allSections.push({
+      key: "sectionDivider",
+      render: () => (
+        <View style={s.sectionDivider}>
+          <View style={s.sectionDividerLine} />
+          <Text style={s.sectionDividerText}>Upcoming</Text>
+          <View style={s.sectionDividerLine} />
+        </View>
+      ),
+    });
+
+    // Upcoming section
+    if (upcomingBookings.length === 0) {
+      allSections.push({
+        key: "upcomingEmpty",
+        render: () => (
+          <View style={[s.emptyWrap, { paddingVertical: 12 }]}>
+            <Text style={s.emptyText}>No upcoming bookings</Text>
+          </View>
+        ),
+      });
+    } else {
+      upcomingBookings.forEach((b) =>
+        allSections.push({ key: `booking-upcoming-${b.id}`, render: () => <BookingCard item={b} /> }),
+      );
+    }
+  }
 
   return (
     <View style={s.container}>
@@ -643,14 +604,56 @@ export default function OwnerDashboardScreen() {
         keyExtractor={(item) => item.key}
         contentContainerStyle={s.list}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={colors.primary}
-          />
+          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
         }
         renderItem={({ item }) => item.render()}
       />
+
+      {/* Android: DateTimePicker renders as a native dialog when visible */}
+      {Platform.OS === "android" && activePicker !== null && (
+        <DateTimePicker
+          value={pickerValue}
+          mode="date"
+          display="default"
+          minimumDate={pickerMinDate}
+          onChange={handlePickerChange}
+        />
+      )}
+
+      {/* iOS: bottom sheet modal */}
+      {Platform.OS === "ios" && (
+        <Modal
+          visible={activePicker !== null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setActivePicker(null)}
+        >
+          <TouchableOpacity
+            style={s.pickerOverlay}
+            activeOpacity={1}
+            onPress={() => setActivePicker(null)}
+          >
+            <View style={s.pickerSheet}>
+              <View style={s.pickerSheetHeader}>
+                <Text style={s.pickerSheetLabel}>
+                  {activePicker === "from" ? "From date" : "To date"}
+                </Text>
+                <TouchableOpacity onPress={() => setActivePicker(null)}>
+                  <Text style={s.pickerDoneBtn}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={pickerValue}
+                mode="date"
+                display="spinner"
+                minimumDate={pickerMinDate}
+                onChange={handlePickerChange}
+                style={{ width: "100%" }}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </View>
   );
 }
