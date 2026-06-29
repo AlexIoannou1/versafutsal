@@ -113,6 +113,7 @@ export default function OwnerVenueDetailScreen() {
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editContactPhone, setEditContactPhone] = useState("");
   const [editCancellationWindowHours, setEditCancellationWindowHours] = useState("24");
   const [editSaving, setEditSaving] = useState(false);
 
@@ -256,6 +257,7 @@ export default function OwnerVenueDetailScreen() {
     setEditName(venue.name);
     setEditAddress(venue.address);
     setEditDescription(venue.description ?? "");
+    setEditContactPhone((venue as VenueDetail & { contactPhone?: string | null }).contactPhone ?? "");
     setEditCancellationWindowHours(String(venue.cancellationWindowHours ?? 24));
     setEditModalVisible(true);
   };
@@ -263,6 +265,10 @@ export default function OwnerVenueDetailScreen() {
   const handleSaveDetails = async () => {
     if (!editName.trim()) {
       Alert.alert("Error", "Venue name is required.");
+      return;
+    }
+    if (!editContactPhone.trim()) {
+      Alert.alert("Error", "Contact phone number is required.");
       return;
     }
     const windowHours = parseInt(editCancellationWindowHours, 10);
@@ -276,6 +282,7 @@ export default function OwnerVenueDetailScreen() {
         name: editName.trim(),
         address: editAddress.trim(),
         description: editDescription.trim() || undefined,
+        contactPhone: editContactPhone.trim(),
         cancellationWindowHours: windowHours,
       });
       setEditModalVisible(false);
@@ -773,6 +780,12 @@ export default function OwnerVenueDetailScreen() {
             <Text style={s.infoLabel}>Address</Text>
             <Text style={s.infoValue}>{venue.address}</Text>
           </View>
+          <View style={s.infoRow}>
+            <Text style={s.infoLabel}>Contact Phone</Text>
+            <Text style={s.infoValue}>
+              {(venue as VenueDetail & { contactPhone?: string | null }).contactPhone || "—"}
+            </Text>
+          </View>
           {venue.description && (
             <View style={s.infoRow}>
               <Text style={s.infoLabel}>About</Text>
@@ -954,6 +967,21 @@ export default function OwnerVenueDetailScreen() {
             <View style={s.mField}>
               <Text style={s.mLabel}>Address</Text>
               <TextInput style={s.mInput} value={editAddress} onChangeText={setEditAddress} />
+            </View>
+            <View style={s.mField}>
+              <Text style={s.mLabel}>Contact Phone Number *</Text>
+              <TextInput
+                style={s.mInput}
+                value={editContactPhone}
+                onChangeText={setEditContactPhone}
+                placeholder="e.g. +357 99 123456"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+              />
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
+                Use the number listed on Google Maps or social media.
+              </Text>
             </View>
             <View style={s.mField}>
               <Text style={s.mLabel}>Description</Text>

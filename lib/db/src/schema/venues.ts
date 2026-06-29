@@ -45,6 +45,7 @@ export const venuesTable = pgTable("venues", {
   cancellationWindowHours: integer("cancellation_window_hours")
     .notNull()
     .default(24),
+  contactPhone: text("contact_phone"),
   rejectionReason: text("rejection_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

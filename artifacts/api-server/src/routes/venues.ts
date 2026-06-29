@@ -254,7 +254,7 @@ router.get<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_
 // POST /owner/venues — create venue
 router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
-    const { name, district, address, description, amenities, cancellationWindowHours } =
+    const { name, district, address, description, amenities, cancellationWindowHours, contactPhone } =
       req.body as {
         name: string;
         district: string;
@@ -262,10 +262,16 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
         description?: string;
         amenities?: string[];
         cancellationWindowHours?: number;
+        contactPhone: string;
       };
 
     if (!name || !district || !address) {
       res.status(400).json({ error: "name, district, and address are required" });
+      return;
+    }
+
+    if (!contactPhone?.trim()) {
+      res.status(400).json({ error: "contactPhone is required" });
       return;
     }
 
@@ -292,6 +298,7 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
         description: description ?? null,
         amenities: amenities ?? [],
         cancellationWindowHours: cancellationWindowHours ?? 24,
+        contactPhone: contactPhone.trim(),
         status: "PENDING",
       })
       .returning();
@@ -318,7 +325,7 @@ router.put<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_
     }
     if (!assertOwnsVenue(existing.ownerId, req.user!.userId, res)) return;
 
-    const { name, district, address, description, amenities, cancellationWindowHours } =
+    const { name, district, address, description, amenities, cancellationWindowHours, contactPhone } =
       req.body as Partial<{
         name: string;
         district: string;
@@ -326,6 +333,7 @@ router.put<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_
         description: string;
         amenities: string[];
         cancellationWindowHours: number;
+        contactPhone: string;
       }>;
 
     if (cancellationWindowHours !== undefined) {
@@ -350,6 +358,7 @@ router.put<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_
         ...(description !== undefined && { description }),
         ...(amenities !== undefined && { amenities }),
         ...(cancellationWindowHours !== undefined && { cancellationWindowHours }),
+        ...(contactPhone !== undefined && { contactPhone: contactPhone.trim() }),
         updatedAt: new Date(),
       })
       .where(eq(venuesTable.id, req.params.id))

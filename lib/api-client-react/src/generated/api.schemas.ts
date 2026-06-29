@@ -108,6 +108,7 @@ export interface VenueRecord {
   description?: string | null;
   amenities: string[];
   cancellationWindowHours: number;
+  contactPhone?: string | null;
   rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -227,6 +228,7 @@ export interface CreateVenueRequest {
   description?: string;
   amenities?: string[];
   cancellationWindowHours?: number;
+  contactPhone: string;
 }
 
 export interface UpdateVenueRequest {
@@ -236,6 +238,7 @@ export interface UpdateVenueRequest {
   description?: string;
   amenities?: string[];
   cancellationWindowHours?: number;
+  contactPhone?: string;
 }
 
 export interface CreatePitchRequest {

@@ -82,6 +82,7 @@ export default function VenueNewScreen() {
   const [district, setDistrict] = useState("");
   const [address, setAddress] = useState("");
   const [description, setDescription] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [cancellationWindowHours, setCancellationWindowHours] = useState("24");
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
 
@@ -116,6 +117,7 @@ export default function VenueNewScreen() {
       if (!name.trim()) { Alert.alert("Required", "Venue name is required."); return; }
       if (!district) { Alert.alert("Required", "Please select a district."); return; }
       if (!address.trim()) { Alert.alert("Required", "Address is required."); return; }
+      if (!contactPhone.trim()) { Alert.alert("Required", "Contact phone number is required."); return; }
 
       setStepLoading(true);
       try {
@@ -129,6 +131,7 @@ export default function VenueNewScreen() {
             const v = parseInt(cancellationWindowHours, 10);
             return isNaN(v) ? 24 : v;
           })(),
+          contactPhone: contactPhone.trim(),
         });
         const id = result?.venue?.id;
         if (!id) throw new Error("No venue ID returned");
@@ -454,6 +457,22 @@ export default function VenueNewScreen() {
                 placeholder="Street, city"
                 placeholderTextColor={colors.mutedForeground}
               />
+            </View>
+
+            <View style={s.field}>
+              <Text style={s.label}>Contact Phone Number *</Text>
+              <TextInput
+                style={s.input}
+                value={contactPhone}
+                onChangeText={setContactPhone}
+                placeholder="e.g. +357 99 123456"
+                placeholderTextColor={colors.mutedForeground}
+                keyboardType="phone-pad"
+                autoComplete="tel"
+              />
+              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
+                Use the number listed on Google Maps or social media. Admins will call this to verify your venue.
+              </Text>
             </View>
 
             <View style={s.field}>
