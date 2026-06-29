@@ -60,15 +60,23 @@ export default function AdminBookingsScreen() {
   const [dateTo, setDateTo] = useState("");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
+  // Only treat input as a valid date when it matches YYYY-MM-DD exactly, preventing
+  // RangeError crashes from intermediate typing states like "2026-0" or "2026-06-".
+  function safeIso(value: string, endOfDay = false): string | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return null;
+    if (endOfDay) d.setHours(23, 59, 59, 999);
+    return d.toISOString();
+  }
+
   const params = useMemo(() => {
     const p: Record<string, string> = {};
     if (selectedStatus !== "All") p.status = selectedStatus;
-    if (dateFrom) p.from = new Date(dateFrom).toISOString();
-    if (dateTo) {
-      const d = new Date(dateTo);
-      d.setHours(23, 59, 59, 999);
-      p.to = d.toISOString();
-    }
+    const fromIso = safeIso(dateFrom);
+    if (fromIso) p.from = fromIso;
+    const toIso = safeIso(dateTo, true);
+    if (toIso) p.to = toIso;
     return p;
   }, [selectedStatus, dateFrom, dateTo]);
 
@@ -97,17 +105,27 @@ export default function AdminBookingsScreen() {
       const venue = b.venue as { id?: string; name?: string; district?: string } | undefined;
       const player = b.player as { name?: string; email?: string } | undefined;
 
+      // Venue chip filter
       if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
 
-      if (search.trim() || selectedPlayerSearch.trim()) {
-        const q = (search + " " + selectedPlayerSearch).toLowerCase().trim();
-        const matchPlayer =
-          player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
+      // Venue text search — evaluated independently from player search (AND semantics)
+      if (search.trim()) {
+        const q = search.toLowerCase();
         const matchVenue =
           venue?.name?.toLowerCase().includes(q) ||
-          venue?.district?.toLowerCase().includes(q);
-        if (!matchPlayer && !matchVenue) return false;
+          (venue?.district as string | undefined)?.toLowerCase().includes(q);
+        if (!matchVenue) return false;
       }
+
+      // Player search — evaluated independently (AND semantics)
+      if (selectedPlayerSearch.trim()) {
+        const q = selectedPlayerSearch.toLowerCase();
+        const matchPlayer =
+          player?.name?.toLowerCase().includes(q) ||
+          player?.email?.toLowerCase().includes(q);
+        if (!matchPlayer) return false;
+      }
+
       return true;
     });
   }, [bookings, selectedVenueId, search, selectedPlayerSearch]);
