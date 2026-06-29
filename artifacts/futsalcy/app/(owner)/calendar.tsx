@@ -14,7 +14,7 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useListOwnerBookings } from "@workspace/api-client-react";
 
-type ViewMode = "day" | "month" | "list";
+type ViewMode = "day" | "month";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -208,23 +208,6 @@ export default function OwnerCalendarScreen() {
     return bookingsByDay.get(key) ?? [];
   }
 
-  // ─── List helpers ─────────────────────────────────────────────────────────
-  const todayBookings = useMemo(
-    () =>
-      bookings
-        .filter((b) => isSameDay(new Date(b.startAt), today))
-        .sort((a, b) => a.startAt.localeCompare(b.startAt)),
-    [bookings],
-  );
-
-  const otherBookings = useMemo(
-    () =>
-      bookings
-        .filter((b) => !isSameDay(new Date(b.startAt), today))
-        .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? "")),
-    [bookings],
-  );
-
   // ─── Navigation ──────────────────────────────────────────────────────────
   function navigate(dir: 1 | -1) {
     const d = new Date(currentDate);
@@ -243,8 +226,7 @@ export default function OwnerCalendarScreen() {
 
   function navLabel() {
     if (viewMode === "day") return formatDateLong(currentDate);
-    if (viewMode === "month") return `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
-    return "All Bookings";
+    return `${MONTH_NAMES[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
   }
 
   // ─── Styles ───────────────────────────────────────────────────────────────
@@ -332,27 +314,11 @@ export default function OwnerCalendarScreen() {
     monthDotText: { fontSize: 8, fontFamily: "Inter_500Medium", color: "#fff" },
     moreText: { fontSize: 8, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
 
-    // List view
-    listScroll: { flex: 1 },
-    listContent: { padding: 16, paddingBottom: insets.bottom + 80 },
-    listSectionHeader: {
-      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
-      marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.6,
-    },
-    listDivider: {
-      flexDirection: "row", alignItems: "center", gap: 10,
-      marginTop: 8, marginBottom: 16,
-    },
-    listDividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-    listDividerText: {
-      fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground,
-    },
   });
 
   const VIEW_MODES: { key: ViewMode; label: string }[] = [
     { key: "day", label: "Day" },
     { key: "month", label: "Month" },
-    { key: "list", label: "List" },
   ];
 
   if (isLoading) {
@@ -462,71 +428,6 @@ export default function OwnerCalendarScreen() {
     );
   };
 
-  // ─── List View ────────────────────────────────────────────────────────────
-  const ListView = () => {
-    const isEmpty = bookings.length === 0;
-    return (
-      <ScrollView
-        style={s.listScroll}
-        contentContainerStyle={s.listContent}
-        refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
-        }
-      >
-        {isEmpty ? (
-          <View style={{ alignItems: "center", paddingVertical: 48, gap: 8 }}>
-            <Feather name="calendar" size={32} color={colors.mutedForeground} />
-            <Text style={s.noBookings}>No bookings yet.</Text>
-          </View>
-        ) : (
-          <>
-            {/* ── Today ── */}
-            <Text style={s.listSectionHeader}>Today</Text>
-            {todayBookings.length === 0 ? (
-              <Text style={[s.noBookings, { paddingVertical: 12, textAlign: "left" }]}>
-                No bookings today.
-              </Text>
-            ) : (
-              todayBookings.map((b) => (
-                <BookingRow key={b.id} booking={b} colors={colors}
-                  onPress={() => router.push(`/owner/booking/${b.id}`)} />
-              ))
-            )}
-
-            {/* ── Divider ── */}
-            <View style={s.listDivider}>
-              <View style={s.listDividerLine} />
-              <Text style={s.listDividerText}>Other bookings</Text>
-              <View style={s.listDividerLine} />
-            </View>
-
-            {/* ── Rest — newest created first ── */}
-            {otherBookings.length === 0 ? (
-              <Text style={[s.noBookings, { paddingVertical: 12, textAlign: "left" }]}>
-                No other bookings.
-              </Text>
-            ) : (
-              otherBookings.map((b) => {
-                const dateLabel = new Date(b.startAt).toLocaleDateString("en-GB", {
-                  weekday: "short", day: "numeric", month: "short", year: "numeric",
-                });
-                return (
-                  <View key={b.id} style={{ marginBottom: 2 }}>
-                    <Text style={[s.listSectionHeader, { marginBottom: 4, marginTop: 0 }]}>
-                      {dateLabel}
-                    </Text>
-                    <BookingRow booking={b} colors={colors}
-                      onPress={() => router.push(`/owner/booking/${b.id}`)} />
-                  </View>
-                );
-              })
-            )}
-          </>
-        )}
-      </ScrollView>
-    );
-  };
-
   return (
     <View style={s.container}>
       {/* Toolbar */}
@@ -545,25 +446,22 @@ export default function OwnerCalendarScreen() {
           ))}
         </View>
 
-        {viewMode !== "list" && (
-          <View style={s.navRow}>
-            <TouchableOpacity style={s.navBtn} onPress={() => navigate(-1)}>
-              <Feather name="chevron-left" size={16} color={colors.foreground} />
-            </TouchableOpacity>
-            <Text style={s.navLabel} numberOfLines={1}>{navLabel()}</Text>
-            <TouchableOpacity style={s.navBtn} onPress={() => navigate(1)}>
-              <Feather name="chevron-right" size={16} color={colors.foreground} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.todayBtn} onPress={goToday}>
-              <Text style={s.todayBtnText}>Today</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <View style={s.navRow}>
+          <TouchableOpacity style={s.navBtn} onPress={() => navigate(-1)}>
+            <Feather name="chevron-left" size={16} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={s.navLabel} numberOfLines={1}>{navLabel()}</Text>
+          <TouchableOpacity style={s.navBtn} onPress={() => navigate(1)}>
+            <Feather name="chevron-right" size={16} color={colors.foreground} />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.todayBtn} onPress={goToday}>
+            <Text style={s.todayBtnText}>Today</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {viewMode === "day" && <DayView />}
       {viewMode === "month" && <MonthView />}
-      {viewMode === "list" && <ListView />}
     </View>
   );
 }
