@@ -29,6 +29,13 @@
       "when": 1782735312280,
       "tag": "0003_clear_goliath",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1751155200000,
+      "tag": "0004_partial_slot_constraint",
+      "breakpoints": true
     }
   ]
 }

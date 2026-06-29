@@ -11,12 +11,14 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import {
   useGetVenue,
   useCreateBooking,
   useCheckoutBooking,
   useGetCheckoutFee,
+  getGetPitchAvailabilityQueryKey,
 } from "@workspace/api-client-react";
 
 const MONTHS_FULL = [
@@ -58,8 +60,11 @@ export default function BookSummaryScreen() {
     endAt: string;
   }>();
 
+  const queryClient = useQueryClient();
+
   const [paymentType, setPaymentType] = useState<PaymentType>("FULL");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [isSlotConflict, setIsSlotConflict] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Persisted booking ID — set on first successful createBooking, reused on checkout retry
@@ -141,6 +146,7 @@ export default function BookSummaryScreen() {
   function handlePayNow() {
     if (isProcessing) return;
     setCheckoutError(null);
+    setIsSlotConflict(false);
     setIsProcessing(true);
 
     if (pendingBookingId) {
@@ -161,9 +167,20 @@ export default function BookSummaryScreen() {
         },
         onError: (err: unknown) => {
           setIsProcessing(false);
+          const status = (err as { response?: { status?: number } })?.response?.status;
           const msg =
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
             "Could not reserve slot. Please try again.";
+          if (status === 409) {
+            // Slot was taken by a concurrent request — invalidate the availability
+            // cache so the slot grid shows fresh data when the user goes back.
+            if (venueId && pitchId) {
+              void queryClient.invalidateQueries({
+                queryKey: getGetPitchAvailabilityQueryKey(venueId, pitchId),
+              });
+            }
+            setIsSlotConflict(true);
+          }
           setCheckoutError(msg);
         },
       },
@@ -544,32 +561,45 @@ export default function BookSummaryScreen() {
       {/* CTA */}
       <View style={s.bottomBar}>
         {checkoutError && <Text style={s.errorText}>{checkoutError}</Text>}
-        <TouchableOpacity
-          style={[s.primaryBtn, isProcessing && s.primaryBtnDisabled]}
-          onPress={handlePayNow}
-          disabled={isProcessing}
-          activeOpacity={0.85}
-        >
-          {isProcessing ? (
-            <ActivityIndicator color={colors.primaryForeground} />
-          ) : (
-            <>
-              <Feather name="lock" size={18} color={colors.primaryForeground} />
-              <Text style={s.primaryBtnText}>
-                {checkoutError ? "Retry Payment" : "Pay Now"}
-                {totalDue != null ? ` · €${totalDue.toFixed(2)}` : ""}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={s.secondaryBtn}
-          onPress={() => router.back()}
-          activeOpacity={0.8}
-          disabled={isProcessing}
-        >
-          <Text style={s.secondaryBtnText}>Back to Slots</Text>
-        </TouchableOpacity>
+        {isSlotConflict ? (
+          <TouchableOpacity
+            style={s.primaryBtn}
+            onPress={() => router.back()}
+            activeOpacity={0.85}
+          >
+            <Feather name="refresh-cw" size={18} color={colors.primaryForeground} />
+            <Text style={s.primaryBtnText}>Choose Another Slot</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[s.primaryBtn, isProcessing && s.primaryBtnDisabled]}
+              onPress={handlePayNow}
+              disabled={isProcessing}
+              activeOpacity={0.85}
+            >
+              {isProcessing ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <>
+                  <Feather name="lock" size={18} color={colors.primaryForeground} />
+                  <Text style={s.primaryBtnText}>
+                    {checkoutError ? "Retry Payment" : "Pay Now"}
+                    {totalDue != null ? ` · €${totalDue.toFixed(2)}` : ""}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.secondaryBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+              disabled={isProcessing}
+            >
+              <Text style={s.secondaryBtnText}>Back to Slots</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );

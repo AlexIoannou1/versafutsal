@@ -5,9 +5,9 @@ import {
   pgEnum,
   uuid,
   jsonb,
-  unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -45,8 +45,11 @@ export const bookingsTable = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => ({
-    // Prevent double booking — same pitch cannot have two bookings with same startAt
-    uniquePitchSlot: unique("unique_pitch_slot").on(table.pitchId, table.startAt),
+    // Partial unique index — same pitch cannot have two active (PENDING/CONFIRMED) bookings at the same startAt.
+    // CANCELLED, REFUNDED, and NO_SHOW rows are excluded so the slot can be rebooked after cancellation.
+    uniquePitchSlotActive: uniqueIndex("unique_pitch_slot_active")
+      .on(table.pitchId, table.startAt)
+      .where(sql`(status = 'PENDING' OR status = 'CONFIRMED')`),
   }),
 );
 

@@ -307,6 +307,26 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
           throw Object.assign(new Error("maintenance_blocked"), { _type: "maintenance_blocked" });
         }
 
+        // Check for an existing active booking on this slot (PENDING or CONFIRMED).
+        // This catches the common case early with a clear error; the partial unique
+        // index on (pitch_id, start_at) WHERE status IN ('PENDING','CONFIRMED') acts
+        // as the final safety net for true concurrent races.
+        const conflictingBooking = await tx
+          .select({ id: bookingsTable.id })
+          .from(bookingsTable)
+          .where(
+            and(
+              eq(bookingsTable.pitchId, pitchId),
+              eq(bookingsTable.startAt, startDate),
+              inArray(bookingsTable.status, ["PENDING", "CONFIRMED"]),
+            ),
+          )
+          .limit(1);
+
+        if (conflictingBooking.length > 0) {
+          throw Object.assign(new Error("slot_taken"), { _type: "slot_taken" });
+        }
+
         const pricingRules = await tx
           .select()
           .from(pricingRulesTable)
@@ -347,13 +367,19 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
         res.status(409).json({ error: "This slot is blocked for maintenance. Please choose another time." });
         return;
       }
-      // PostgreSQL unique constraint violation = double-booking
+      // Active booking conflict detected by the SELECT check inside the transaction
+      if ((err as { _type?: string })?._type === "slot_taken") {
+        res.status(409).json({ error: "Slot no longer available. Please choose another time." });
+        return;
+      }
+      // PostgreSQL partial unique index violation — true concurrent race where two
+      // requests both passed the SELECT check before either committed.
       // Drizzle wraps the pg error: check both err.code and err.cause?.code
       const pgCode =
         (err as { code?: string })?.code ??
         (err as { cause?: { code?: string } })?.cause?.code;
       if (pgCode === "23505") {
-        res.status(409).json({ error: "This slot is no longer available. Please choose another time." });
+        res.status(409).json({ error: "Slot no longer available. Please choose another time." });
         return;
       }
       throw err;
