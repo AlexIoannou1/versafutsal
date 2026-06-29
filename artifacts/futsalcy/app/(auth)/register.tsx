@@ -35,14 +35,16 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { selectedMode, login } = useAuth();
 
-  // All hooks must be called unconditionally before any early return.
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Admin accounts cannot be self-registered. Show a clear message.
+  const isOwner = selectedMode === "VENUE_OWNER";
+
+  // Admin accounts cannot be self-registered.
   if (selectedMode === "ADMIN") {
     return (
       <View
@@ -102,7 +104,11 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Missing fields", "Please fill in all fields.");
+      Alert.alert("Missing fields", "Please fill in all required fields.");
+      return;
+    }
+    if (isOwner && !phoneNumber.trim()) {
+      Alert.alert("Missing field", "Phone number is required for venue owners so we can verify your account.");
       return;
     }
     if (password.length < 6) {
@@ -117,7 +123,8 @@ export default function RegisterScreen() {
         password,
         name: name.trim(),
         role: selectedMode || "PLAYER",
-      });
+        phoneNumber: phoneNumber.trim() || undefined,
+      } as Parameters<typeof registerUser>[0] & { phoneNumber?: string });
 
       await login(
         {
@@ -125,6 +132,7 @@ export default function RegisterScreen() {
           email: data.user.email,
           name: data.user.name,
           role: toAppMode(data.user.role),
+          phoneNumber: (data.user as { phoneNumber?: string | null }).phoneNumber,
         },
         data.token,
       );
@@ -179,6 +187,9 @@ export default function RegisterScreen() {
       color: colors.foreground,
       marginBottom: 6,
     },
+    required: {
+      color: colors.destructive,
+    },
     inputRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -196,6 +207,12 @@ export default function RegisterScreen() {
       color: colors.foreground,
     },
     eyeBtn: { padding: 4 },
+    hint: {
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      marginTop: 4,
+    },
     submitBtn: {
       backgroundColor: loading ? colors.muted : colors.primary,
       borderRadius: 12,
@@ -267,6 +284,28 @@ export default function RegisterScreen() {
               testID="register-email"
             />
           </View>
+        </View>
+
+        <View style={s.field}>
+          <Text style={s.label}>
+            Phone number{isOwner ? <Text style={s.required}> *</Text> : null}
+          </Text>
+          <View style={s.inputRow}>
+            <TextInput
+              style={s.input}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+              placeholder="+357 99 000000"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="phone-pad"
+              testID="register-phone"
+            />
+          </View>
+          {isOwner && (
+            <Text style={s.hint}>
+              Required for venue owners — we'll call to verify your account before approval.
+            </Text>
+          )}
         </View>
 
         <View style={s.field}>

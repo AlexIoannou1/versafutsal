@@ -11,11 +11,12 @@ const router: IRouter = Router();
 // POST /auth/register
 router.post("/auth/register", async (req, res) => {
   try {
-    const { email, password, name, role } = req.body as {
+    const { email, password, name, role, phoneNumber } = req.body as {
       email: string;
       password: string;
       name: string;
       role?: UserRole;
+      phoneNumber?: string;
     };
 
     if (!email || !password || !name) {
@@ -55,6 +56,7 @@ router.post("/auth/register", async (req, res) => {
         passwordHash,
         name,
         role: userRole,
+        phoneNumber: phoneNumber?.trim() || null,
       })
       .returning();
 
@@ -70,6 +72,7 @@ router.post("/auth/register", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        phoneNumber: user.phoneNumber,
         createdAt: user.createdAt,
       },
       token,
@@ -122,6 +125,7 @@ router.post("/auth/login", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        phoneNumber: user.phoneNumber,
         createdAt: user.createdAt,
       },
       token,
@@ -133,8 +137,134 @@ router.post("/auth/login", async (req, res) => {
 });
 
 // GET /auth/me
-router.get("/auth/me", requireAuth, (req, res) => {
-  res.json({ user: req.user });
+router.get("/auth/me", requireAuth, async (req, res) => {
+  try {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user!.userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    res.json({
+      user: {
+        userId: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        phoneNumber: user.phoneNumber,
+      },
+    });
+  } catch (err) {
+    console.error("GET /auth/me error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /auth/profile — update name, email, phoneNumber
+router.patch("/auth/profile", requireAuth, async (req, res) => {
+  try {
+    const { name, email, phoneNumber } = req.body as {
+      name?: string;
+      email?: string;
+      phoneNumber?: string;
+    };
+
+    const updates: Partial<typeof usersTable.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (name !== undefined) updates.name = name.trim();
+    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber.trim() || null;
+
+    if (email !== undefined) {
+      const trimmed = email.trim().toLowerCase();
+      // Check uniqueness if changing email
+      const existing = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.email, trimmed))
+        .limit(1);
+      if (existing.length > 0 && existing[0].id !== req.user!.userId) {
+        res.status(409).json({ error: "Email already in use" });
+        return;
+      }
+      updates.email = trimmed;
+    }
+
+    const [updated] = await db
+      .update(usersTable)
+      .set(updates)
+      .where(eq(usersTable.id, req.user!.userId))
+      .returning();
+
+    res.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        role: updated.role,
+        phoneNumber: updated.phoneNumber,
+        createdAt: updated.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error("PATCH /auth/profile error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /auth/password — change password
+router.patch("/auth/password", requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword: string;
+      newPassword: string;
+    };
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: "currentPassword and newPassword are required" });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      res.status(400).json({ error: "New password must be at least 6 characters" });
+      return;
+    }
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user!.userId))
+      .limit(1);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Current password is incorrect" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await db
+      .update(usersTable)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(usersTable.id, req.user!.userId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("PATCH /auth/password error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 export default router;

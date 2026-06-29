@@ -14,41 +14,49 @@ import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useGetPitchAvailability } from "@workspace/api-client-react";
 
-const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS_SHORT = [
-  "Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec",
+const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
 ];
 
 function toDateStr(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function buildDateOptions(): Array<{ date: Date; label: string; dayStr: string }> {
-  const result = [];
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  for (let i = 1; i <= 30; i++) {
-    const d = new Date(today);
-    d.setUTCDate(today.getUTCDate() + i);
-    result.push({
-      date: d,
-      label: `${DAYS_SHORT[d.getUTCDay()]}\n${d.getUTCDate()} ${MONTHS_SHORT[d.getUTCMonth()]}`,
-      dayStr: toDateStr(d),
-    });
-  }
-  return result;
 }
 
 function formatSlotTime(iso: string): string {
   const d = new Date(iso);
   const h = d.getUTCHours();
-  const m = d.getUTCMinutes();
+  const min = d.getUTCMinutes();
   const ampm = h >= 12 ? "PM" : "AM";
   const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+  return `${h12}:${String(min).padStart(2, "0")} ${ampm}`;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function buildMonthGrid(year: number, month: number) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<Date | null> = [];
+
+  // Leading nulls for days before the 1st
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(new Date(year, month, d));
+  }
+  // Pad to complete the last row
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
 }
 
 export default function BookPitchScreen() {
@@ -64,18 +72,56 @@ export default function BookPitchScreen() {
 
   const decodedPitchName = pitchName ? decodeURIComponent(String(pitchName)) : "Pitch";
 
-  const dateOptions = useMemo(buildDateOptions, []);
-  const [selectedDateIdx, setSelectedDateIdx] = useState(0);
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const [displayYear, setDisplayYear] = useState(today.getFullYear());
+  const [displayMonth, setDisplayMonth] = useState(today.getMonth());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ startAt: string; endAt: string } | null>(null);
 
-  const selectedDateStr = dateOptions[selectedDateIdx]?.dayStr ?? "";
+  const selectedDateStr = selectedDate ? toDateStr(selectedDate) : "";
 
   const { data: availData, isLoading: slotsLoading } = useGetPitchAvailability(
     venueId!,
     pitchId!,
     { date: selectedDateStr },
+    { query: { enabled: !!selectedDate && !!venueId && !!pitchId } },
   );
   const slots = availData?.slots ?? [];
+
+  const monthGrid = useMemo(
+    () => buildMonthGrid(displayYear, displayMonth),
+    [displayYear, displayMonth],
+  );
+
+  function prevMonth() {
+    if (displayMonth === 0) {
+      setDisplayMonth(11);
+      setDisplayYear((y) => y - 1);
+    } else {
+      setDisplayMonth((m) => m - 1);
+    }
+  }
+
+  function nextMonth() {
+    if (displayMonth === 11) {
+      setDisplayMonth(0);
+      setDisplayYear((y) => y + 1);
+    } else {
+      setDisplayMonth((m) => m + 1);
+    }
+  }
+
+  function handleDayPress(day: Date) {
+    // Disallow past dates
+    if (day < today) return;
+    setSelectedDate(day);
+    setSelectedSlot(null);
+  }
 
   function handleContinue() {
     if (!selectedSlot) return;
@@ -86,34 +132,86 @@ export default function BookPitchScreen() {
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    datePicker: {
+    calendarSection: {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      paddingVertical: 12,
+      paddingBottom: 8,
     },
-    dateScroll: { paddingHorizontal: 16, gap: 8 },
-    dateCard: {
-      width: 56,
-      height: 68,
-      borderRadius: 10,
+    monthNav: {
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: colors.card,
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 8,
+    },
+    navBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
     },
-    dateCardSelected: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
+    monthLabel: {
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
     },
-    dateLabel: {
+    dayNamesRow: {
+      flexDirection: "row",
+      paddingHorizontal: 8,
+      marginBottom: 4,
+    },
+    dayNameCell: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 4,
+    },
+    dayNameText: {
       fontSize: 11,
       fontFamily: "Inter_500Medium",
       color: colors.mutedForeground,
-      textAlign: "center",
-      lineHeight: 16,
     },
-    dateLabelSelected: { color: colors.primaryForeground },
+    gridRow: {
+      flexDirection: "row",
+      paddingHorizontal: 8,
+    },
+    dayCell: {
+      flex: 1,
+      aspectRatio: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      margin: 1,
+      borderRadius: 8,
+    },
+    dayCellPast: {
+      opacity: 0.3,
+    },
+    dayCellToday: {
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    dayCellSelected: {
+      backgroundColor: colors.primary,
+    },
+    dayText: {
+      fontSize: 13,
+      fontFamily: "Inter_400Regular",
+      color: colors.foreground,
+    },
+    dayTextToday: {
+      color: colors.primary,
+      fontFamily: "Inter_600SemiBold",
+    },
+    dayTextSelected: {
+      color: colors.primaryForeground,
+      fontFamily: "Inter_600SemiBold",
+    },
+    dayTextPast: {
+      color: colors.mutedForeground,
+    },
     slotsSection: { flex: 1 },
     slotsHeader: {
       padding: 16,
@@ -148,16 +246,9 @@ export default function BookPitchScreen() {
       borderColor: colors.border,
       backgroundColor: colors.card,
     },
-    slotAvailable: {
-      borderColor: colors.primary + "60",
-    },
-    slotSelected: {
-      borderColor: colors.primary,
-      backgroundColor: colors.primary + "20",
-    },
-    slotUnavailable: {
-      opacity: 0.4,
-    },
+    slotAvailable: { borderColor: colors.primary + "60" },
+    slotSelected: { borderColor: colors.primary, backgroundColor: colors.primary + "20" },
+    slotUnavailable: { opacity: 0.4 },
     slotTime: {
       fontSize: 13,
       fontFamily: "Inter_600SemiBold",
@@ -171,22 +262,29 @@ export default function BookPitchScreen() {
       color: colors.mutedForeground,
       marginTop: 2,
     },
+    noDateWrap: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 32,
+      gap: 8,
+    },
+    noDateText: {
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      textAlign: "center",
+    },
     noSlots: {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      paddingVertical: 48,
+      paddingVertical: 40,
       gap: 8,
     },
     noSlotsText: {
       fontSize: 15,
       fontFamily: "Inter_500Medium",
-      color: colors.mutedForeground,
-      textAlign: "center",
-    },
-    noSlotsSub: {
-      fontSize: 13,
-      fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -197,9 +295,7 @@ export default function BookPitchScreen() {
       padding: 16,
       paddingBottom: insets.bottom + (Platform.OS === "web" ? 8 : 12),
     },
-    selectedInfo: {
-      marginBottom: 10,
-    },
+    selectedInfo: { marginBottom: 10 },
     selectedInfoText: {
       fontSize: 14,
       fontFamily: "Inter_500Medium",
@@ -222,101 +318,146 @@ export default function BookPitchScreen() {
       color: colors.primaryForeground,
     },
     confirmBtnTextDisabled: { color: colors.mutedForeground },
-    errorText: {
-      fontSize: 13,
-      fontFamily: "Inter_400Regular",
-      color: colors.destructive,
-      textAlign: "center",
-      marginBottom: 8,
-    },
     loaderWrap: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32 },
   });
+
+  // Group grid cells into rows of 7
+  const rows: Array<Array<Date | null>> = [];
+  for (let i = 0; i < monthGrid.length; i += 7) {
+    rows.push(monthGrid.slice(i, i + 7));
+  }
 
   return (
     <View style={s.container}>
       <Stack.Screen options={{ title: decodedPitchName, headerBackTitle: "Back" }} />
 
-      {/* Date Strip */}
-      <View style={s.datePicker}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.dateScroll}
-        >
-          {dateOptions.map((opt, idx) => (
-            <TouchableOpacity
-              key={opt.dayStr}
-              style={[s.dateCard, idx === selectedDateIdx && s.dateCardSelected]}
-              onPress={() => {
-                setSelectedDateIdx(idx);
-                setSelectedSlot(null);
-              }}
-            >
-              <Text style={[s.dateLabel, idx === selectedDateIdx && s.dateLabelSelected]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
+      {/* Month Calendar */}
+      <View style={s.calendarSection}>
+        <View style={s.monthNav}>
+          <TouchableOpacity style={s.navBtn} onPress={prevMonth}>
+            <Feather name="chevron-left" size={18} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={s.monthLabel}>
+            {MONTH_NAMES[displayMonth]} {displayYear}
+          </Text>
+          <TouchableOpacity style={s.navBtn} onPress={nextMonth}>
+            <Feather name="chevron-right" size={18} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Day names header */}
+        <View style={s.dayNamesRow}>
+          {DAY_NAMES.map((d) => (
+            <View key={d} style={s.dayNameCell}>
+              <Text style={s.dayNameText}>{d}</Text>
+            </View>
           ))}
-        </ScrollView>
+        </View>
+
+        {/* Calendar grid */}
+        {rows.map((row, ri) => (
+          <View key={ri} style={s.gridRow}>
+            {row.map((day, ci) => {
+              if (!day) {
+                return <View key={ci} style={s.dayCell} />;
+              }
+              const isToday = isSameDay(day, today);
+              const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+              const isPast = day < today;
+              return (
+                <TouchableOpacity
+                  key={ci}
+                  style={[
+                    s.dayCell,
+                    isPast && s.dayCellPast,
+                    isToday && !isSelected && s.dayCellToday,
+                    isSelected && s.dayCellSelected,
+                  ]}
+                  onPress={() => handleDayPress(day)}
+                  disabled={isPast}
+                  activeOpacity={isPast ? 1 : 0.7}
+                >
+                  <Text
+                    style={[
+                      s.dayText,
+                      isPast && s.dayTextPast,
+                      isToday && !isSelected && s.dayTextToday,
+                      isSelected && s.dayTextSelected,
+                    ]}
+                  >
+                    {day.getDate()}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
       </View>
 
       {/* Slot Grid */}
       <View style={s.slotsSection}>
-        <View style={s.slotsHeader}>
-          <Text style={s.slotsTitle}>Available Slots</Text>
-          {slotMins && (
-            <Text style={s.slotsSub}>{slotMins} minute slots · tap to select</Text>
-          )}
-        </View>
-
-        {slotsLoading ? (
-          <View style={s.loaderWrap}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        ) : slots.length === 0 ? (
-          <View style={s.noSlots}>
-            <Feather name="moon" size={32} color={colors.mutedForeground} />
-            <Text style={s.noSlotsText}>No slots available</Text>
-            <Text style={s.noSlotsSub}>This venue is closed on this day or fully booked.</Text>
+        {!selectedDate ? (
+          <View style={s.noDateWrap}>
+            <Feather name="calendar" size={28} color={colors.mutedForeground} />
+            <Text style={s.noDateText}>Pick a date above to see available slots</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={s.slotsGrid} showsVerticalScrollIndicator={false}>
-            {slots.map((slot) => {
-              const isSelected =
-                selectedSlot?.startAt === slot.startAt;
-              const isAvailable = slot.available;
-              return (
-                <TouchableOpacity
-                  key={slot.startAt}
-                  style={[
-                    s.slot,
-                    isAvailable && s.slotAvailable,
-                    isSelected && s.slotSelected,
-                    !isAvailable && s.slotUnavailable,
-                  ]}
-                  onPress={() => {
-                    if (!isAvailable) return;
-                    setSelectedSlot(isSelected ? null : { startAt: slot.startAt, endAt: slot.endAt });
-                  }}
-                  disabled={!isAvailable}
-                  activeOpacity={isAvailable ? 0.7 : 1}
-                >
-                  <Text
-                    style={[
-                      s.slotTime,
-                      isAvailable && s.slotTimeAvailable,
-                      isSelected && s.slotTimeSelected,
-                    ]}
-                  >
-                    {formatSlotTime(slot.startAt)}
-                  </Text>
-                  {!isAvailable && slot.reason && (
-                    <Text style={s.slotReason}>{slot.reason}</Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <>
+            <View style={s.slotsHeader}>
+              <Text style={s.slotsTitle}>Available Slots</Text>
+              {slotMins && (
+                <Text style={s.slotsSub}>{slotMins} minute slots · tap to select</Text>
+              )}
+            </View>
+
+            {slotsLoading ? (
+              <View style={s.loaderWrap}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : slots.length === 0 ? (
+              <View style={s.noSlots}>
+                <Feather name="moon" size={32} color={colors.mutedForeground} />
+                <Text style={s.noSlotsText}>No slots available</Text>
+              </View>
+            ) : (
+              <ScrollView contentContainerStyle={s.slotsGrid} showsVerticalScrollIndicator={false}>
+                {slots.map((slot) => {
+                  const isSelected = selectedSlot?.startAt === slot.startAt;
+                  const isAvailable = slot.available;
+                  return (
+                    <TouchableOpacity
+                      key={slot.startAt}
+                      style={[
+                        s.slot,
+                        isAvailable && s.slotAvailable,
+                        isSelected && s.slotSelected,
+                        !isAvailable && s.slotUnavailable,
+                      ]}
+                      onPress={() => {
+                        if (!isAvailable) return;
+                        setSelectedSlot(isSelected ? null : { startAt: slot.startAt, endAt: slot.endAt });
+                      }}
+                      disabled={!isAvailable}
+                      activeOpacity={isAvailable ? 0.7 : 1}
+                    >
+                      <Text
+                        style={[
+                          s.slotTime,
+                          isAvailable && s.slotTimeAvailable,
+                          isSelected && s.slotTimeSelected,
+                        ]}
+                      >
+                        {formatSlotTime(slot.startAt)}
+                      </Text>
+                      {!isAvailable && slot.reason && (
+                        <Text style={s.slotReason}>{slot.reason}</Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </>
         )}
       </View>
 
@@ -340,10 +481,8 @@ export default function BookPitchScreen() {
             size={20}
             color={selectedSlot ? colors.primaryForeground : colors.mutedForeground}
           />
-          <Text
-            style={[s.confirmBtnText, !selectedSlot && s.confirmBtnTextDisabled]}
-          >
-            {selectedSlot ? "Review Booking" : "Select a Slot"}
+          <Text style={[s.confirmBtnText, !selectedSlot && s.confirmBtnTextDisabled]}>
+            {selectedSlot ? "Review Booking" : "Select a Date & Slot"}
           </Text>
         </TouchableOpacity>
       </View>

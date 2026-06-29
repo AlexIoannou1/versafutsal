@@ -10,6 +10,7 @@ export const usersTable = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   name: text("name").notNull(),
   role: roleEnum("role").notNull().default("PLAYER"),
+  phoneNumber: text("phone_number"),
   pushToken: text("push_token"), // Expo push token for native notifications
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

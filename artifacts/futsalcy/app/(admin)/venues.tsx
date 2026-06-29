@@ -45,7 +45,7 @@ type VenueItem = {
   address: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   rejectionReason?: string | null;
-  owner?: { name: string; email: string } | null;
+  owner?: { name: string; email: string; phoneNumber?: string | null } | null;
   createdAt: string;
 };
 
@@ -394,10 +394,17 @@ export default function AdminVenuesScreen() {
                 {item.owner && (
                   <View style={s.ownerBox}>
                     <Feather name="user" size={14} color={colors.mutedForeground} />
-                    <Text style={s.ownerText}>
-                      <Text style={s.ownerName}>{item.owner.name}</Text>
-                      {" "}· {item.owner.email}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.ownerText}>
+                        <Text style={s.ownerName}>{item.owner.name}</Text>
+                        {" "}· {item.owner.email}
+                      </Text>
+                      {item.owner.phoneNumber ? (
+                        <Text style={[s.ownerText, { marginTop: 2 }]}>
+                          📞 {item.owner.phoneNumber}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
                 )}
 

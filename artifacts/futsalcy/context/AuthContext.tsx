@@ -15,6 +15,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: AppMode;
+  phoneNumber?: string | null;
 }
 
 interface AuthState {
@@ -27,6 +28,7 @@ interface AuthState {
 interface AuthContextValue extends AuthState {
   selectMode: (mode: AppMode) => Promise<void>;
   login: (user: AuthUser, token: string) => Promise<void>;
+  updateUser: (patch: Partial<AuthUser>) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -94,6 +96,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  /** Update user fields without touching the token or storage-mode. */
+  const updateUser = useCallback(async (patch: Partial<AuthUser>) => {
+    setState((s) => {
+      if (!s.user) return s;
+      const updated = { ...s.user, ...patch };
+      // Persist updated user asynchronously (fire-and-forget)
+      AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updated)).catch(() => {});
+      return { ...s, user: updated };
+    });
+  }, []);
+
   const logout = useCallback(async () => {
     await Promise.all([
       AsyncStorage.removeItem(STORAGE_KEYS.TOKEN),
@@ -104,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, selectMode, login, logout }}>
+    <AuthContext.Provider value={{ ...state, selectMode, login, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -30,12 +30,17 @@ router.get("/admin/venues", requireAuth, requireRole("ADMIN"), async (req, res) 
       ? await db.select().from(venuesTable).where(eq(venuesTable.status, statusFilter))
       : await db.select().from(venuesTable);
 
-    // Enrich with owner names
+    // Enrich with owner info (name, email, phone)
     const ownerIds = [...new Set(venues.map((v) => v.ownerId))];
     const owners =
       ownerIds.length > 0
         ? await db
-            .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+            .select({
+              id: usersTable.id,
+              name: usersTable.name,
+              email: usersTable.email,
+              phoneNumber: usersTable.phoneNumber,
+            })
             .from(usersTable)
             .where(inArray(usersTable.id, ownerIds))
         : [];

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  TextInput,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,6 +33,8 @@ const STATUS_LABELS: Record<string, string> = {
   NO_SHOW: "No Show",
 };
 
+const FILTER_STATUSES = ["All", "PENDING", "CONFIRMED", "CANCELLED", "REFUNDED"];
+
 function formatDateShort(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", {
     weekday: "short",
@@ -45,6 +49,10 @@ function formatTimeRange(startIso: string, endIso: string) {
   return `${fmt(new Date(startIso))} – ${fmt(new Date(endIso))}`;
 }
 
+function toDateOnlyStr(iso: string) {
+  return iso.slice(0, 10);
+}
+
 export default function OwnerDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -54,11 +62,57 @@ export default function OwnerDashboardScreen() {
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
   const bookings = data?.bookings ?? [];
 
+  // Filter/search state
+  const [search, setSearch] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("All");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+  const venues = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { id: string; name: string }[] = [];
+    for (const b of bookings) {
+      const v = b.venue as { id: string; name: string } | undefined;
+      if (v && !seen.has(v.id)) {
+        seen.add(v.id);
+        result.push({ id: v.id, name: v.name });
+      }
+    }
+    return result;
+  }, [bookings]);
+
+  const [selectedVenueId, setSelectedVenueId] = useState<string | "ALL">("ALL");
+
+  const filtered = useMemo(() => {
+    return bookings.filter((b) => {
+      const player = b.player as { name: string; email: string } | undefined;
+      const venue = b.venue as { id: string; name: string } | undefined;
+      const bDate = toDateOnlyStr(b.startAt);
+
+      if (selectedStatus !== "All" && b.status !== selectedStatus) return false;
+      if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
+      if (dateFrom && bDate < dateFrom) return false;
+      if (dateTo && bDate > dateTo) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchPlayer = player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
+        const matchVenue = venue?.name?.toLowerCase().includes(q);
+        if (!matchPlayer && !matchVenue) return false;
+      }
+      return true;
+    });
+  }, [bookings, selectedStatus, selectedVenueId, dateFrom, dateTo, search]);
+
+  const hasActiveFilters =
+    selectedStatus !== "All" ||
+    selectedVenueId !== "ALL" ||
+    dateFrom !== "" ||
+    dateTo !== "" ||
+    search !== "";
+
   const upcoming = bookings.filter(
     (b) => new Date(b.startAt) >= new Date() && (b.status === "PENDING" || b.status === "CONFIRMED"),
-  );
-  const past = bookings.filter(
-    (b) => new Date(b.startAt) < new Date() || (b.status !== "PENDING" && b.status !== "CONFIRMED"),
   );
 
   const s = StyleSheet.create({
@@ -110,7 +164,10 @@ export default function OwnerDashboardScreen() {
     sectionHeader: {
       paddingHorizontal: 16,
       paddingTop: 8,
-      paddingBottom: 8,
+      paddingBottom: 6,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
     },
     sectionTitle: {
       fontSize: 14,
@@ -118,6 +175,85 @@ export default function OwnerDashboardScreen() {
       color: colors.foreground,
       textTransform: "uppercase",
       letterSpacing: 0.6,
+    },
+    // Search & filter
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      gap: 6,
+    },
+    searchText: {
+      flex: 1,
+      height: 38,
+      fontSize: 13,
+      fontFamily: "Inter_400Regular",
+      color: colors.foreground,
+    },
+    filterBtn: {
+      padding: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: hasActiveFilters ? colors.primary : colors.border,
+      backgroundColor: hasActiveFilters ? colors.primary + "15" : colors.card,
+    },
+    filterPanel: {
+      paddingHorizontal: 16,
+      paddingBottom: 10,
+      gap: 10,
+    },
+    filterLabel: {
+      fontSize: 11,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 5,
+    },
+    chipRow: { flexDirection: "row", gap: 6 },
+    chip: {
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    chipText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    chipTextActive: { color: "#fff" },
+    dateRow: { flexDirection: "row", gap: 8 },
+    dateField: { flex: 1 },
+    dateInput: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.foreground,
+    },
+    clearBtn: { alignSelf: "flex-end" },
+    clearBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.destructive },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginHorizontal: 16,
+      marginVertical: 8,
     },
     list: { paddingHorizontal: 16, paddingBottom: insets.bottom + 100 },
     card: {
@@ -146,10 +282,7 @@ export default function OwnerDashboardScreen() {
       paddingHorizontal: 8,
       paddingVertical: 3,
     },
-    statusText: {
-      fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
-    },
+    statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
     metaRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -171,11 +304,10 @@ export default function OwnerDashboardScreen() {
       fontFamily: "Inter_400Regular",
       color: colors.mutedForeground,
     },
-    divider: {
-      height: 1,
-      backgroundColor: colors.border,
-      marginHorizontal: 16,
-      marginVertical: 8,
+    resultCount: {
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
     },
   });
 
@@ -187,11 +319,7 @@ export default function OwnerDashboardScreen() {
     );
   }
 
-  const BookingCard = ({
-    item,
-  }: {
-    item: (typeof bookings)[0];
-  }) => {
+  const BookingCard = ({ item }: { item: (typeof bookings)[0] }) => {
     const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
     const player = item.player as { name: string; email: string } | undefined;
     const pitch = item.pitch as { name: string } | undefined;
@@ -223,9 +351,6 @@ export default function OwnerDashboardScreen() {
           <Text style={s.metaText}>
             {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
           </Text>
-        </View>
-        <View style={[s.metaRow, { justifyContent: "flex-end", marginTop: 4 }]}>
-          <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
         </View>
       </TouchableOpacity>
     );
@@ -260,50 +385,164 @@ export default function OwnerDashboardScreen() {
         </View>
       ),
     },
+    { key: "divider1", render: () => <View style={s.divider} /> },
     {
-      key: "upcomingHeader",
+      key: "bookingsHeader",
       render: () => (
         <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Upcoming</Text>
+          <Text style={s.sectionTitle}>Bookings</Text>
+          {hasActiveFilters && (
+            <Text style={s.resultCount}>{filtered.length} shown</Text>
+          )}
         </View>
       ),
     },
-    ...upcoming.map((b) => ({ key: `upcoming-${b.id}`, render: () => <BookingCard item={b} /> })),
-    ...(upcoming.length === 0
+    {
+      key: "searchRow",
+      render: () => (
+        <View style={s.searchRow}>
+          <View style={s.searchInput}>
+            <Feather name="search" size={14} color={colors.mutedForeground} />
+            <TextInput
+              style={s.searchText}
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Player name, venue…"
+              placeholderTextColor={colors.mutedForeground}
+            />
+            {search !== "" && (
+              <TouchableOpacity onPress={() => setSearch("")}>
+                <Feather name="x" size={14} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={s.filterBtn}
+            onPress={() => setFiltersExpanded((v) => !v)}
+          >
+            <Feather
+              name="sliders"
+              size={16}
+              color={hasActiveFilters ? colors.primary : colors.foreground}
+            />
+          </TouchableOpacity>
+        </View>
+      ),
+    },
+    ...(filtersExpanded
       ? [
           {
-            key: "noUpcoming",
+            key: "filterPanel",
+            render: () => (
+              <View style={s.filterPanel}>
+                <View>
+                  <Text style={s.filterLabel}>Status</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={s.chipRow}>
+                      {FILTER_STATUSES.map((st) => (
+                        <TouchableOpacity
+                          key={st}
+                          style={[s.chip, selectedStatus === st && s.chipActive]}
+                          onPress={() => setSelectedStatus(st)}
+                        >
+                          <Text style={[s.chipText, selectedStatus === st && s.chipTextActive]}>
+                            {st === "All" ? "All Statuses" : STATUS_LABELS[st] ?? st}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+
+                {venues.length > 0 && (
+                  <View>
+                    <Text style={s.filterLabel}>Venue</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={s.chipRow}>
+                        <TouchableOpacity
+                          style={[s.chip, selectedVenueId === "ALL" && s.chipActive]}
+                          onPress={() => setSelectedVenueId("ALL")}
+                        >
+                          <Text style={[s.chipText, selectedVenueId === "ALL" && s.chipTextActive]}>
+                            All Venues
+                          </Text>
+                        </TouchableOpacity>
+                        {venues.map((v) => (
+                          <TouchableOpacity
+                            key={v.id}
+                            style={[s.chip, selectedVenueId === v.id && s.chipActive]}
+                            onPress={() => setSelectedVenueId(v.id)}
+                          >
+                            <Text
+                              style={[s.chipText, selectedVenueId === v.id && s.chipTextActive]}
+                            >
+                              {v.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+
+                <View>
+                  <Text style={s.filterLabel}>Date Range (YYYY-MM-DD)</Text>
+                  <View style={s.dateRow}>
+                    <View style={s.dateField}>
+                      <TextInput
+                        style={s.dateInput}
+                        value={dateFrom}
+                        onChangeText={setDateFrom}
+                        placeholder="From"
+                        placeholderTextColor={colors.mutedForeground}
+                      />
+                    </View>
+                    <View style={s.dateField}>
+                      <TextInput
+                        style={s.dateInput}
+                        value={dateTo}
+                        onChangeText={setDateTo}
+                        placeholder="To"
+                        placeholderTextColor={colors.mutedForeground}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {hasActiveFilters && (
+                  <TouchableOpacity
+                    style={s.clearBtn}
+                    onPress={() => {
+                      setSelectedStatus("All");
+                      setSelectedVenueId("ALL");
+                      setDateFrom("");
+                      setDateTo("");
+                      setSearch("");
+                    }}
+                  >
+                    <Text style={s.clearBtnText}>Clear all filters</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ),
+          },
+        ]
+      : []),
+    ...(filtered.length === 0
+      ? [
+          {
+            key: "empty",
             render: () => (
               <View style={s.emptyWrap}>
                 <Feather name="calendar" size={28} color={colors.mutedForeground} />
-                <Text style={s.emptyText}>No upcoming bookings</Text>
+                <Text style={s.emptyText}>
+                  {hasActiveFilters ? "No bookings match your filters" : "No bookings yet"}
+                </Text>
               </View>
             ),
           },
         ]
-      : []),
-    { key: "divider", render: () => <View style={s.divider} /> },
-    {
-      key: "pastHeader",
-      render: () => (
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Past</Text>
-        </View>
-      ),
-    },
-    ...past.slice(0, 20).map((b) => ({ key: `past-${b.id}`, render: () => <BookingCard item={b} /> })),
-    ...(past.length === 0
-      ? [
-          {
-            key: "noPast",
-            render: () => (
-              <View style={s.emptyWrap}>
-                <Text style={s.emptyText}>No past bookings yet</Text>
-              </View>
-            ),
-          },
-        ]
-      : []),
+      : filtered.map((b) => ({ key: `booking-${b.id}`, render: () => <BookingCard item={b} /> }))),
   ];
 
   return (
