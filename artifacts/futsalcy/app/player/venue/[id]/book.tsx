@@ -44,18 +44,32 @@ function isSameDay(a: Date, b: Date) {
   );
 }
 
-function buildMonthGrid(year: number, month: number) {
+type CalendarCell = { date: Date; isCurrentMonth: boolean };
+
+function buildMonthGrid(year: number, month: number): CalendarCell[] {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: Array<Date | null> = [];
+  const cells: CalendarCell[] = [];
 
-  // Leading nulls for days before the 1st
-  for (let i = 0; i < firstDay; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push(new Date(year, month, d));
+  // Leading days from previous month
+  if (firstDay > 0) {
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    for (let i = firstDay - 1; i >= 0; i--) {
+      cells.push({ date: new Date(year, month - 1, prevMonthDays - i), isCurrentMonth: false });
+    }
   }
-  // Pad to complete the last row
-  while (cells.length % 7 !== 0) cells.push(null);
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ date: new Date(year, month, d), isCurrentMonth: true });
+  }
+
+  // Trailing days from next month to complete the last row
+  let nextDay = 1;
+  while (cells.length % 7 !== 0) {
+    cells.push({ date: new Date(year, month + 1, nextDay++), isCurrentMonth: false });
+  }
+
   return cells;
 }
 
@@ -196,6 +210,9 @@ export default function BookPitchScreen() {
     dayCellSelected: {
       backgroundColor: colors.primary,
     },
+    dayTextAdjacent: {
+      opacity: 0.3,
+    },
     dayText: {
       fontSize: 13,
       fontFamily: "Inter_400Regular",
@@ -322,7 +339,7 @@ export default function BookPitchScreen() {
   });
 
   // Group grid cells into rows of 7
-  const rows: Array<Array<Date | null>> = [];
+  const rows: Array<Array<CalendarCell>> = [];
   for (let i = 0; i < monthGrid.length; i += 7) {
     rows.push(monthGrid.slice(i, i + 7));
   }
@@ -357,30 +374,29 @@ export default function BookPitchScreen() {
         {/* Calendar grid */}
         {rows.map((row, ri) => (
           <View key={ri} style={s.gridRow}>
-            {row.map((day, ci) => {
-              if (!day) {
-                return <View key={ci} style={s.dayCell} />;
-              }
-              const isToday = isSameDay(day, today);
-              const isSelected = selectedDate ? isSameDay(day, selectedDate) : false;
+            {row.map(({ date: day, isCurrentMonth }, ci) => {
+              const isToday = isCurrentMonth && isSameDay(day, today);
+              const isSelected = isCurrentMonth && (selectedDate ? isSameDay(day, selectedDate) : false);
               const isPast = day < today;
+              const isAdjacent = !isCurrentMonth;
               return (
                 <TouchableOpacity
                   key={ci}
                   style={[
                     s.dayCell,
-                    isPast && s.dayCellPast,
+                    isPast && isCurrentMonth && s.dayCellPast,
                     isToday && !isSelected && s.dayCellToday,
                     isSelected && s.dayCellSelected,
                   ]}
-                  onPress={() => handleDayPress(day)}
-                  disabled={isPast}
-                  activeOpacity={isPast ? 1 : 0.7}
+                  onPress={() => isCurrentMonth && !isPast && handleDayPress(day)}
+                  disabled={isAdjacent || isPast}
+                  activeOpacity={isAdjacent || isPast ? 1 : 0.7}
                 >
                   <Text
                     style={[
                       s.dayText,
-                      isPast && s.dayTextPast,
+                      isAdjacent && s.dayTextAdjacent,
+                      isPast && isCurrentMonth && s.dayTextPast,
                       isToday && !isSelected && s.dayTextToday,
                       isSelected && s.dayTextSelected,
                     ]}
