@@ -58,6 +58,26 @@ function RootLayoutNav() {
         name="player/venue/[id]"
         options={{ headerShown: true, title: "Venue Details" }}
       />
+      <Stack.Screen
+        name="player/venue/[id]/book"
+        options={{ headerShown: true }}
+      />
+      <Stack.Screen
+        name="player/venue/[id]/book-summary"
+        options={{ headerShown: true, title: "Checkout" }}
+      />
+      <Stack.Screen
+        name="player/booking/[id]"
+        options={{ headerShown: true, title: "Booking" }}
+      />
+      <Stack.Screen
+        name="owner/booking/[id]"
+        options={{ headerShown: true, title: "Booking Detail" }}
+      />
+      <Stack.Screen
+        name="admin/booking/[id]"
+        options={{ headerShown: true, title: "Booking (Admin)" }}
+      />
       <Stack.Screen name="+not-found" />
     </Stack>
   );
