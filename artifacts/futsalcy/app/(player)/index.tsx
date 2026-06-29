@@ -9,7 +9,6 @@ import {
   TextInput,
   RefreshControl,
   Image,
-  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -78,6 +77,7 @@ export default function PlayerVenuesScreen() {
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     headerArea: {
+      backgroundColor: colors.background,
       paddingHorizontal: 16,
       paddingTop: insets.top + 16,
       paddingBottom: 12,
@@ -259,11 +259,7 @@ export default function PlayerVenuesScreen() {
 
   return (
     <View style={s.container}>
-      <ScrollView
-        style={s.headerArea}
-        scrollEnabled={false}
-        contentContainerStyle={{ flexGrow: 0 }}
-      >
+      <View style={s.headerArea}>
         <Text style={s.headerTitle}>Find a Venue</Text>
 
         <View style={s.searchRow}>
@@ -368,7 +364,7 @@ export default function PlayerVenuesScreen() {
             />
           </View>
         </View>
-      </ScrollView>
+      </View>
 
       {isLoading ? (
         <View style={s.center}>
