@@ -8,8 +8,11 @@ import glyphMap from "@expo/vector-icons/build/vendor/react-native-vector-icons/
 // pre-bundled version may be an older/mismatched build. Using a unique name forces
 // expo-font to actually download and register the correct TTF from this bundle,
 // which fixes the boxed-X glyph rendering on Android Expo Go.
+// Load from the app's own assets/fonts/ directory — Metro explicitly bundles
+// these and Asset.fromModule() resolves them reliably on Android new arch + Expo Go.
+// (Loading from node_modules via Asset.fromModule can fail silently on Android.)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const fontAsset = require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf");
+const fontAsset = require("../assets/fonts/Feather.ttf");
 
 const FeatherIcons = createIconSet(glyphMap, "FeatherIcons", fontAsset);
 

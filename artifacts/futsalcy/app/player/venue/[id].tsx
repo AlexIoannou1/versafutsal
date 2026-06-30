@@ -25,7 +25,7 @@ function formatTime(t: string): string {
   return `${h12}:${m} ${ampm}`;
 }
 
-type FeatherName = ComponentProps<typeof Feather>["name"];
+type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
 
 const TYPE_ICONS: Record<string, FeatherName> = {
   INDOOR: "home",

@@ -16,7 +16,7 @@ import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useListVenues, type VenueSummary } from "@workspace/api-client-react";
 
-type FeatherName = ComponentProps<typeof Feather>["name"];
+type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
 
 const DISTRICTS = [
   { key: "", label: "All" },

@@ -8,7 +8,7 @@ import {
 // FeatherIcons font loaded under a unique name to bypass Expo Go's pre-registered
 // 'feather' font (which causes boxed-X glyphs on Android). See components/FeatherIcons.tsx.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const FeatherFont = require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf") as number;
+const FeatherFont = require("../assets/fonts/Feather.ttf") as number;
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";

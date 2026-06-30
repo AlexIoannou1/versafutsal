@@ -1,0 +1,1 @@
+- [Feather icons Android Expo Go fix](feather-android-fix.md) — boxed-X glyphs on Android; root cause is Expo Go pre-registering 'feather' font, causing expo-font to skip loading the correct TTF.
