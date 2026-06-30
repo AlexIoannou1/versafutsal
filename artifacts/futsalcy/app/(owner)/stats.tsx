@@ -206,7 +206,7 @@ export default function StatsScreen() {
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    scrollContent: { paddingBottom: insets.bottom + 32 },
+    scrollContent: { paddingBottom: insets.bottom + 100 },
     header: {
       paddingTop: insets.top > 0 ? insets.top + 8 : 16,
       paddingHorizontal: 20,

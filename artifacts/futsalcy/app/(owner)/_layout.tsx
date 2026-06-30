@@ -27,10 +27,6 @@ function NativeTabLayout() {
         <Icon sf={{ default: "chart.bar.xaxis", selected: "chart.bar.xaxis" }} />
         <Label>Stats</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="venues">
-        <Icon sf={{ default: "building.2", selected: "building.2.fill" }} />
-        <Label>Venues</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -128,13 +124,7 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="venues"
         options={{
-          title: "Venues",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="building.2" tintColor={color} size={22} />
-            ) : (
-              <Feather name="grid" size={22} color={color} />
-            ),
+          href: null,
         }}
       />
       <Tabs.Screen

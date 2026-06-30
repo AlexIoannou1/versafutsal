@@ -26,6 +26,39 @@ export default function OwnerProfileScreen() {
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     scroll: { flex: 1, padding: 24 },
+    sectionTitle: {
+      fontSize: 12,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+      marginBottom: 8,
+    },
+    menuCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 20,
+      overflow: "hidden",
+    },
+    menuRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 12,
+    },
+    menuRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    menuRowText: {
+      flex: 1,
+      fontSize: 15,
+      fontFamily: "Inter_500Medium",
+      color: colors.foreground,
+    },
     avatar: {
       width: 72,
       height: 72,
@@ -116,6 +149,18 @@ export default function OwnerProfileScreen() {
           <Feather name="edit-2" size={18} color={colors.foreground} />
           <Text style={s.editBtnText}>Edit Profile</Text>
         </TouchableOpacity>
+
+        <Text style={s.sectionTitle}>Manage</Text>
+        <View style={s.menuCard}>
+          <TouchableOpacity
+            style={s.menuRow}
+            onPress={() => router.push("/(owner)/venues")}
+          >
+            <Feather name="grid" size={20} color={colors.primary} />
+            <Text style={s.menuRowText}>My Venues</Text>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
           <Feather name="log-out" size={18} color={colors.destructive} />
