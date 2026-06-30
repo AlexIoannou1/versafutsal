@@ -97,6 +97,7 @@ type Booking = {
   endAt: string;
   status: string;
   createdAt?: string;
+  guestName?: string | null;
   pitch?: { id?: string; name?: string } | null;
   venue?: { name: string } | null;
   player?: { name: string; email: string } | null;
@@ -115,6 +116,8 @@ function BookingRow({
   const pitch = booking.pitch as { name: string } | undefined;
   const venue = booking.venue as { name: string } | undefined;
   const player = booking.player as { name: string; email: string } | undefined;
+  const guestName = booking.guestName ?? null;
+  const isManual = !!guestName;
 
   const bs = StyleSheet.create({
     card: {
@@ -134,6 +137,8 @@ function BookingRow({
     badgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
     pitchText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
     playerText: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
+    manualBadge: { backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" },
+    manualBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary },
   });
 
   return (
@@ -144,18 +149,25 @@ function BookingRow({
           <Text style={bs.time}>
             {formatTime(booking.startAt)} – {formatTime(booking.endAt)}
           </Text>
-          <View style={[bs.badge, { backgroundColor: statusColor + "20" }]}>
-            <Text style={[bs.badgeText, { color: statusColor }]}>
-              {STATUS_LABELS[booking.status] ?? booking.status}
-            </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+            {isManual && (
+              <View style={bs.manualBadge}>
+                <Text style={bs.manualBadgeText}>MANUAL</Text>
+              </View>
+            )}
+            <View style={[bs.badge, { backgroundColor: statusColor + "20" }]}>
+              <Text style={[bs.badgeText, { color: statusColor }]}>
+                {STATUS_LABELS[booking.status] ?? booking.status}
+              </Text>
+            </View>
           </View>
         </View>
         <Text style={bs.pitchText} numberOfLines={1}>
           {venue?.name ? `${venue.name} · ` : ""}{pitch?.name ?? "Pitch"}
         </Text>
-        {player?.name && (
+        {(isManual ? guestName : player?.name) && (
           <Text style={bs.playerText} numberOfLines={1}>
-            {player.name}
+            {isManual ? guestName : player?.name}
           </Text>
         )}
       </View>
