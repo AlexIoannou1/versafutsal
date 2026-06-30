@@ -287,8 +287,10 @@ export default function OwnerBookingDetailScreen() {
   const hoursUntilStart =
     (new Date(booking.startAt).getTime() - Date.now()) / (1000 * 60 * 60);
   const withinWindow = hoursUntilStart >= windowHours;
-  const canCancel =
-    (booking.status === "CONFIRMED" || booking.status === "PENDING") && withinWindow;
+  // Manual bookings have no payment — owners can cancel them at any time.
+  const canCancel = isManual
+    ? booking.status === "CONFIRMED" || booking.status === "PENDING"
+    : (booking.status === "CONFIRMED" || booking.status === "PENDING") && withinWindow;
 
   async function handleConfirmCancel() {
     if (!id) return;
@@ -431,12 +433,14 @@ export default function OwnerBookingDetailScreen() {
           <View style={s.modalSheet}>
             <Text style={s.modalTitle}>Cancel Booking</Text>
             <Text style={s.modalSubtitle}>
-              Cancelling as venue owner. A refund will be issued automatically if payment was collected.
+              {isManual
+                ? "This is a walk-in booking with no payment on file. Cancelling it will free the slot immediately."
+                : "Cancelling as venue owner. A refund will be issued automatically if payment was collected."}
             </Text>
 
             <TextInput
               style={s.reasonInput}
-              placeholder="Reason for cancellation (required)"
+              placeholder={isManual ? "Reason for cancellation (optional)" : "Reason for cancellation (required)"}
               placeholderTextColor={colors.mutedForeground}
               value={cancelReason}
               onChangeText={setCancelReason}
@@ -454,7 +458,7 @@ export default function OwnerBookingDetailScreen() {
               <TouchableOpacity
                 style={s.modalConfirmBtn}
                 onPress={handleConfirmCancel}
-                disabled={cancelMutation.isPending || !cancelReason.trim()}
+                disabled={cancelMutation.isPending || (!isManual && !cancelReason.trim())}
                 activeOpacity={0.8}
               >
                 {cancelMutation.isPending ? (

@@ -922,8 +922,10 @@ router.post<{ id: string }>(
         return;
       }
 
-      // Owners must provide a reason for audit quality (UI enforces this; API mirrors it)
-      if (actorRole === "VENUE_OWNER" && !reason?.trim()) {
+      // Owners must provide a reason for regular bookings (audit quality).
+      // Manual (walk-in) bookings are exempt — no payment was collected.
+      const isManual = !!booking.guestName;
+      if (actorRole === "VENUE_OWNER" && !isManual && !reason?.trim()) {
         res.status(400).json({ error: "A cancellation reason is required for owner-initiated cancellations." });
         return;
       }
@@ -944,6 +946,8 @@ router.post<{ id: string }>(
       }
 
       // ── Policy check: enforce cancellation window for both players and owners ─
+      // Manual bookings (walk-in / phone) have no payment, so owners can cancel
+      // them at any time without restriction.
       const snapshot = booking.policySnapshot as {
         cancellationWindowHours?: number;
       };
@@ -952,8 +956,9 @@ router.post<{ id: string }>(
         (booking.startAt.getTime() - Date.now()) / (1000 * 60 * 60);
       const withinWindow = hoursUntilStart >= windowHours;
 
-      if (!withinWindow) {
-        // Both players and owners must cancel within the configurable window.
+      if (!withinWindow && !isManual) {
+        // Both players and owners must cancel within the configurable window
+        // (except manual bookings which have no payment to refund).
         // If an owner needs to cancel outside the window (e.g. emergency), admin
         // can use POST /admin/bookings/:id/refund to override.
         res.status(400).json({
@@ -962,7 +967,7 @@ router.post<{ id: string }>(
         });
         return;
       }
-      // Within window: refund is always issued if a payment exists
+      // Within window (or manual booking): refund is always issued if a payment exists
       const refundEligible = true;
 
       // ── Find succeeded payment (if any) ───────────────────────────────────
