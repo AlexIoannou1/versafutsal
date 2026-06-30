@@ -611,73 +611,79 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), a
 
     const endDate = new Date(startDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
 
-    // Atomic transaction: conflict check + insert as CONFIRMED
+    // Atomic transaction: conflict check + insert as CONFIRMED.
+    // SERIALIZABLE isolation prevents the classic read-then-write race where two
+    // concurrent requests both pass the conflict check before either commits.
+    // PostgreSQL will abort one of them with error code 40001 (serialization_failure).
     let booking: typeof bookingsTable.$inferSelect;
     try {
-      const result = await db.transaction(async (tx) => {
-        // Maintenance block check
-        const conflictingBlock = await tx
-          .select({ id: maintenanceBlocksTable.id })
-          .from(maintenanceBlocksTable)
-          .where(
-            and(
-              eq(maintenanceBlocksTable.pitchId, pitchId),
-              lt(maintenanceBlocksTable.startAt, endDate),
-              gt(maintenanceBlocksTable.endAt, startDate),
-            ),
-          )
-          .limit(1);
+      const result = await db.transaction(
+        async (tx) => {
+          // Maintenance block check
+          const conflictingBlock = await tx
+            .select({ id: maintenanceBlocksTable.id })
+            .from(maintenanceBlocksTable)
+            .where(
+              and(
+                eq(maintenanceBlocksTable.pitchId, pitchId),
+                lt(maintenanceBlocksTable.startAt, endDate),
+                gt(maintenanceBlocksTable.endAt, startDate),
+              ),
+            )
+            .limit(1);
 
-        if (conflictingBlock.length > 0) {
-          throw Object.assign(new Error("maintenance_blocked"), { _type: "maintenance_blocked" });
-        }
+          if (conflictingBlock.length > 0) {
+            throw Object.assign(new Error("maintenance_blocked"), { _type: "maintenance_blocked" });
+          }
 
-        // Active booking conflict check
-        const conflictingBooking = await tx
-          .select({ id: bookingsTable.id })
-          .from(bookingsTable)
-          .where(
-            and(
-              eq(bookingsTable.pitchId, pitchId),
-              eq(bookingsTable.startAt, startDate),
-              inArray(bookingsTable.status, ["PENDING", "CONFIRMED"]),
-            ),
-          )
-          .limit(1);
+          // Active booking conflict check
+          const conflictingBooking = await tx
+            .select({ id: bookingsTable.id })
+            .from(bookingsTable)
+            .where(
+              and(
+                eq(bookingsTable.pitchId, pitchId),
+                eq(bookingsTable.startAt, startDate),
+                inArray(bookingsTable.status, ["PENDING", "CONFIRMED"]),
+              ),
+            )
+            .limit(1);
 
-        if (conflictingBooking.length > 0) {
-          throw Object.assign(new Error("slot_taken"), { _type: "slot_taken" });
-        }
+          if (conflictingBooking.length > 0) {
+            throw Object.assign(new Error("slot_taken"), { _type: "slot_taken" });
+          }
 
-        const pricingRules = await tx
-          .select()
-          .from(pricingRulesTable)
-          .where(eq(pricingRulesTable.pitchId, pitchId));
+          const pricingRules = await tx
+            .select()
+            .from(pricingRulesTable)
+            .where(eq(pricingRulesTable.pitchId, pitchId));
 
-        const policySnapshot = {
-          pricePerHour: pricingRules[0]?.pricePerHour ?? null,
-          cancellationWindowHours: pitchRow.venueCancellationWindowHours,
-          slotDurationMinutes: pitchRow.slotDurationMinutes,
-          capturedAt: new Date().toISOString(),
-        };
+          const policySnapshot = {
+            pricePerHour: pricingRules[0]?.pricePerHour ?? null,
+            cancellationWindowHours: pitchRow.venueCancellationWindowHours,
+            slotDurationMinutes: pitchRow.slotDurationMinutes,
+            capturedAt: new Date().toISOString(),
+          };
 
-        const [inserted] = await tx
-          .insert(bookingsTable)
-          .values({
-            venueId: pitchRow.venueId,
-            pitchId,
-            playerId: req.user!.userId,
-            startAt: startDate,
-            endAt: endDate,
-            status: "CONFIRMED",
-            policySnapshot,
-            guestName: guestName.trim(),
-            guestPhone: guestPhone.trim(),
-          })
-          .returning();
+          const [inserted] = await tx
+            .insert(bookingsTable)
+            .values({
+              venueId: pitchRow.venueId,
+              pitchId,
+              playerId: req.user!.userId,
+              startAt: startDate,
+              endAt: endDate,
+              status: "CONFIRMED",
+              policySnapshot,
+              guestName: guestName.trim(),
+              guestPhone: guestPhone.trim(),
+            })
+            .returning();
 
-        return inserted!;
-      });
+          return inserted!;
+        },
+        { isolationLevel: "serializable" },
+      );
 
       booking = result;
     } catch (err: unknown) {
@@ -692,7 +698,8 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), a
       const pgCode =
         (err as { code?: string })?.code ??
         (err as { cause?: { code?: string } })?.cause?.code;
-      if (pgCode === "23505") {
+      // 23505 = unique_violation, 40001 = serialization_failure (concurrent booking race)
+      if (pgCode === "23505" || pgCode === "40001") {
         res.status(409).json({ error: "Slot no longer available. Please choose another time." });
         return;
       }
