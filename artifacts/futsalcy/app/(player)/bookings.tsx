@@ -82,6 +82,7 @@ export default function PlayerBookingsScreen() {
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [pastExpanded, setPastExpanded] = useState(false);
 
   // iOS picker visibility — Android auto-dismisses
   const [showFromPicker, setShowFromPicker] = useState(false);
@@ -116,18 +117,30 @@ export default function PlayerBookingsScreen() {
     return d;
   }, []);
 
-  const sections = useMemo(() => {
-    const upcoming = filtered
+  const upcomingBookings = useMemo(() =>
+    filtered
       .filter((b) => new Date(b.startAt) >= today)
-      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-    const past = filtered
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
+    [filtered, today]);
+
+  const pastBookings = useMemo(() =>
+    filtered
       .filter((b) => new Date(b.startAt) < today)
-      .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime());
-    const result: { title: string; data: Booking[] }[] = [];
-    if (upcoming.length > 0) result.push({ title: "Upcoming", data: upcoming });
-    if (past.length > 0) result.push({ title: "Past", data: past });
+      .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime()),
+    [filtered, today]);
+
+  const sections = useMemo(() => {
+    const result: { title: string; data: Booking[]; isPast?: boolean; pastCount?: number }[] = [];
+    if (upcomingBookings.length > 0) result.push({ title: "Upcoming", data: upcomingBookings });
+    if (pastBookings.length > 0)
+      result.push({
+        title: "Past",
+        data: pastExpanded ? pastBookings : [],
+        isPast: true,
+        pastCount: pastBookings.length,
+      });
     return result;
-  }, [filtered, today]);
+  }, [upcomingBookings, pastBookings, pastExpanded]);
 
   const hasActiveFilters = effectiveArea !== "All Areas" || dateFrom !== null || dateTo !== null;
   const activeFilterCount =
@@ -241,12 +254,25 @@ export default function PlayerBookingsScreen() {
       paddingBottom: 6,
       backgroundColor: colors.background,
     },
+    sectionHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
     sectionHeaderText: {
       fontSize: 12,
       fontFamily: "Inter_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.8,
+    },
+    sectionHeaderCount: {
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+    },
+    sectionHeaderChevron: {
+      marginLeft: "auto" as never,
     },
     list: { paddingBottom: insets.bottom + 24 },
     cardWrap: { paddingHorizontal: 16, paddingBottom: 10 },
@@ -480,11 +506,31 @@ export default function PlayerBookingsScreen() {
               tintColor={colors.primary}
             />
           }
-          renderSectionHeader={({ section }) => (
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionHeaderText}>{section.title}</Text>
-            </View>
-          )}
+          renderSectionHeader={({ section }) =>
+            section.isPast ? (
+              <TouchableOpacity
+                style={s.sectionHeader}
+                onPress={() => setPastExpanded((v) => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={s.sectionHeaderRow}>
+                  <Text style={s.sectionHeaderText}>Past</Text>
+                  <Text style={s.sectionHeaderCount}>({section.pastCount})</Text>
+                  <View style={s.sectionHeaderChevron}>
+                    <FeatherIcons
+                      name={pastExpanded ? "chevron-up" : "chevron-down"}
+                      size={15}
+                      color={colors.mutedForeground}
+                    />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionHeaderText}>{section.title}</Text>
+              </View>
+            )
+          }
           renderItem={({ item }) => {
             const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
             const venue = item.venue as { name: string; district: string } | undefined;
