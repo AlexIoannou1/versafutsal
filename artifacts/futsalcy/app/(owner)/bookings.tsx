@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  ActivityIndicator,
+  Animated,
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useListOwnerBookings } from "@workspace/api-client-react";
+import type { BookingStatus } from "@workspace/api-client-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,27 +58,54 @@ function formatTimeRange(startIso: string, endIso: string) {
   return `${fmt(new Date(startIso))} – ${fmt(new Date(endIso))}`;
 }
 
-function startOfDay(d: Date): Date {
-  const c = new Date(d);
-  c.setHours(0, 0, 0, 0);
-  return c;
-}
+// ─── Skeleton Loader ──────────────────────────────────────────────────────────
 
-function endOfDay(d: Date): Date {
-  const c = new Date(d);
-  c.setHours(23, 59, 59, 999);
-  return c;
-}
+function SkeletonCard({ colors }: { colors: ReturnType<typeof useColors> }) {
+  const opacity = React.useRef(new Animated.Value(0.4)).current;
 
-function isSameDay(a: Date, b: Date) {
+  React.useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [opacity]);
+
+  const bg = colors.mutedForeground + "30";
+
   return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
+    <Animated.View
+      style={{
+        opacity,
+        backgroundColor: colors.card,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: colors.border,
+        gap: 10,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <View style={{ height: 14, width: "45%", borderRadius: 6, backgroundColor: bg }} />
+        <View style={{ height: 20, width: 70, borderRadius: 6, backgroundColor: bg }} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        <View style={{ height: 12, width: 12, borderRadius: 4, backgroundColor: bg }} />
+        <View style={{ height: 12, width: "55%", borderRadius: 6, backgroundColor: bg }} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+        <View style={{ height: 12, width: 12, borderRadius: 4, backgroundColor: bg }} />
+        <View style={{ height: 12, width: "65%", borderRadius: 6, backgroundColor: bg }} />
+      </View>
+    </Animated.View>
   );
 }
 
-// ─── Booking Card ────────────────────────────────────────────────────────────
+// ─── Booking Card ─────────────────────────────────────────────────────────────
 
 type Booking = {
   id: string;
@@ -85,11 +113,13 @@ type Booking = {
   endAt: string;
   status: string;
   player?: { name: string; email: string };
-  venue?: { id: string; name: string; district: string };
+  venue?: { id: string; name: string };
   pitch?: { name: string };
   guestName?: string | null;
   [key: string]: unknown;
 };
+
+type CardStyles = ReturnType<typeof StyleSheet.create>;
 
 function BookingCard({
   item,
@@ -100,7 +130,7 @@ function BookingCard({
   item: Booking;
   onPress: () => void;
   colors: ReturnType<typeof useColors>;
-  s: ReturnType<typeof StyleSheet.create>;
+  s: CardStyles;
 }) {
   const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
   const player = item.player as { name: string; email: string } | undefined;
@@ -143,21 +173,7 @@ function BookingCard({
   );
 }
 
-// ─── Section Header ───────────────────────────────────────────────────────────
-
-function SectionDivider({ label, count, colors }: { label: string; count: number; colors: ReturnType<typeof useColors> }) {
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginTop: 4, marginBottom: 10 }}>
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>
-        {label} · {count}
-      </Text>
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-    </View>
-  );
-}
-
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function OwnerBookingsScreen() {
   const colors = useColors();
@@ -169,17 +185,44 @@ export default function OwnerBookingsScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [venueId, setVenueId] = useState<string | "ALL">("ALL");
 
-  const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
-  const allBookings = (data?.bookings ?? []) as Booking[];
+  // Map period → from/to API params
+  const { fromParam, toParam } = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
 
-  const today = useMemo(() => startOfDay(new Date()), []);
-  const todayEnd = useMemo(() => endOfDay(new Date()), []);
+    if (period === "Upcoming") {
+      return { fromParam: todayStart.toISOString(), toParam: undefined };
+    }
+    if (period === "Today") {
+      return { fromParam: todayStart.toISOString(), toParam: todayEnd.toISOString() };
+    }
+    if (period === "Past") {
+      const yesterday = new Date(todayStart.getTime() - 1);
+      return { fromParam: undefined, toParam: yesterday.toISOString() };
+    }
+    return { fromParam: undefined, toParam: undefined };
+  }, [period]);
 
-  // Derive unique venues for filter
+  // Build server-side query params
+  const apiParams = useMemo(() => {
+    const p: { status?: BookingStatus; from?: string; to?: string } = {};
+    if (statusFilter !== "All") p.status = statusFilter as BookingStatus;
+    if (fromParam) p.from = fromParam;
+    if (toParam) p.to = toParam;
+    return p;
+  }, [statusFilter, fromParam, toParam]);
+
+  const { data, isLoading, refetch, isRefetching } = useListOwnerBookings(apiParams);
+  const serverBookings = (data?.bookings ?? []) as Booking[];
+
+  // Derive unique venues for client-side venue filter
   const venues = useMemo(() => {
+    // Use all bookings response to get full venue list when possible
     const seen = new Set<string>();
     const result: { id: string; name: string }[] = [];
-    for (const b of allBookings) {
+    for (const b of serverBookings) {
       const v = b.venue as { id: string; name: string } | undefined;
       if (v && !seen.has(v.id)) {
         seen.add(v.id);
@@ -187,83 +230,48 @@ export default function OwnerBookingsScreen() {
       }
     }
     return result;
-  }, [allBookings]);
+  }, [serverBookings]);
 
-  // Apply all filters
+  // Client-side filters: search + venue (not supported by API)
   const filtered = useMemo(() => {
-    return allBookings.filter((b) => {
-      const startDate = new Date(b.startAt);
-
-      // Period filter
-      if (period === "Upcoming" && startDate < today) return false;
-      if (period === "Today" && !isSameDay(startDate, today)) return false;
-      if (period === "Past" && startDate >= today) return false;
-
-      // Status filter
-      if (statusFilter !== "All" && b.status !== statusFilter) return false;
-
-      // Venue filter
+    return serverBookings.filter((b) => {
+      // Venue filter (client-side — API has no venueId param)
       if (venueId !== "ALL") {
         const v = b.venue as { id: string } | undefined;
         if (v?.id !== venueId) return false;
       }
 
-      // Search filter (guest name, player name, booking ID prefix)
+      // Search: guest name, player name/email, booking ID prefix
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const player = b.player as { name: string; email: string } | undefined;
         const matchGuest = b.guestName?.toLowerCase().includes(q);
-        const matchPlayer = player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
+        const matchPlayer =
+          player?.name?.toLowerCase().includes(q) ||
+          player?.email?.toLowerCase().includes(q);
         const matchId = b.id.slice(0, 8).toLowerCase().includes(q);
         if (!matchGuest && !matchPlayer && !matchId) return false;
       }
 
       return true;
     });
-  }, [allBookings, period, statusFilter, venueId, search, today]);
+  }, [serverBookings, venueId, search]);
 
-  // For "All" period, split into sections; otherwise flat list with sort
-  const { sections, flatList } = useMemo(() => {
-    if (period !== "All") {
-      // Upcoming: nearest first; Today: time order; Past: most recent first
-      const sorted = [...filtered].sort((a, b) => {
-        if (period === "Upcoming" || period === "Today") {
-          return a.startAt.localeCompare(b.startAt);
-        }
-        return b.startAt.localeCompare(a.startAt);
-      });
-      return { sections: null, flatList: sorted };
-    }
+  const hasActiveFilters =
+    search !== "" || period !== "All" || statusFilter !== "All" || venueId !== "ALL";
 
-    // All period: split into three groups
-    const upcoming = filtered
-      .filter((b) => new Date(b.startAt) >= today && !isSameDay(new Date(b.startAt), today))
-      .sort((a, b) => a.startAt.localeCompare(b.startAt));
-    const todayItems = filtered
-      .filter((b) => isSameDay(new Date(b.startAt), today))
-      .sort((a, b) => a.startAt.localeCompare(b.startAt));
-    const past = filtered
-      .filter((b) => new Date(b.startAt) < today)
-      .sort((a, b) => b.startAt.localeCompare(a.startAt));
-
-    return {
-      sections: { upcoming, today: todayItems, past },
-      flatList: null,
-    };
-  }, [filtered, period, today, todayEnd]);
-
-  const hasActiveFilters = search !== "" || period !== "All" || statusFilter !== "All" || venueId !== "ALL";
+  const clearFilters = () => {
+    setSearch("");
+    setPeriod("All");
+    setStatusFilter("All");
+    setVenueId("ALL");
+  };
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    center: { flex: 1, alignItems: "center", justifyContent: "center" },
 
     // Search
-    searchWrap: {
-      paddingHorizontal: 16,
-      paddingTop: 10,
-      paddingBottom: 6,
-    },
+    searchWrap: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
     searchBox: {
       flexDirection: "row",
       alignItems: "center",
@@ -282,9 +290,8 @@ export default function OwnerBookingsScreen() {
       color: colors.foreground,
     },
 
-    // Filter rows
+    // Filters
     filterSection: { paddingBottom: 8 },
-    filterRow: { paddingLeft: 16, paddingBottom: 6 },
     filterLabel: {
       fontSize: 10,
       fontFamily: "Inter_600SemiBold",
@@ -294,6 +301,7 @@ export default function OwnerBookingsScreen() {
       paddingLeft: 16,
       marginBottom: 5,
     },
+    filterRow: { paddingLeft: 16 },
     pillRow: { flexDirection: "row", gap: 6, paddingRight: 16 },
     pill: {
       borderRadius: 20,
@@ -307,10 +315,9 @@ export default function OwnerBookingsScreen() {
     pillText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
     pillTextActive: { color: "#fff" },
 
-    // Divider
     divider: { height: 1, backgroundColor: colors.border, marginBottom: 6 },
 
-    // Count row
+    // Result count
     countRow: {
       paddingHorizontal: 16,
       paddingBottom: 6,
@@ -346,7 +353,6 @@ export default function OwnerBookingsScreen() {
       fontFamily: "Inter_600SemiBold",
       color: colors.foreground,
       minWidth: 0,
-      marginRight: 0,
     },
     manualBadge: {
       borderRadius: 6,
@@ -358,105 +364,30 @@ export default function OwnerBookingsScreen() {
     statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
     statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
-    metaText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, flex: 1 },
+    metaText: {
+      fontSize: 12,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      flex: 1,
+    },
 
     // Empty
     emptyWrap: { alignItems: "center", paddingTop: 60, gap: 10 },
-    emptyIcon: { opacity: 0.4 },
     emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.foreground },
-    emptySubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" },
+    emptySubtitle: {
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.mutedForeground,
+      textAlign: "center",
+      paddingHorizontal: 24,
+    },
   });
 
-  // Build flat data array for the FlatList (handles both sectioned and flat modes)
-  type ListItem =
-    | { type: "section"; label: string; count: number; key: string }
-    | { type: "booking"; booking: Booking; key: string }
-    | { type: "section-empty"; label: string; key: string }
-    | { type: "empty"; key: string };
+  // ── Header (search + filters) ───────────────────────────────────────────────
 
-  const listData = useMemo((): ListItem[] => {
-    if (isLoading) return [];
-
-    if (filtered.length === 0) {
-      return [{ type: "empty", key: "empty" }];
-    }
-
-    if (flatList) {
-      return flatList.map((b) => ({ type: "booking" as const, booking: b, key: b.id }));
-    }
-
-    if (!sections) return [];
-
-    const items: ListItem[] = [];
-
-    // Today
-    items.push({ type: "section", label: "Today", count: sections.today.length, key: "sec-today" });
-    if (sections.today.length === 0) {
-      items.push({ type: "section-empty", label: "No bookings today", key: "empty-today" });
-    } else {
-      sections.today.forEach((b) => items.push({ type: "booking", booking: b, key: b.id }));
-    }
-
-    // Upcoming
-    items.push({ type: "section", label: "Upcoming", count: sections.upcoming.length, key: "sec-upcoming" });
-    if (sections.upcoming.length === 0) {
-      items.push({ type: "section-empty", label: "No upcoming bookings", key: "empty-upcoming" });
-    } else {
-      sections.upcoming.forEach((b) => items.push({ type: "booking", booking: b, key: b.id }));
-    }
-
-    // Past
-    items.push({ type: "section", label: "Past", count: sections.past.length, key: "sec-past" });
-    if (sections.past.length === 0) {
-      items.push({ type: "section-empty", label: "No past bookings", key: "empty-past" });
-    } else {
-      sections.past.forEach((b) => items.push({ type: "booking", booking: b, key: b.id }));
-    }
-
-    return items;
-  }, [isLoading, filtered.length, flatList, sections]);
-
-  const renderItem = ({ item }: { item: ListItem }) => {
-    if (item.type === "empty") {
-      return (
-        <View style={s.emptyWrap}>
-          <View style={s.emptyIcon}>
-            <Feather name="search" size={40} color={colors.mutedForeground} />
-          </View>
-          <Text style={s.emptyTitle}>No bookings found</Text>
-          <Text style={s.emptySubtitle}>
-            {hasActiveFilters
-              ? "Try adjusting your search or filters"
-              : "No bookings have been made yet"}
-          </Text>
-        </View>
-      );
-    }
-    if (item.type === "section") {
-      return <SectionDivider label={item.label} count={item.count} colors={colors} />;
-    }
-    if (item.type === "section-empty") {
-      return (
-        <View style={{ paddingHorizontal: 4, paddingBottom: 6 }}>
-          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, paddingBottom: 6, paddingLeft: 4 }}>
-            {item.label}
-          </Text>
-        </View>
-      );
-    }
-    return (
-      <BookingCard
-        item={item.booking}
-        onPress={() => router.push(`/owner/booking/${item.booking.id}`)}
-        colors={colors}
-        s={s}
-      />
-    );
-  };
-
-  const Header = (
+  const ListHeader = (
     <View>
-      {/* Search bar */}
+      {/* Search */}
       <View style={s.searchWrap}>
         <View style={s.searchBox}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
@@ -496,7 +427,7 @@ export default function OwnerBookingsScreen() {
         </ScrollView>
 
         {/* Status filter */}
-        <Text style={[s.filterLabel, { marginTop: 6 }]}>Status</Text>
+        <Text style={[s.filterLabel, { marginTop: 8 }]}>Status</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow}>
           <View style={s.pillRow}>
             {STATUS_OPTIONS.map((st) => (
@@ -517,7 +448,7 @@ export default function OwnerBookingsScreen() {
         {/* Venue filter — only shown when owner has more than one venue */}
         {venues.length > 1 && (
           <>
-            <Text style={[s.filterLabel, { marginTop: 6 }]}>Venue</Text>
+            <Text style={[s.filterLabel, { marginTop: 8 }]}>Venue</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow}>
               <View style={s.pillRow}>
                 <TouchableOpacity
@@ -525,7 +456,9 @@ export default function OwnerBookingsScreen() {
                   onPress={() => setVenueId("ALL")}
                   activeOpacity={0.7}
                 >
-                  <Text style={[s.pillText, venueId === "ALL" && s.pillTextActive]}>All Venues</Text>
+                  <Text style={[s.pillText, venueId === "ALL" && s.pillTextActive]}>
+                    All Venues
+                  </Text>
                 </TouchableOpacity>
                 {venues.map((v) => (
                   <TouchableOpacity
@@ -534,7 +467,9 @@ export default function OwnerBookingsScreen() {
                     onPress={() => setVenueId(v.id)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[s.pillText, venueId === v.id && s.pillTextActive]}>{v.name}</Text>
+                    <Text style={[s.pillText, venueId === v.id && s.pillTextActive]}>
+                      {v.name}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -543,16 +478,16 @@ export default function OwnerBookingsScreen() {
         )}
       </View>
 
-      {/* Result count + clear */}
+      {/* Count + clear */}
       <View style={s.divider} />
       <View style={s.countRow}>
         <Text style={s.countText}>
-          {isLoading ? "Loading…" : `${filtered.length} booking${filtered.length !== 1 ? "s" : ""}`}
+          {isLoading
+            ? "Loading…"
+            : `${filtered.length} booking${filtered.length !== 1 ? "s" : ""}`}
         </Text>
         {hasActiveFilters && (
-          <TouchableOpacity
-            onPress={() => { setSearch(""); setPeriod("All"); setStatusFilter("All"); setVenueId("ALL"); }}
-          >
+          <TouchableOpacity onPress={clearFilters}>
             <Text style={s.clearText}>Clear filters</Text>
           </TouchableOpacity>
         )}
@@ -560,21 +495,73 @@ export default function OwnerBookingsScreen() {
     </View>
   );
 
+  // ── Skeleton list ───────────────────────────────────────────────────────────
+
   if (isLoading) {
     return (
-      <View style={s.center}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={s.container}>
+        <View>{ListHeader}</View>
+        <View style={[s.listContent, { flex: 1 }]}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonCard key={i} colors={colors} />
+          ))}
+        </View>
       </View>
     );
   }
 
+  // ── Empty state ─────────────────────────────────────────────────────────────
+
+  if (filtered.length === 0) {
+    return (
+      <View style={s.container}>
+        <FlatList
+          data={[]}
+          keyExtractor={() => ""}
+          renderItem={() => null}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={
+            <View style={s.emptyWrap}>
+              <Feather name="search" size={40} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+              <Text style={s.emptyTitle}>No bookings found</Text>
+              <Text style={s.emptySubtitle}>
+                {hasActiveFilters
+                  ? "Try adjusting your search or filters"
+                  : "No bookings have been made yet"}
+              </Text>
+            </View>
+          }
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+            />
+          }
+          contentContainerStyle={s.listContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        />
+      </View>
+    );
+  }
+
+  // ── Booking list (newest-first from server) ─────────────────────────────────
+
   return (
     <View style={s.container}>
       <FlatList
-        data={listData}
-        keyExtractor={(item) => item.key}
-        renderItem={renderItem}
-        ListHeaderComponent={Header}
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <BookingCard
+            item={item}
+            onPress={() => router.push(`/owner/booking/${item.id}`)}
+            colors={colors}
+            s={s}
+          />
+        )}
+        ListHeaderComponent={ListHeader}
         contentContainerStyle={s.listContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
