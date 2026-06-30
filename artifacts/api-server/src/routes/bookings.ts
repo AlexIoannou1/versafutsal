@@ -749,6 +749,152 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), a
   }
 });
 
+// ─── Owner Stats ──────────────────────────────────────────────────────────────
+
+// GET /owner/stats?from=&to= — aggregate booking & revenue analytics for the owner
+router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+  try {
+    const { from, to } = req.query as { from?: string; to?: string };
+
+    const ownerVenues = await db
+      .select({ id: venuesTable.id })
+      .from(venuesTable)
+      .where(eq(venuesTable.ownerId, req.user!.userId));
+
+    const venueIds = ownerVenues.map((v) => v.id);
+
+    const emptyStats = {
+      totalBookings: 0,
+      totalRevenue: 0,
+      avgRevenue: 0,
+      byDay: [] as { date: string; count: number }[],
+      byHour: [] as { hour: number; count: number }[],
+      byDayOfWeek: [] as { day: number; count: number }[],
+      byPitch: [] as { pitchId: string; pitchName: string; count: number; revenue: number }[],
+      byStatus: [] as { status: string; count: number }[],
+    };
+
+    if (venueIds.length === 0) {
+      res.json(emptyStats);
+      return;
+    }
+
+    const conditions: ReturnType<typeof eq | typeof inArray | typeof gte | typeof lte>[] = [
+      inArray(bookingsTable.venueId, venueIds),
+    ];
+    if (from) {
+      const fromDate = new Date(from);
+      if (!isNaN(fromDate.getTime())) conditions.push(gte(bookingsTable.startAt, fromDate));
+    }
+    if (to) {
+      const toDate = new Date(to);
+      if (!isNaN(toDate.getTime())) conditions.push(lte(bookingsTable.startAt, toDate));
+    }
+
+    const rows = await db
+      .select({
+        id: bookingsTable.id,
+        startAt: bookingsTable.startAt,
+        status: bookingsTable.status,
+        pitchId: bookingsTable.pitchId,
+        policySnapshot: bookingsTable.policySnapshot,
+        pitchName: pitchesTable.name,
+      })
+      .from(bookingsTable)
+      .innerJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+      .where(and(...conditions));
+
+    if (rows.length === 0) {
+      res.json(emptyStats);
+      return;
+    }
+
+    // ── Compute revenue ──────────────────────────────────────────────────────
+    function computeRevenue(row: (typeof rows)[0]): number {
+      const snapshot = row.policySnapshot as {
+        pricePerHour?: string | number | null;
+        slotDurationMinutes?: number;
+      } | null;
+      const price = parseFloat(String(snapshot?.pricePerHour ?? "0")) || 0;
+      const durationHours = ((snapshot?.slotDurationMinutes ?? 60)) / 60;
+      return price * durationHours;
+    }
+
+    // ── Total / avg ──────────────────────────────────────────────────────────
+    const totalBookings = rows.length;
+    const confirmedRows = rows.filter((r) => r.status === "CONFIRMED");
+    const totalRevenue = confirmedRows.reduce((sum, r) => sum + computeRevenue(r), 0);
+    const avgRevenue = confirmedRows.length > 0 ? totalRevenue / confirmedRows.length : 0;
+
+    // ── By day (YYYY-MM-DD) ──────────────────────────────────────────────────
+    const dayMap = new Map<string, number>();
+    for (const r of rows) {
+      const date = r.startAt.toISOString().slice(0, 10);
+      dayMap.set(date, (dayMap.get(date) ?? 0) + 1);
+    }
+    const byDay = Array.from(dayMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // ── By hour (0–23) ───────────────────────────────────────────────────────
+    const hourMap = new Map<number, number>();
+    for (const r of rows) {
+      const hour = r.startAt.getUTCHours();
+      hourMap.set(hour, (hourMap.get(hour) ?? 0) + 1);
+    }
+    const byHour = Array.from(hourMap.entries())
+      .map(([hour, count]) => ({ hour, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // ── By day of week (0=Sun … 6=Sat) ──────────────────────────────────────
+    const dowMap = new Map<number, number>();
+    for (const r of rows) {
+      const day = r.startAt.getUTCDay();
+      dowMap.set(day, (dowMap.get(day) ?? 0) + 1);
+    }
+    const byDayOfWeek = Array.from(dowMap.entries())
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // ── By pitch ──────────────────────────────────────────────────────────────
+    const pitchMap = new Map<string, { pitchName: string; count: number; revenue: number }>();
+    for (const r of rows) {
+      const prev = pitchMap.get(r.pitchId) ?? { pitchName: r.pitchName, count: 0, revenue: 0 };
+      pitchMap.set(r.pitchId, {
+        pitchName: r.pitchName,
+        count: prev.count + 1,
+        revenue: prev.revenue + (r.status === "CONFIRMED" ? computeRevenue(r) : 0),
+      });
+    }
+    const byPitch = Array.from(pitchMap.entries())
+      .map(([pitchId, v]) => ({ pitchId, ...v }))
+      .sort((a, b) => b.count - a.count);
+
+    // ── By status ────────────────────────────────────────────────────────────
+    const statusMap = new Map<string, number>();
+    for (const r of rows) {
+      statusMap.set(r.status, (statusMap.get(r.status) ?? 0) + 1);
+    }
+    const byStatus = Array.from(statusMap.entries())
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({
+      totalBookings,
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      avgRevenue: Math.round(avgRevenue * 100) / 100,
+      byDay,
+      byHour,
+      byDayOfWeek,
+      byPitch,
+      byStatus,
+    });
+  } catch (err) {
+    console.error("GET /owner/stats error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ─── Owner Bookings ───────────────────────────────────────────────────────────
 
 // GET /owner/bookings?status=&from=&to=&pitchId=

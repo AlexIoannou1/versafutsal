@@ -23,6 +23,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "list.bullet", selected: "list.bullet" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="stats">
+        <Icon sf={{ default: "chart.bar.xaxis", selected: "chart.bar.xaxis" }} />
+        <Label>Stats</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="venues">
         <Icon sf={{ default: "building.2", selected: "building.2.fill" }} />
         <Label>Venues</Label>
@@ -106,6 +110,18 @@ function ClassicTabLayout() {
               <SymbolView name="list.bullet" tintColor={color} size={22} />
             ) : (
               <Feather name="list" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="stats"
+        options={{
+          title: "Stats",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="chart.bar.xaxis" tintColor={color} size={22} />
+            ) : (
+              <Feather name="trending-up" size={22} color={color} />
             ),
         }}
       />
