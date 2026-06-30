@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SectionList,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -129,18 +128,8 @@ export default function PlayerBookingsScreen() {
       .sort((a, b) => new Date(b.startAt).getTime() - new Date(a.startAt).getTime()),
     [filtered, today]);
 
-  const sections = useMemo(() => {
-    const result: { title: string; data: Booking[]; isPast?: boolean; pastCount?: number }[] = [];
-    if (upcomingBookings.length > 0) result.push({ title: "Upcoming", data: upcomingBookings });
-    if (pastBookings.length > 0)
-      result.push({
-        title: "Past",
-        data: pastExpanded ? pastBookings : [],
-        isPast: true,
-        pastCount: pastBookings.length,
-      });
-    return result;
-  }, [upcomingBookings, pastBookings, pastExpanded]);
+  const hasUpcoming = upcomingBookings.length > 0;
+  const hasPast = pastBookings.length > 0;
 
   const hasActiveFilters = effectiveArea !== "All Areas" || dateFrom !== null || dateTo !== null;
   const activeFilterCount =
@@ -479,7 +468,7 @@ export default function PlayerBookingsScreen() {
       </View>
 
       {/* List */}
-      {sections.length === 0 ? (
+      {!hasUpcoming && !hasPast ? (
         <View style={s.center}>
           <View style={s.emptyIcon}>
             <FeatherIcons name="calendar" size={28} color={colors.mutedForeground} />
@@ -494,11 +483,8 @@ export default function PlayerBookingsScreen() {
           </Text>
         </View>
       ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
+        <ScrollView
           contentContainerStyle={s.list}
-          stickySectionHeadersEnabled={false}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
@@ -506,8 +492,55 @@ export default function PlayerBookingsScreen() {
               tintColor={colors.primary}
             />
           }
-          renderSectionHeader={({ section }) =>
-            section.isPast ? (
+        >
+          {/* Upcoming section */}
+          {hasUpcoming && (
+            <>
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionHeaderText}>Upcoming</Text>
+              </View>
+              {upcomingBookings.map((item) => {
+                const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
+                const venue = item.venue as { name: string; district: string } | undefined;
+                const pitch = item.pitch as { name: string } | undefined;
+                return (
+                  <View key={item.id} style={s.cardWrap}>
+                    <TouchableOpacity
+                      style={s.card}
+                      onPress={() => router.push(`/player/booking/${item.id}`)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={s.cardHeader}>
+                        <Text style={s.venueName} numberOfLines={1}>
+                          {venue?.name ?? "Venue"}
+                          {venue?.district ? ` · ${venue.district}` : ""}
+                        </Text>
+                        <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
+                          <Text style={[s.statusText, { color: statusColor }]}>
+                            {STATUS_LABELS[item.status] ?? item.status}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={s.pitchRow}>
+                        <FeatherIcons name="grid" size={13} color={colors.mutedForeground} />
+                        <Text style={s.pitchText}>{pitch?.name ?? "Pitch"}</Text>
+                      </View>
+                      <View style={s.timeRow}>
+                        <FeatherIcons name="calendar" size={13} color={colors.mutedForeground} />
+                        <Text style={s.timeText}>
+                          {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </>
+          )}
+
+          {/* Past section */}
+          {hasPast && (
+            <>
               <TouchableOpacity
                 style={s.sectionHeader}
                 onPress={() => setPastExpanded((v) => !v)}
@@ -515,7 +548,7 @@ export default function PlayerBookingsScreen() {
               >
                 <View style={s.sectionHeaderRow}>
                   <Text style={s.sectionHeaderText}>Past</Text>
-                  <Text style={s.sectionHeaderCount}>({section.pastCount})</Text>
+                  <Text style={s.sectionHeaderCount}>({pastBookings.length})</Text>
                   <View style={s.sectionHeaderChevron}>
                     <FeatherIcons
                       name={pastExpanded ? "chevron-up" : "chevron-down"}
@@ -525,49 +558,45 @@ export default function PlayerBookingsScreen() {
                   </View>
                 </View>
               </TouchableOpacity>
-            ) : (
-              <View style={s.sectionHeader}>
-                <Text style={s.sectionHeaderText}>{section.title}</Text>
-              </View>
-            )
-          }
-          renderItem={({ item }) => {
-            const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
-            const venue = item.venue as { name: string; district: string } | undefined;
-            const pitch = item.pitch as { name: string } | undefined;
-            return (
-              <View style={s.cardWrap}>
-                <TouchableOpacity
-                  style={s.card}
-                  onPress={() => router.push(`/player/booking/${item.id}`)}
-                  activeOpacity={0.7}
-                >
-                  <View style={s.cardHeader}>
-                    <Text style={s.venueName} numberOfLines={1}>
-                      {venue?.name ?? "Venue"}
-                      {venue?.district ? ` · ${venue.district}` : ""}
-                    </Text>
-                    <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
-                      <Text style={[s.statusText, { color: statusColor }]}>
-                        {STATUS_LABELS[item.status] ?? item.status}
-                      </Text>
-                    </View>
+              {pastExpanded && pastBookings.map((item) => {
+                const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
+                const venue = item.venue as { name: string; district: string } | undefined;
+                const pitch = item.pitch as { name: string } | undefined;
+                return (
+                  <View key={item.id} style={s.cardWrap}>
+                    <TouchableOpacity
+                      style={s.card}
+                      onPress={() => router.push(`/player/booking/${item.id}`)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={s.cardHeader}>
+                        <Text style={s.venueName} numberOfLines={1}>
+                          {venue?.name ?? "Venue"}
+                          {venue?.district ? ` · ${venue.district}` : ""}
+                        </Text>
+                        <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
+                          <Text style={[s.statusText, { color: statusColor }]}>
+                            {STATUS_LABELS[item.status] ?? item.status}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={s.pitchRow}>
+                        <FeatherIcons name="grid" size={13} color={colors.mutedForeground} />
+                        <Text style={s.pitchText}>{pitch?.name ?? "Pitch"}</Text>
+                      </View>
+                      <View style={s.timeRow}>
+                        <FeatherIcons name="calendar" size={13} color={colors.mutedForeground} />
+                        <Text style={s.timeText}>
+                          {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
                   </View>
-                  <View style={s.pitchRow}>
-                    <FeatherIcons name="grid" size={13} color={colors.mutedForeground} />
-                    <Text style={s.pitchText}>{pitch?.name ?? "Pitch"}</Text>
-                  </View>
-                  <View style={s.timeRow}>
-                    <FeatherIcons name="calendar" size={13} color={colors.mutedForeground} />
-                    <Text style={s.timeText}>
-                      {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
-        />
+                );
+              })}
+            </>
+          )}
+        </ScrollView>
       )}
     </View>
   );
