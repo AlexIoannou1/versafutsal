@@ -1,0 +1,591 @@
+import React, { useState, useMemo } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import { useColors } from "@/hooks/useColors";
+import { useListOwnerBookings } from "@workspace/api-client-react";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STATUS_COLORS: Record<string, string> = {
+  PENDING: "#F59E0B",
+  CONFIRMED: "#00C851",
+  CANCELLED: "#EF4444",
+  REFUNDED: "#6366F1",
+  NO_SHOW: "#6B7280",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pending",
+  CONFIRMED: "Confirmed",
+  CANCELLED: "Cancelled",
+  REFUNDED: "Refunded",
+  NO_SHOW: "No Show",
+};
+
+const PERIOD_OPTIONS = ["All", "Upcoming", "Today", "Past"] as const;
+type Period = (typeof PERIOD_OPTIONS)[number];
+
+const STATUS_OPTIONS = ["All", "CONFIRMED", "PENDING", "CANCELLED", "NO_SHOW", "REFUNDED"] as const;
+type StatusFilter = (typeof STATUS_OPTIONS)[number];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDateShort(iso: string) {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatTimeRange(startIso: string, endIso: string) {
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${fmt(new Date(startIso))} – ${fmt(new Date(endIso))}`;
+}
+
+function startOfDay(d: Date): Date {
+  const c = new Date(d);
+  c.setHours(0, 0, 0, 0);
+  return c;
+}
+
+function endOfDay(d: Date): Date {
+  const c = new Date(d);
+  c.setHours(23, 59, 59, 999);
+  return c;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+// ─── Booking Card ────────────────────────────────────────────────────────────
+
+type Booking = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  status: string;
+  player?: { name: string; email: string };
+  venue?: { id: string; name: string; district: string };
+  pitch?: { name: string };
+  guestName?: string | null;
+  [key: string]: unknown;
+};
+
+function BookingCard({
+  item,
+  onPress,
+  colors,
+  s,
+}: {
+  item: Booking;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+  s: ReturnType<typeof StyleSheet.create>;
+}) {
+  const statusColor = STATUS_COLORS[item.status] ?? colors.mutedForeground;
+  const player = item.player as { name: string; email: string } | undefined;
+  const pitch = item.pitch as { name: string } | undefined;
+  const venue = item.venue as { name: string } | undefined;
+  const guestName = item.guestName ?? null;
+  const isManual = !!guestName;
+  const displayName = isManual ? guestName : (player?.name ?? player?.email ?? "Player");
+
+  return (
+    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.7}>
+      <View style={s.cardHeader}>
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, marginRight: 8, minWidth: 0 }}>
+          <Text style={s.playerName} numberOfLines={1}>{displayName}</Text>
+          {isManual && (
+            <View style={[s.manualBadge, { backgroundColor: colors.primary + "18" }]}>
+              <Text style={[s.manualBadgeText, { color: colors.primary }]}>MANUAL</Text>
+            </View>
+          )}
+        </View>
+        <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
+          <Text style={[s.statusText, { color: statusColor }]}>
+            {STATUS_LABELS[item.status] ?? item.status}
+          </Text>
+        </View>
+      </View>
+      <View style={s.metaRow}>
+        <Feather name="grid" size={12} color={colors.mutedForeground} />
+        <Text style={s.metaText} numberOfLines={1}>
+          {venue?.name ?? ""}{pitch?.name ? ` · ${pitch.name}` : ""}
+        </Text>
+      </View>
+      <View style={s.metaRow}>
+        <Feather name="calendar" size={12} color={colors.mutedForeground} />
+        <Text style={s.metaText}>
+          {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+
+function SectionDivider({ label, count, colors }: { label: string; count: number; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 16, marginTop: 4, marginBottom: 10 }}>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>
+        {label} · {count}
+      </Text>
+      <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+    </View>
+  );
+}
+
+// ─── Main Screen ─────────────────────────────────────────────────────────────
+
+export default function OwnerBookingsScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState<Period>("All");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [venueId, setVenueId] = useState<string | "ALL">("ALL");
+
+  const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
+  const allBookings = (data?.bookings ?? []) as Booking[];
+
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const todayEnd = useMemo(() => endOfDay(new Date()), []);
+
+  // Derive unique venues for filter
+  const venues = useMemo(() => {
+    const seen = new Set<string>();
+    const result: { id: string; name: string }[] = [];
+    for (const b of allBookings) {
+      const v = b.venue as { id: string; name: string } | undefined;
+      if (v && !seen.has(v.id)) {
+        seen.add(v.id);
+        result.push({ id: v.id, name: v.name });
+      }
+    }
+    return result;
+  }, [allBookings]);
+
+  // Apply all filters
+  const filtered = useMemo(() => {
+    return allBookings.filter((b) => {
+      const startDate = new Date(b.startAt);
+
+      // Period filter
+      if (period === "Upcoming" && startDate < today) return false;
+      if (period === "Today" && !isSameDay(startDate, today)) return false;
+      if (period === "Past" && startDate >= today) return false;
+
+      // Status filter
+      if (statusFilter !== "All" && b.status !== statusFilter) return false;
+
+      // Venue filter
+      if (venueId !== "ALL") {
+        const v = b.venue as { id: string } | undefined;
+        if (v?.id !== venueId) return false;
+      }
+
+      // Search filter (guest name, player name, booking ID prefix)
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const player = b.player as { name: string; email: string } | undefined;
+        const matchGuest = b.guestName?.toLowerCase().includes(q);
+        const matchPlayer = player?.name?.toLowerCase().includes(q) || player?.email?.toLowerCase().includes(q);
+        const matchId = b.id.slice(0, 8).toLowerCase().includes(q);
+        if (!matchGuest && !matchPlayer && !matchId) return false;
+      }
+
+      return true;
+    });
+  }, [allBookings, period, statusFilter, venueId, search, today]);
+
+  // For "All" period, split into sections; otherwise flat list with sort
+  const { sections, flatList } = useMemo(() => {
+    if (period !== "All") {
+      // Upcoming: nearest first; Today: time order; Past: most recent first
+      const sorted = [...filtered].sort((a, b) => {
+        if (period === "Upcoming" || period === "Today") {
+          return a.startAt.localeCompare(b.startAt);
+        }
+        return b.startAt.localeCompare(a.startAt);
+      });
+      return { sections: null, flatList: sorted };
+    }
+
+    // All period: split into three groups
+    const upcoming = filtered
+      .filter((b) => new Date(b.startAt) >= today && !isSameDay(new Date(b.startAt), today))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const todayItems = filtered
+      .filter((b) => isSameDay(new Date(b.startAt), today))
+      .sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const past = filtered
+      .filter((b) => new Date(b.startAt) < today)
+      .sort((a, b) => b.startAt.localeCompare(a.startAt));
+
+    return {
+      sections: { upcoming, today: todayItems, past },
+      flatList: null,
+    };
+  }, [filtered, period, today, todayEnd]);
+
+  const hasActiveFilters = search !== "" || period !== "All" || statusFilter !== "All" || venueId !== "ALL";
+
+  const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+    // Search
+    searchWrap: {
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 6,
+    },
+    searchBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      gap: 8,
+      height: 40,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      fontFamily: "Inter_400Regular",
+      color: colors.foreground,
+    },
+
+    // Filter rows
+    filterSection: { paddingBottom: 8 },
+    filterRow: { paddingLeft: 16, paddingBottom: 6 },
+    filterLabel: {
+      fontSize: 10,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.mutedForeground,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      paddingLeft: 16,
+      marginBottom: 5,
+    },
+    pillRow: { flexDirection: "row", gap: 6, paddingRight: 16 },
+    pill: {
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+    pillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    pillText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    pillTextActive: { color: "#fff" },
+
+    // Divider
+    divider: { height: 1, backgroundColor: colors.border, marginBottom: 6 },
+
+    // Count row
+    countRow: {
+      paddingHorizontal: 16,
+      paddingBottom: 6,
+      paddingTop: 2,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    countText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    clearText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary },
+
+    // List
+    listContent: { paddingHorizontal: 16, paddingBottom: insets.bottom + 100 },
+
+    // Card
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 14,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      marginBottom: 5,
+    },
+    playerName: {
+      flex: 1,
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
+      minWidth: 0,
+      marginRight: 0,
+    },
+    manualBadge: {
+      borderRadius: 6,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      flexShrink: 0,
+    },
+    manualBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+    statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+    statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+    metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
+    metaText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, flex: 1 },
+
+    // Empty
+    emptyWrap: { alignItems: "center", paddingTop: 60, gap: 10 },
+    emptyIcon: { opacity: 0.4 },
+    emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.foreground },
+    emptySubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" },
+  });
+
+  // Build flat data array for the FlatList (handles both sectioned and flat modes)
+  type ListItem =
+    | { type: "section"; label: string; count: number; key: string }
+    | { type: "booking"; booking: Booking; key: string }
+    | { type: "section-empty"; label: string; key: string }
+    | { type: "empty"; key: string };
+
+  const listData = useMemo((): ListItem[] => {
+    if (isLoading) return [];
+
+    if (filtered.length === 0) {
+      return [{ type: "empty", key: "empty" }];
+    }
+
+    if (flatList) {
+      return flatList.map((b) => ({ type: "booking" as const, booking: b, key: b.id }));
+    }
+
+    if (!sections) return [];
+
+    const items: ListItem[] = [];
+
+    // Today
+    items.push({ type: "section", label: "Today", count: sections.today.length, key: "sec-today" });
+    if (sections.today.length === 0) {
+      items.push({ type: "section-empty", label: "No bookings today", key: "empty-today" });
+    } else {
+      sections.today.forEach((b) => items.push({ type: "booking", booking: b, key: b.id }));
+    }
+
+    // Upcoming
+    items.push({ type: "section", label: "Upcoming", count: sections.upcoming.length, key: "sec-upcoming" });
+    if (sections.upcoming.length === 0) {
+      items.push({ type: "section-empty", label: "No upcoming bookings", key: "empty-upcoming" });
+    } else {
+      sections.upcoming.forEach((b) => items.push({ type: "booking", booking: b, key: b.id }));
+    }
+
+    // Past
+    items.push({ type: "section", label: "Past", count: sections.past.length, key: "sec-past" });
+    if (sections.past.length === 0) {
+      items.push({ type: "section-empty", label: "No past bookings", key: "empty-past" });
+    } else {
+      sections.past.forEach((b) => items.push({ type: "booking", booking: b, key: b.id }));
+    }
+
+    return items;
+  }, [isLoading, filtered.length, flatList, sections]);
+
+  const renderItem = ({ item }: { item: ListItem }) => {
+    if (item.type === "empty") {
+      return (
+        <View style={s.emptyWrap}>
+          <View style={s.emptyIcon}>
+            <Feather name="search" size={40} color={colors.mutedForeground} />
+          </View>
+          <Text style={s.emptyTitle}>No bookings found</Text>
+          <Text style={s.emptySubtitle}>
+            {hasActiveFilters
+              ? "Try adjusting your search or filters"
+              : "No bookings have been made yet"}
+          </Text>
+        </View>
+      );
+    }
+    if (item.type === "section") {
+      return <SectionDivider label={item.label} count={item.count} colors={colors} />;
+    }
+    if (item.type === "section-empty") {
+      return (
+        <View style={{ paddingHorizontal: 4, paddingBottom: 6 }}>
+          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, paddingBottom: 6, paddingLeft: 4 }}>
+            {item.label}
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <BookingCard
+        item={item.booking}
+        onPress={() => router.push(`/owner/booking/${item.booking.id}`)}
+        colors={colors}
+        s={s}
+      />
+    );
+  };
+
+  const Header = (
+    <View>
+      {/* Search bar */}
+      <View style={s.searchWrap}>
+        <View style={s.searchBox}>
+          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <TextInput
+            style={s.searchInput}
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name or booking ID…"
+            placeholderTextColor={colors.mutedForeground}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {search !== "" && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Period filter */}
+      <View style={s.filterSection}>
+        <Text style={s.filterLabel}>Period</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow}>
+          <View style={s.pillRow}>
+            {PERIOD_OPTIONS.map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[s.pill, period === p && s.pillActive]}
+                onPress={() => setPeriod(p)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.pillText, period === p && s.pillTextActive]}>{p}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Status filter */}
+        <Text style={[s.filterLabel, { marginTop: 6 }]}>Status</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow}>
+          <View style={s.pillRow}>
+            {STATUS_OPTIONS.map((st) => (
+              <TouchableOpacity
+                key={st}
+                style={[s.pill, statusFilter === st && s.pillActive]}
+                onPress={() => setStatusFilter(st)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.pillText, statusFilter === st && s.pillTextActive]}>
+                  {st === "All" ? "All Statuses" : (STATUS_LABELS[st] ?? st)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Venue filter — only shown when owner has more than one venue */}
+        {venues.length > 1 && (
+          <>
+            <Text style={[s.filterLabel, { marginTop: 6 }]}>Venue</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow}>
+              <View style={s.pillRow}>
+                <TouchableOpacity
+                  style={[s.pill, venueId === "ALL" && s.pillActive]}
+                  onPress={() => setVenueId("ALL")}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.pillText, venueId === "ALL" && s.pillTextActive]}>All Venues</Text>
+                </TouchableOpacity>
+                {venues.map((v) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={[s.pill, venueId === v.id && s.pillActive]}
+                    onPress={() => setVenueId(v.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.pillText, venueId === v.id && s.pillTextActive]}>{v.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </>
+        )}
+      </View>
+
+      {/* Result count + clear */}
+      <View style={s.divider} />
+      <View style={s.countRow}>
+        <Text style={s.countText}>
+          {isLoading ? "Loading…" : `${filtered.length} booking${filtered.length !== 1 ? "s" : ""}`}
+        </Text>
+        {hasActiveFilters && (
+          <TouchableOpacity
+            onPress={() => { setSearch(""); setPeriod("All"); setStatusFilter("All"); setVenueId("ALL"); }}
+          >
+            <Text style={s.clearText}>Clear filters</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.container}>
+      <FlatList
+        data={listData}
+        keyExtractor={(item) => item.key}
+        renderItem={renderItem}
+        ListHeaderComponent={Header}
+        contentContainerStyle={s.listContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+          />
+        }
+      />
+    </View>
+  );
+}
