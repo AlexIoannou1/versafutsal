@@ -263,7 +263,7 @@ export default function PlayerBookingsScreen() {
     sectionHeaderChevron: {
       marginLeft: "auto" as never,
     },
-    list: { paddingBottom: insets.bottom + 24 },
+    list: { paddingBottom: insets.bottom + 100 },
     cardWrap: { paddingHorizontal: 16, paddingBottom: 10 },
     card: {
       backgroundColor: colors.card,
