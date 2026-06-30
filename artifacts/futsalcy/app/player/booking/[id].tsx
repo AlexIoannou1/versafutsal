@@ -458,6 +458,30 @@ export default function PlayerBookingDetailScreen() {
             </View>
           )}
         </View>
+
+        <View style={{
+          marginHorizontal: 16,
+          marginBottom: 12,
+          backgroundColor: colors.primary + "12",
+          borderRadius: 10,
+          borderWidth: 1,
+          borderColor: colors.primary + "30",
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 10,
+          padding: 12,
+        }}>
+          <Feather name="info" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+          <Text style={{
+            flex: 1,
+            fontSize: 13,
+            fontFamily: "Inter_400Regular",
+            color: colors.foreground,
+            lineHeight: 19,
+          }}>
+            Need to make changes to this booking? Please contact the venue owner directly.
+          </Text>
+        </View>
       </ScrollView>
 
       <View style={s.bottomBar}>
