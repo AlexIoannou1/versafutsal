@@ -12,7 +12,7 @@ import {
   refundsTable,
   auditLogTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, lt, gt, inArray, desc } from "drizzle-orm";
+import { eq, and, gte, lte, lt, gt, inArray, desc, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 
@@ -878,6 +878,259 @@ router.get<{ id: string }>(
       res.json({ booking: enrichBooking(row) });
     } catch (err) {
       console.error("GET /owner/bookings/:id error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// PUT /owner/bookings/:id — Owner edits an upcoming CONFIRMED/PENDING booking
+router.put<{ id: string }>(
+  "/owner/bookings/:id",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const bookingId = req.params.id;
+      const { pitchId, startAt, guestName, guestPhone } = req.body as {
+        pitchId?: string;
+        startAt?: string;
+        guestName?: string | null;
+        guestPhone?: string | null;
+      };
+
+      if (!pitchId || !startAt) {
+        res.status(400).json({ error: "pitchId and startAt are required" });
+        return;
+      }
+
+      const newStartDate = new Date(startAt);
+      if (isNaN(newStartDate.getTime())) {
+        res.status(400).json({ error: "startAt must be a valid ISO 8601 timestamp" });
+        return;
+      }
+      if (newStartDate <= new Date()) {
+        res.status(400).json({ error: "Cannot reschedule a booking to a past or current time" });
+        return;
+      }
+
+      // Verify the booking belongs to one of the owner's venues
+      const ownerVenues = await db
+        .select({ id: venuesTable.id })
+        .from(venuesTable)
+        .where(eq(venuesTable.ownerId, req.user!.userId));
+
+      const ownerVenueIds = ownerVenues.map((v) => v.id);
+      if (ownerVenueIds.length === 0) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const [existingRow] = await db
+        .select({ booking: bookingsTable })
+        .from(bookingsTable)
+        .where(
+          and(
+            eq(bookingsTable.id, bookingId),
+            inArray(bookingsTable.venueId, ownerVenueIds),
+          ),
+        )
+        .limit(1);
+
+      if (!existingRow) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const existing = existingRow.booking;
+
+      if (existing.status !== "CONFIRMED" && existing.status !== "PENDING") {
+        res.status(400).json({ error: "Only CONFIRMED or PENDING bookings can be edited" });
+        return;
+      }
+      if (existing.startAt <= new Date()) {
+        res.status(400).json({ error: "Cannot edit a booking that has already started or passed" });
+        return;
+      }
+
+      // Verify new pitch belongs to one of the owner's venues
+      const ownerCheck = await assertOwnerOfPitch(pitchId, req.user!.userId, res);
+      if (!ownerCheck) return;
+      const { venueId: newVenueId } = ownerCheck;
+
+      // Load new pitch + venue details
+      const [pitchRow] = await db
+        .select({
+          id: pitchesTable.id,
+          venueId: pitchesTable.venueId,
+          slotDurationMinutes: pitchesTable.slotDurationMinutes,
+          name: pitchesTable.name,
+          type: pitchesTable.type,
+          size: pitchesTable.size,
+          venueStatus: venuesTable.status,
+          venueName: venuesTable.name,
+          venueDistrict: venuesTable.district,
+          venueAddress: venuesTable.address,
+          venueCancellationWindowHours: venuesTable.cancellationWindowHours,
+        })
+        .from(pitchesTable)
+        .innerJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+        .where(eq(pitchesTable.id, pitchId))
+        .limit(1);
+
+      if (!pitchRow) {
+        res.status(404).json({ error: "Pitch not found" });
+        return;
+      }
+
+      if (pitchRow.venueStatus !== "APPROVED") {
+        res.status(400).json({ error: "Venue is not open for booking" });
+        return;
+      }
+
+      // Validate startAt falls on a valid slot boundary
+      const dateStr = newStartDate.toISOString().slice(0, 10);
+      const dayOfWeek = newStartDate.getUTCDay();
+
+      const [hoursRow] = await db
+        .select()
+        .from(openingHoursTable)
+        .where(
+          and(
+            eq(openingHoursTable.venueId, newVenueId),
+            eq(openingHoursTable.dayOfWeek, dayOfWeek),
+          ),
+        )
+        .limit(1);
+
+      if (!hoursRow || hoursRow.isClosed) {
+        res.status(400).json({ error: "The venue is closed on this day" });
+        return;
+      }
+
+      const validSlots = generateSlots(dateStr, hoursRow.openTime, hoursRow.closeTime, pitchRow.slotDurationMinutes);
+      const validStartTimes = new Set(validSlots.map((s) => s.startAt));
+
+      if (!validStartTimes.has(newStartDate.toISOString())) {
+        res.status(400).json({ error: "The selected time is not a valid slot for this pitch." });
+        return;
+      }
+
+      const newEndDate = new Date(newStartDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
+
+      // Atomic update: conflict check (excluding self) + update, serializable to prevent races
+      let updated: typeof bookingsTable.$inferSelect;
+      try {
+        updated = await db.transaction(
+          async (tx) => {
+            // Maintenance block check
+            const conflictingBlock = await tx
+              .select({ id: maintenanceBlocksTable.id })
+              .from(maintenanceBlocksTable)
+              .where(
+                and(
+                  eq(maintenanceBlocksTable.pitchId, pitchId),
+                  lt(maintenanceBlocksTable.startAt, newEndDate),
+                  gt(maintenanceBlocksTable.endAt, newStartDate),
+                ),
+              )
+              .limit(1);
+
+            if (conflictingBlock.length > 0) {
+              throw Object.assign(new Error("maintenance_blocked"), { _type: "maintenance_blocked" });
+            }
+
+            // Active booking conflict check (excluding the booking being edited)
+            const conflictingBooking = await tx
+              .select({ id: bookingsTable.id })
+              .from(bookingsTable)
+              .where(
+                and(
+                  eq(bookingsTable.pitchId, pitchId),
+                  eq(bookingsTable.startAt, newStartDate),
+                  inArray(bookingsTable.status, ["PENDING", "CONFIRMED"]),
+                  ne(bookingsTable.id, bookingId),
+                ),
+              )
+              .limit(1);
+
+            if (conflictingBooking.length > 0) {
+              throw Object.assign(new Error("slot_taken"), { _type: "slot_taken" });
+            }
+
+            const [result] = await tx
+              .update(bookingsTable)
+              .set({
+                pitchId,
+                venueId: newVenueId,
+                startAt: newStartDate,
+                endAt: newEndDate,
+                ...(existing.guestName != null
+                  ? {
+                      guestName: guestName?.trim() ?? existing.guestName,
+                      guestPhone: guestPhone?.trim() ?? existing.guestPhone,
+                    }
+                  : {}),
+                updatedAt: new Date(),
+              })
+              .where(eq(bookingsTable.id, bookingId))
+              .returning();
+
+            return result!;
+          },
+          { isolationLevel: "serializable" },
+        );
+      } catch (err: unknown) {
+        if ((err as { _type?: string })?._type === "maintenance_blocked") {
+          res.status(409).json({ error: "This slot is blocked for maintenance. Please choose another time." });
+          return;
+        }
+        if ((err as { _type?: string })?._type === "slot_taken") {
+          res.status(409).json({ error: "Slot no longer available. Please choose another time." });
+          return;
+        }
+        const pgCode =
+          (err as { code?: string })?.code ??
+          (err as { cause?: { code?: string } })?.cause?.code;
+        if (pgCode === "23505" || pgCode === "40001") {
+          res.status(409).json({ error: "Slot no longer available. Please choose another time." });
+          return;
+        }
+        throw err;
+      }
+
+      // Reload the full enriched booking to return
+      const [fullRow] = await db
+        .select({
+          booking: bookingsTable,
+          venue: {
+            id: venuesTable.id,
+            name: venuesTable.name,
+            district: venuesTable.district,
+            address: venuesTable.address,
+          },
+          pitch: {
+            id: pitchesTable.id,
+            name: pitchesTable.name,
+            type: pitchesTable.type,
+            size: pitchesTable.size,
+            slotDurationMinutes: pitchesTable.slotDurationMinutes,
+          },
+          player: {
+            id: usersTable.id,
+            name: usersTable.name,
+            email: usersTable.email,
+          },
+        })
+        .from(bookingsTable)
+        .innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+        .innerJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+        .innerJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
+        .where(eq(bookingsTable.id, updated.id))
+        .limit(1);
+
+      res.json({ booking: enrichBooking(fullRow!) });
+    } catch (err) {
+      console.error("PUT /owner/bookings/:id error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
   },

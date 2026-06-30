@@ -180,6 +180,18 @@ export default function OwnerBookingDetailScreen() {
       fontFamily: "Inter_500Medium",
       color: colors.foreground,
     },
+    editBtn: {
+      borderRadius: 12,
+      height: 48,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.primary,
+    },
+    editBtnText: {
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.primaryForeground,
+    },
     dangerBtn: {
       borderRadius: 12,
       height: 48,
@@ -287,10 +299,12 @@ export default function OwnerBookingDetailScreen() {
   const hoursUntilStart =
     (new Date(booking.startAt).getTime() - Date.now()) / (1000 * 60 * 60);
   const withinWindow = hoursUntilStart >= windowHours;
+  const isUpcoming = new Date(booking.startAt) > new Date();
   // Manual bookings have no payment — owners can cancel them at any time.
   const canCancel = isManual
     ? booking.status === "CONFIRMED" || booking.status === "PENDING"
     : (booking.status === "CONFIRMED" || booking.status === "PENDING") && withinWindow;
+  const canEdit = isUpcoming && (booking.status === "CONFIRMED" || booking.status === "PENDING");
 
   async function handleConfirmCancel() {
     if (!id) return;
@@ -410,6 +424,15 @@ export default function OwnerBookingDetailScreen() {
       </ScrollView>
 
       <View style={s.bottomBar}>
+        {canEdit && (
+          <TouchableOpacity
+            style={s.editBtn}
+            onPress={() => router.push({ pathname: "/owner/booking-edit", params: { bookingId: id } })}
+            activeOpacity={0.8}
+          >
+            <Text style={s.editBtnText}>Edit Booking</Text>
+          </TouchableOpacity>
+        )}
         {canCancel && (
           <TouchableOpacity
             style={s.dangerBtn}

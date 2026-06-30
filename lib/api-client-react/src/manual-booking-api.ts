@@ -42,3 +42,32 @@ export function useCreateManualBooking() {
     },
   });
 }
+
+// ─── Update booking ────────────────────────────────────────────────────────────
+
+export interface UpdateOwnerBookingRequest {
+  id: string;
+  pitchId: string;
+  startAt: string;
+  guestName?: string;
+  guestPhone?: string;
+}
+
+async function updateOwnerBooking(
+  { id, ...body }: UpdateOwnerBookingRequest,
+): Promise<CreateManualBookingResponse> {
+  return customFetch<CreateManualBookingResponse>(`/api/owner/bookings/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function useUpdateOwnerBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateOwnerBookingRequest) => updateOwnerBooking(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/owner/bookings"] });
+    },
+  });
+}
