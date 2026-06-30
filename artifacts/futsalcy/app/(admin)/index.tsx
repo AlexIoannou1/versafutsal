@@ -187,7 +187,7 @@ export default function AdminSettingsScreen() {
       gap: 12,
     },
     feeInput: {
-      flex: 1,
+      width: 90,
       fontSize: 15,
       fontFamily: "Inter_500Medium",
       color: colors.foreground,
@@ -202,7 +202,6 @@ export default function AdminSettingsScreen() {
       fontSize: 15,
       fontFamily: "Inter_500Medium",
       color: colors.foreground,
-      flex: 1,
     },
     editBtn: {
       paddingHorizontal: 12,
