@@ -354,12 +354,12 @@ export default function OwnerDashboardScreen() {
         activeOpacity={0.7}
       >
         <View style={s.cardHeader}>
-          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, marginRight: 8 }}>
-            <Text style={[s.playerName, { flex: 0, flexShrink: 1 }]} numberOfLines={1}>
+          <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, marginRight: 8, minWidth: 0 }}>
+            <Text style={[s.playerName, { flex: 1, marginRight: 0, minWidth: 0 }]} numberOfLines={1}>
               {isManual ? guestName : (player?.name ?? player?.email ?? "Player")}
             </Text>
             {isManual && (
-              <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+              <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 }}>
                 <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>MANUAL</Text>
               </View>
             )}
