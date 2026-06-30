@@ -47,6 +47,14 @@ function RootLayoutNav() {
       <Stack.Screen name="(owner)" />
       <Stack.Screen name="(admin)" />
       <Stack.Screen
+        name="owner/booking-new"
+        options={{ headerShown: true, title: "New Booking" }}
+      />
+      <Stack.Screen
+        name="owner/booking-edit"
+        options={{ headerShown: true, title: "Edit Booking" }}
+      />
+      <Stack.Screen
         name="owner/venue-new"
         options={{ headerShown: true, title: "New Venue", presentation: "modal" }}
       />
