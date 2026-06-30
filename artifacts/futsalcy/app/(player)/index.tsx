@@ -342,7 +342,7 @@ export default function PlayerVenuesScreen() {
             style={s.filterToggleBtn}
             onPress={() => setShowFilters((v) => !v)}
           >
-            <Feather
+            <FeatherIcons
               name="sliders"
               size={16}
               color={activeFilterCount > 0 ? colors.primary : colors.foreground}
@@ -524,7 +524,7 @@ export default function PlayerVenuesScreen() {
                   <View style={s.pitchTypeRow}>
                     {item.pitchTypes.map((pt) => (
                       <View key={pt} style={s.pitchTypeChip}>
-                        <Feather
+                        <FeatherIcons
                           name={PITCH_TYPE_ICONS[pt] ?? "circle"}
                           size={11}
                           color={colors.primary}

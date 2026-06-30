@@ -492,7 +492,7 @@ export default function BookPitchScreen() {
           disabled={!selectedSlot}
           activeOpacity={0.8}
         >
-          <Feather
+          <FeatherIcons
             name="arrow-right"
             size={20}
             color={selectedSlot ? colors.primaryForeground : colors.mutedForeground}

@@ -425,7 +425,7 @@ export default function OwnerBookingNewScreen() {
             }}
             activeOpacity={0.7}
           >
-            <Feather
+            <FeatherIcons
               name="home"
               size={18}
               color={selectedVenue?.id === venue.id ? colors.primary : colors.mutedForeground}
@@ -459,7 +459,7 @@ export default function OwnerBookingNewScreen() {
                   onPress={() => setSelectedPitch({ id: pitch.id, name: pitch.name, slotDurationMinutes: pitch.slotDurationMinutes })}
                   activeOpacity={0.7}
                 >
-                  <Feather
+                  <FeatherIcons
                     name="grid"
                     size={18}
                     color={selectedPitch?.id === pitch.id ? colors.primary : colors.mutedForeground}

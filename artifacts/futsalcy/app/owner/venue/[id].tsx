@@ -715,7 +715,7 @@ export default function OwnerVenueDetailScreen() {
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Status Banner */}
         <View style={[s.statusBanner, { backgroundColor: statusColor + "20" }]}>
-          <Feather
+          <FeatherIcons
             name={venue.status === "APPROVED" ? "check-circle" : venue.status === "REJECTED" ? "x-circle" : "clock"}
             size={20}
             color={statusColor}

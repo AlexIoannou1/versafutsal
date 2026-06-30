@@ -579,7 +579,7 @@ export default function VenueNewScreen() {
                     ]}
                     onPress={() => setPitchType(t.key)}
                   >
-                    <Feather
+                    <FeatherIcons
                       name={t.icon}
                       size={18}
                       color={active ? colors.primary : colors.mutedForeground}
@@ -593,7 +593,7 @@ export default function VenueNewScreen() {
                       {t.label}
                     </Text>
                     {active && (
-                      <Feather
+                      <FeatherIcons
                         name="check-circle"
                         size={16}
                         color={colors.primary}

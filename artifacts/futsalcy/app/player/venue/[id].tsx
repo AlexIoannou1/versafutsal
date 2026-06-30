@@ -354,7 +354,7 @@ export default function PlayerVenueDetailScreen() {
                 <View style={s.pitchRow}>
                   <Text style={s.pitchName}>{pitch.name}</Text>
                   <View style={s.pitchTypeBadge}>
-                    <Feather
+                    <FeatherIcons
                       name={TYPE_ICONS[pitch.type] ?? "circle"}
                       size={12}
                       color={colors.foreground}

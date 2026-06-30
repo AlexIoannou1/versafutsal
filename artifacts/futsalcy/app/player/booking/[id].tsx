@@ -369,7 +369,7 @@ export default function PlayerBookingDetailScreen() {
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.successBanner}>
           <View style={[s.successIcon, { backgroundColor: statusColor + "20" }]}>
-            <Feather
+            <FeatherIcons
               name={
                 booking.status === "CANCELLED" || booking.status === "REFUNDED"
                   ? "x-circle"
