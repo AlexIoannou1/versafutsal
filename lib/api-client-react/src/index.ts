@@ -8,9 +8,11 @@ export type {
   UpdateProfileResponse,
   ChangePasswordRequest,
 } from "./profile-api";
-export { useCreateManualBooking, useUpdateOwnerBooking } from "./manual-booking-api";
+export { useCreateManualBooking, useUpdateOwnerBooking, useGetOwnerBookingAudit } from "./manual-booking-api";
 export type {
   CreateManualBookingRequest,
   CreateManualBookingResponse,
   UpdateOwnerBookingRequest,
+  AuditLogEntry,
+  GetOwnerBookingAuditResponse,
 } from "./manual-booking-api";

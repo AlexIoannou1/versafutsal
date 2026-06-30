@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
 
 export interface CreateManualBookingRequest {
@@ -69,5 +69,31 @@ export function useUpdateOwnerBooking() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["/api/owner/bookings"] });
     },
+  });
+}
+
+// ─── Booking Audit Log ────────────────────────────────────────────────────────
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  actorUserId: string | null;
+}
+
+export interface GetOwnerBookingAuditResponse {
+  entries: AuditLogEntry[];
+}
+
+async function getOwnerBookingAudit(bookingId: string): Promise<GetOwnerBookingAuditResponse> {
+  return customFetch<GetOwnerBookingAuditResponse>(`/api/owner/bookings/${bookingId}/audit`);
+}
+
+export function useGetOwnerBookingAudit(bookingId: string) {
+  return useQuery({
+    queryKey: ["ownerBookingAudit", bookingId],
+    queryFn: () => getOwnerBookingAudit(bookingId),
+    enabled: !!bookingId,
   });
 }

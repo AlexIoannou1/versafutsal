@@ -18,7 +18,9 @@ import { useColors } from "@/hooks/useColors";
 import {
   useGetOwnerBooking,
   useCancelBooking,
+  useGetOwnerBookingAudit,
 } from "@workspace/api-client-react";
+import type { AuditLogEntry } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -36,6 +38,94 @@ const STATUS_LABELS: Record<string, string> = {
   REFUNDED: "Refunded",
   NO_SHOW: "No Show",
 };
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function getAuditActionMeta(action: string, metadata: Record<string, unknown>) {
+  switch (action) {
+    case "MANUAL_BOOKING_CREATED":
+      return { icon: "plus-circle" as const, color: "#00C851", label: "Manual booking created" };
+    case "BOOKING_EDITED": {
+      const changes = metadata.changes as Record<string, unknown> | undefined;
+      const parts: string[] = [];
+      if (changes?.startAt) parts.push("time");
+      if (changes?.pitchId) parts.push("pitch");
+      if (changes?.guestName || changes?.guestPhone) parts.push("guest details");
+      const detail = parts.length > 0 ? ` — ${parts.join(", ")} changed` : "";
+      return { icon: "edit-2" as const, color: "#F59E0B", label: `Booking edited${detail}` };
+    }
+    case "BOOKING_CANCELLED":
+      return { icon: "x-circle" as const, color: "#EF4444", label: "Booking cancelled" };
+    case "BOOKING_CREATED":
+      return { icon: "check-circle" as const, color: "#6366F1", label: "Booking created" };
+    case "BOOKING_CONFIRMED":
+      return { icon: "check-circle" as const, color: "#00C851", label: "Booking confirmed" };
+    case "BOOKING_REFUNDED":
+      return { icon: "rotate-ccw" as const, color: "#6366F1", label: "Booking refunded" };
+    default:
+      return {
+        icon: "clock" as const,
+        color: "#6B7280",
+        label: action.toLowerCase().replace(/_/g, " "),
+      };
+  }
+}
+
+type AuditEntryRowProps = {
+  entry: AuditLogEntry;
+  isFirst: boolean;
+  borderColor: string;
+  foreground: string;
+  muted: string;
+};
+
+function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: AuditEntryRowProps) {
+  const { icon, color, label } = getAuditActionMeta(entry.action, entry.metadata);
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        borderTopWidth: isFirst ? 0 : 1,
+        borderTopColor: borderColor,
+      }}
+    >
+      <View
+        style={{
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          backgroundColor: color + "20",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Feather name={icon} size={13} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: foreground }}>
+          {label}
+        </Text>
+        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: muted, marginTop: 2 }}>
+          {timeAgo(entry.createdAt)}
+        </Text>
+      </View>
+    </View>
+  );
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -67,6 +157,9 @@ export default function OwnerBookingDetailScreen() {
   const { data, isLoading, error } = useGetOwnerBooking(id!);
   const booking = data?.booking;
   const cancelMutation = useCancelBooking();
+
+  const { data: auditData, isLoading: auditLoading } = useGetOwnerBookingAudit(id ?? "");
+  const auditEntries = auditData?.entries ?? [];
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -420,6 +513,33 @@ export default function OwnerBookingDetailScreen() {
             <Text style={s.rowLabel}>Created</Text>
             <Text style={s.rowValue}>{formatDate(booking.createdAt)}</Text>
           </View>
+        </View>
+
+        {/* Activity / Audit Trail */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Activity</Text>
+          {auditLoading ? (
+            <View style={[s.row, s.rowFirst, { justifyContent: "center" }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : auditEntries.length === 0 ? (
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={[s.rowValue, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+                No activity recorded yet
+              </Text>
+            </View>
+          ) : (
+            auditEntries.map((entry, i) => (
+              <AuditEntryRow
+                key={entry.id}
+                entry={entry}
+                isFirst={i === 0}
+                borderColor={colors.border}
+                foreground={colors.foreground}
+                muted={colors.mutedForeground}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
 

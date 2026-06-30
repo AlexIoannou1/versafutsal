@@ -706,6 +706,21 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), a
       throw err;
     }
 
+    // Write audit log entry — fire-and-forget so a log failure never blocks the response
+    db.insert(auditLogTable).values({
+      actorUserId: req.user!.userId,
+      entityType: "BOOKING",
+      entityId: booking.id,
+      action: "MANUAL_BOOKING_CREATED",
+      metadata: {
+        guestName: guestName.trim(),
+        guestPhone: guestPhone.trim(),
+        pitchId,
+        startAt: booking.startAt.toISOString(),
+        actorEmail: req.user!.email,
+      },
+    }).catch((e) => console.error("audit log insert failed (MANUAL_BOOKING_CREATED):", e));
+
     res.status(201).json({
       booking: {
         ...booking,
@@ -816,6 +831,70 @@ router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (re
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// GET /owner/bookings/:id/audit — Fetch audit trail for a booking (owner must own the venue)
+router.get<{ id: string }>(
+  "/owner/bookings/:id/audit",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const bookingId = req.params.id;
+
+      // Verify the booking belongs to one of the owner's venues
+      const ownerVenues = await db
+        .select({ id: venuesTable.id })
+        .from(venuesTable)
+        .where(eq(venuesTable.ownerId, req.user!.userId));
+
+      const venueIds = ownerVenues.map((v) => v.id);
+      if (venueIds.length === 0) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const [bookingCheck] = await db
+        .select({ id: bookingsTable.id })
+        .from(bookingsTable)
+        .where(
+          and(
+            eq(bookingsTable.id, bookingId),
+            inArray(bookingsTable.venueId, venueIds),
+          ),
+        )
+        .limit(1);
+
+      if (!bookingCheck) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const entries = await db
+        .select()
+        .from(auditLogTable)
+        .where(
+          and(
+            eq(auditLogTable.entityType, "BOOKING"),
+            eq(auditLogTable.entityId, bookingId),
+          ),
+        )
+        .orderBy(desc(auditLogTable.createdAt));
+
+      res.json({
+        entries: entries.map((e) => ({
+          id: e.id,
+          action: e.action,
+          metadata: e.metadata,
+          createdAt: e.createdAt.toISOString(),
+          actorUserId: e.actorUserId,
+        })),
+      });
+    } catch (err) {
+      console.error("GET /owner/bookings/:id/audit error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // GET /owner/bookings/:id — single booking detail (owner must own the venue)
 router.get<{ id: string }>(
@@ -1127,6 +1206,31 @@ router.put<{ id: string }>(
         .innerJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
         .where(eq(bookingsTable.id, updated.id))
         .limit(1);
+
+      // Write audit log entry for the edit — fire-and-forget
+      const auditChanges: Record<string, { from: unknown; to: unknown }> = {};
+      if (existing.pitchId !== updated.pitchId) {
+        auditChanges.pitchId = { from: existing.pitchId, to: updated.pitchId };
+      }
+      if (existing.startAt.toISOString() !== updated.startAt.toISOString()) {
+        auditChanges.startAt = { from: existing.startAt.toISOString(), to: updated.startAt.toISOString() };
+      }
+      if (existing.guestName !== updated.guestName) {
+        auditChanges.guestName = { from: existing.guestName, to: updated.guestName };
+      }
+      if (existing.guestPhone !== updated.guestPhone) {
+        auditChanges.guestPhone = { from: existing.guestPhone, to: updated.guestPhone };
+      }
+      db.insert(auditLogTable).values({
+        actorUserId: req.user!.userId,
+        entityType: "BOOKING",
+        entityId: updated.id,
+        action: "BOOKING_EDITED",
+        metadata: {
+          changes: auditChanges,
+          actorEmail: req.user!.email,
+        },
+      }).catch((e) => console.error("audit log insert failed (BOOKING_EDITED):", e));
 
       res.json({ booking: enrichBooking(fullRow!) });
     } catch (err) {

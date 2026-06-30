@@ -45,6 +45,8 @@ export const auditActionEnum = pgEnum("audit_action", [
   "VENUE_REJECTED",
   "FEE_WAIVED",
   "USER_CREATED",
+  "MANUAL_BOOKING_CREATED",
+  "BOOKING_EDITED",
 ]);
 
 export const auditLogTable = pgTable("audit_log", {
