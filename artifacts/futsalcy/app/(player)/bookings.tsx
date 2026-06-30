@@ -13,7 +13,7 @@ import {
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useListPlayerBookings } from "@workspace/api-client-react";
 
@@ -311,7 +311,7 @@ export default function PlayerBookingsScreen() {
             style={s.filterToggleBtn}
             onPress={() => setFiltersExpanded((v) => !v)}
           >
-            <Feather name="filter" size={14} color={hasActiveFilters ? colors.primary : colors.foreground} />
+            <FeatherIcons name="filter" size={14} color={hasActiveFilters ? colors.primary : colors.foreground} />
             <Text style={s.filterToggleText}>Filters</Text>
             {activeFilterCount > 0 && (
               <Text style={s.filterCount}>{activeFilterCount}</Text>
@@ -359,13 +359,13 @@ export default function PlayerBookingsScreen() {
                       setShowFromPicker((v) => !v);
                     }}
                   >
-                    <Feather name="calendar" size={14} color={colors.mutedForeground} />
+                    <FeatherIcons name="calendar" size={14} color={colors.mutedForeground} />
                     <Text style={[s.dateBtnText, !dateFrom && s.dateBtnPlaceholder]}>
                       {dateFrom ? formatPickerDate(dateFrom) : "From"}
                     </Text>
                     {dateFrom && (
                       <TouchableOpacity onPress={() => { setDateFrom(null); setShowFromPicker(false); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Feather name="x" size={13} color={colors.mutedForeground} />
+                        <FeatherIcons name="x" size={13} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     )}
                   </TouchableOpacity>
@@ -380,13 +380,13 @@ export default function PlayerBookingsScreen() {
                       setShowToPicker((v) => !v);
                     }}
                   >
-                    <Feather name="calendar" size={14} color={colors.mutedForeground} />
+                    <FeatherIcons name="calendar" size={14} color={colors.mutedForeground} />
                     <Text style={[s.dateBtnText, !dateTo && s.dateBtnPlaceholder]}>
                       {dateTo ? formatPickerDate(dateTo) : "To"}
                     </Text>
                     {dateTo && (
                       <TouchableOpacity onPress={() => { setDateTo(null); setShowToPicker(false); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Feather name="x" size={13} color={colors.mutedForeground} />
+                        <FeatherIcons name="x" size={13} color={colors.mutedForeground} />
                       </TouchableOpacity>
                     )}
                   </TouchableOpacity>
@@ -456,7 +456,7 @@ export default function PlayerBookingsScreen() {
       {sections.length === 0 ? (
         <View style={s.center}>
           <View style={s.emptyIcon}>
-            <Feather name="calendar" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="calendar" size={28} color={colors.mutedForeground} />
           </View>
           <Text style={s.emptyTitle}>
             {hasActiveFilters ? "No matches" : "No bookings yet"}
@@ -508,11 +508,11 @@ export default function PlayerBookingsScreen() {
                     </View>
                   </View>
                   <View style={s.pitchRow}>
-                    <Feather name="grid" size={13} color={colors.mutedForeground} />
+                    <FeatherIcons name="grid" size={13} color={colors.mutedForeground} />
                     <Text style={s.pitchText}>{pitch?.name ?? "Pitch"}</Text>
                   </View>
                   <View style={s.timeRow}>
-                    <Feather name="calendar" size={13} color={colors.mutedForeground} />
+                    <FeatherIcons name="calendar" size={13} color={colors.mutedForeground} />
                     <Text style={s.timeText}>
                       {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
                     </Text>

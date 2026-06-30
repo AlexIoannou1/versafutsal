@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useListOwnerBookings } from "@workspace/api-client-react";
 import type { BookingStatus } from "@workspace/api-client-react";
@@ -158,13 +158,13 @@ function BookingCard({
         </View>
       </View>
       <View style={s.metaRow}>
-        <Feather name="grid" size={12} color={colors.mutedForeground} />
+        <FeatherIcons name="grid" size={12} color={colors.mutedForeground} />
         <Text style={s.metaText} numberOfLines={1}>
           {venue?.name ?? ""}{pitch?.name ? ` · ${pitch.name}` : ""}
         </Text>
       </View>
       <View style={s.metaRow}>
-        <Feather name="calendar" size={12} color={colors.mutedForeground} />
+        <FeatherIcons name="calendar" size={12} color={colors.mutedForeground} />
         <Text style={s.metaText}>
           {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
         </Text>
@@ -390,7 +390,7 @@ export default function OwnerBookingsScreen() {
       {/* Search */}
       <View style={s.searchWrap}>
         <View style={s.searchBox}>
-          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <FeatherIcons name="search" size={16} color={colors.mutedForeground} />
           <TextInput
             style={s.searchInput}
             value={search}
@@ -402,7 +402,7 @@ export default function OwnerBookingsScreen() {
           />
           {search !== "" && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Feather name="x" size={14} color={colors.mutedForeground} />
+              <FeatherIcons name="x" size={14} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -522,7 +522,7 @@ export default function OwnerBookingsScreen() {
           ListHeaderComponent={ListHeader}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
-              <Feather name="search" size={40} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
+              <FeatherIcons name="search" size={40} color={colors.mutedForeground} style={{ opacity: 0.4 }} />
               <Text style={s.emptyTitle}>No bookings found</Text>
               <Text style={s.emptySubtitle}>
                 {hasActiveFilters

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -430,7 +430,7 @@ export default function BookSummaryScreen() {
         {/* Hero */}
         <View style={s.heroBanner}>
           <View style={s.heroIcon}>
-            <Feather name="credit-card" size={28} color={colors.primary} />
+            <FeatherIcons name="credit-card" size={28} color={colors.primary} />
           </View>
           <Text style={s.heroTitle}>Complete your booking</Text>
           <Text style={s.heroSub}>Review and pay to confirm your slot.</Text>
@@ -440,17 +440,17 @@ export default function BookSummaryScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>Venue</Text>
           <View style={[s.row, s.rowFirst]}>
-            <View style={s.rowIcon}><Feather name="home" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="home" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Name</Text>
             <Text style={s.rowValue} numberOfLines={2}>{venue?.name ?? "—"}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}><Feather name="map-pin" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="map-pin" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>District</Text>
             <Text style={s.rowValue}>{venue?.district ?? "—"}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}><Feather name="navigation" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="navigation" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Address</Text>
             <Text style={s.rowValue} numberOfLines={2}>{venue?.address ?? "—"}</Text>
           </View>
@@ -460,17 +460,17 @@ export default function BookSummaryScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>Booking Details</Text>
           <View style={[s.row, s.rowFirst]}>
-            <View style={s.rowIcon}><Feather name="grid" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="grid" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Pitch</Text>
             <Text style={s.rowValue}>{decodedPitchName}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}><Feather name="calendar" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="calendar" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Date</Text>
             <Text style={s.rowValue}>{decodedStartAt ? formatFullDate(decodedStartAt) : "—"}</Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}><Feather name="clock" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="clock" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Time</Text>
             <Text style={s.rowValue}>
               {decodedStartAt && decodedEndAt
@@ -479,7 +479,7 @@ export default function BookSummaryScreen() {
             </Text>
           </View>
           <View style={s.row}>
-            <View style={s.rowIcon}><Feather name="watch" size={14} color={colors.mutedForeground} /></View>
+            <View style={s.rowIcon}><FeatherIcons name="watch" size={14} color={colors.mutedForeground} /></View>
             <Text style={s.rowLabel}>Duration</Text>
             <Text style={s.rowValue}>{slotMinutes} minutes</Text>
           </View>
@@ -550,7 +550,7 @@ export default function BookSummaryScreen() {
 
         {/* Cancellation Policy */}
         <View style={s.disclaimerCard}>
-          <Feather name="shield" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
+          <FeatherIcons name="shield" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
           <Text style={s.disclaimerText}>
             Secure payment via MockPaymentProvider. Cancellations made within{" "}
             {venue?.cancellationWindowHours ?? 48} hours of the booking may incur a fee.
@@ -567,7 +567,7 @@ export default function BookSummaryScreen() {
             onPress={() => router.back()}
             activeOpacity={0.85}
           >
-            <Feather name="refresh-cw" size={18} color={colors.primaryForeground} />
+            <FeatherIcons name="refresh-cw" size={18} color={colors.primaryForeground} />
             <Text style={s.primaryBtnText}>Choose Another Slot</Text>
           </TouchableOpacity>
         ) : (
@@ -582,7 +582,7 @@ export default function BookSummaryScreen() {
                 <ActivityIndicator color={colors.primaryForeground} />
               ) : (
                 <>
-                  <Feather name="lock" size={18} color={colors.primaryForeground} />
+                  <FeatherIcons name="lock" size={18} color={colors.primaryForeground} />
                   <Text style={s.primaryBtnText}>
                     {checkoutError ? "Retry Payment" : "Pay Now"}
                     {totalDue != null ? ` · €${totalDue.toFixed(2)}` : ""}

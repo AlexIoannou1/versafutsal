@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useListOwnerBookings } from "@workspace/api-client-react";
 
@@ -464,7 +464,7 @@ export default function OwnerCalendarScreen() {
           zIndex: 10,
         }}
       >
-        <Feather name="plus" size={26} color="#fff" />
+        <FeatherIcons name="plus" size={26} color="#fff" />
       </TouchableOpacity>
 
       {/* Toolbar */}
@@ -485,11 +485,11 @@ export default function OwnerCalendarScreen() {
 
         <View style={s.navRow}>
           <TouchableOpacity style={s.navBtn} onPress={() => navigate(-1)}>
-            <Feather name="chevron-left" size={16} color={colors.foreground} />
+            <FeatherIcons name="chevron-left" size={16} color={colors.foreground} />
           </TouchableOpacity>
           <Text style={s.navLabel} numberOfLines={1}>{navLabel()}</Text>
           <TouchableOpacity style={s.navBtn} onPress={() => navigate(1)}>
-            <Feather name="chevron-right" size={16} color={colors.foreground} />
+            <FeatherIcons name="chevron-right" size={16} color={colors.foreground} />
           </TouchableOpacity>
           <TouchableOpacity style={s.todayBtn} onPress={goToday}>
             <Text style={s.todayBtnText}>Today</Text>

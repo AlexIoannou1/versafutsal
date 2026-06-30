@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useAdminListBookings } from "@workspace/api-client-react";
 
@@ -314,7 +314,7 @@ export default function AdminBookingsScreen() {
       {/* Search row + filter toggle */}
       <View style={s.searchRow}>
         <View style={s.searchInput}>
-          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <FeatherIcons name="search" size={16} color={colors.mutedForeground} />
           <TextInput
             style={s.searchText}
             value={search}
@@ -324,7 +324,7 @@ export default function AdminBookingsScreen() {
           />
           {search !== "" && (
             <TouchableOpacity onPress={() => setSearch("")}>
-              <Feather name="x" size={16} color={colors.mutedForeground} />
+              <FeatherIcons name="x" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -332,7 +332,7 @@ export default function AdminBookingsScreen() {
           style={s.filterToggleBtn}
           onPress={() => setFiltersExpanded((v) => !v)}
         >
-          <Feather name="sliders" size={16} color={hasActiveFilters ? colors.primary : colors.foreground} />
+          <FeatherIcons name="sliders" size={16} color={hasActiveFilters ? colors.primary : colors.foreground} />
         </TouchableOpacity>
       </View>
 
@@ -393,7 +393,7 @@ export default function AdminBookingsScreen() {
           <View>
             <Text style={s.filterLabel}>Player Name / Email</Text>
             <View style={s.playerSearchRow}>
-              <Feather name="user" size={14} color={colors.mutedForeground} />
+              <FeatherIcons name="user" size={14} color={colors.mutedForeground} />
               <TextInput
                 style={s.playerSearchText}
                 value={selectedPlayerSearch}
@@ -403,7 +403,7 @@ export default function AdminBookingsScreen() {
               />
               {selectedPlayerSearch !== "" && (
                 <TouchableOpacity onPress={() => setSelectedPlayerSearch("")}>
-                  <Feather name="x" size={14} color={colors.mutedForeground} />
+                  <FeatherIcons name="x" size={14} color={colors.mutedForeground} />
                 </TouchableOpacity>
               )}
             </View>
@@ -465,7 +465,7 @@ export default function AdminBookingsScreen() {
         </View>
       ) : filtered.length === 0 ? (
         <View style={s.emptyWrap}>
-          <Feather name="calendar" size={32} color={colors.mutedForeground} />
+          <FeatherIcons name="calendar" size={32} color={colors.mutedForeground} />
           <Text style={s.emptyText}>No bookings found</Text>
           <Text style={s.emptySub}>
             {hasActiveFilters ? "Try adjusting your filters." : "No bookings have been made yet."}
@@ -505,17 +505,17 @@ export default function AdminBookingsScreen() {
                   </View>
                 </View>
                 <View style={s.metaRow}>
-                  <Feather name="user" size={12} color={colors.mutedForeground} />
+                  <FeatherIcons name="user" size={12} color={colors.mutedForeground} />
                   <Text style={s.metaText}>
                     {player?.name ?? player?.email ?? "Player"}
                   </Text>
                 </View>
                 <View style={s.metaRow}>
-                  <Feather name="grid" size={12} color={colors.mutedForeground} />
+                  <FeatherIcons name="grid" size={12} color={colors.mutedForeground} />
                   <Text style={s.metaText}>{pitch?.name ?? "Pitch"}</Text>
                 </View>
                 <View style={s.metaRow}>
-                  <Feather name="calendar" size={12} color={colors.mutedForeground} />
+                  <FeatherIcons name="calendar" size={12} color={colors.mutedForeground} />
                   <Text style={s.metaText}>
                     {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
                   </Text>

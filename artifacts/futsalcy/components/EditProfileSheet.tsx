@@ -12,7 +12,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { updateProfile, changePassword } from "@workspace/api-client-react";
@@ -239,7 +239,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
           <View style={s.header}>
             <Text style={s.title}>Edit Profile</Text>
             <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={colors.mutedForeground} />
+              <FeatherIcons name="x" size={22} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
 
@@ -324,7 +324,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       secureTextEntry={!showCurrent}
                     />
                     <TouchableOpacity style={s.eyeBtn} onPress={() => setShowCurrent((v) => !v)}>
-                      <Feather name={showCurrent ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
+                      <FeatherIcons name={showCurrent ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -341,7 +341,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       secureTextEntry={!showNew}
                     />
                     <TouchableOpacity style={s.eyeBtn} onPress={() => setShowNew((v) => !v)}>
-                      <Feather name={showNew ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
+                      <FeatherIcons name={showNew ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
                 </View>

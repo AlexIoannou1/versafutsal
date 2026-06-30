@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import { useQueryClient } from "@tanstack/react-query";
@@ -764,7 +764,7 @@ export default function OwnerVenueDetailScreen() {
           <View style={s.sectionHeader}>
             <Text style={s.sectionTitle}>Venue Details</Text>
             <TouchableOpacity style={s.editBtn} onPress={openEditModal}>
-              <Feather name="edit-2" size={14} color={colors.primary} />
+              <FeatherIcons name="edit-2" size={14} color={colors.primary} />
               <Text style={s.editBtnText}>Edit</Text>
             </TouchableOpacity>
           </View>
@@ -811,12 +811,12 @@ export default function OwnerVenueDetailScreen() {
           <Text style={[s.sectionTitle, { marginBottom: 12 }]}>Photos ({venue.photos.length})</Text>
           {venue.photos.map((photo) => (
             <View key={photo.id} style={s.photoRow}>
-              <Feather name="image" size={16} color={colors.mutedForeground} />
+              <FeatherIcons name="image" size={16} color={colors.mutedForeground} />
               <Text style={s.photoUrl} numberOfLines={1}>
                 {photo.url}
               </Text>
               <TouchableOpacity onPress={() => handleDeletePhoto(photo.id)}>
-                <Feather name="trash-2" size={16} color={colors.destructive} />
+                <FeatherIcons name="trash-2" size={16} color={colors.destructive} />
               </TouchableOpacity>
             </View>
           ))}
@@ -872,25 +872,25 @@ export default function OwnerVenueDetailScreen() {
               )}
               <View style={s.pitchActions}>
                 <TouchableOpacity style={s.pitchActionBtn} onPress={() => openPricingModal(pitch)}>
-                  <Feather name="dollar-sign" size={12} color={colors.foreground} />
+                  <FeatherIcons name="dollar-sign" size={12} color={colors.foreground} />
                   <Text style={s.pitchActionText}>Set Pricing</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.pitchActionBtn, { borderColor: colors.primary + "60" }]} onPress={() => openBlockModal(pitch)}>
-                  <Feather name="slash" size={12} color={colors.primary} />
+                  <FeatherIcons name="slash" size={12} color={colors.primary} />
                   <Text style={[s.pitchActionText, { color: colors.primary }]}>Maintenance</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.pitchActionBtn, { borderColor: colors.destructive + "40" }]}
                   onPress={() => handleDeletePitch(pitch.id, pitch.name)}
                 >
-                  <Feather name="trash-2" size={12} color={colors.destructive} />
+                  <FeatherIcons name="trash-2" size={12} color={colors.destructive} />
                   <Text style={[s.pitchActionText, { color: colors.destructive }]}>Delete</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ))}
           <TouchableOpacity style={s.addBtn} onPress={openPitchModal}>
-            <Feather name="plus" size={16} color={colors.primary} />
+            <FeatherIcons name="plus" size={16} color={colors.primary} />
             <Text style={s.addBtnText}>Add Pitch</Text>
           </TouchableOpacity>
         </View>
@@ -1084,7 +1084,7 @@ export default function OwnerVenueDetailScreen() {
                       {blk.reason && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>{blk.reason}</Text>}
                     </View>
                     <TouchableOpacity onPress={() => handleDeleteBlock(blk.id, blockModalPitch.id)} style={{ padding: 6 }}>
-                      <Feather name="trash-2" size={14} color={colors.destructive} />
+                      <FeatherIcons name="trash-2" size={14} color={colors.destructive} />
                     </TouchableOpacity>
                   </View>
                 ))}

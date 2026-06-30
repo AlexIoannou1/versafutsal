@@ -2,7 +2,7 @@ import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
@@ -72,28 +72,28 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: "Admin",
-          tabBarIcon: ({ color }) => <Feather name="shield" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <FeatherIcons name="shield" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="venues"
         options={{
           title: "Venue Approvals",
-          tabBarIcon: ({ color }) => <Feather name="check-square" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <FeatherIcons name="check-square" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="bookings"
         options={{
           title: "Bookings",
-          tabBarIcon: ({ color }) => <Feather name="list" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <FeatherIcons name="list" size={22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <FeatherIcons name="user" size={22} color={color} />,
         }}
       />
     </Tabs>

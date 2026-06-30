@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useListVenues, type VenueSummary } from "@workspace/api-client-react";
 
@@ -323,7 +323,7 @@ export default function PlayerVenuesScreen() {
         {/* Search bar + filter toggle always visible */}
         <View style={s.searchRow}>
           <View style={s.searchInput}>
-            <Feather name="search" size={16} color={colors.mutedForeground} />
+            <FeatherIcons name="search" size={16} color={colors.mutedForeground} />
             <TextInput
               style={s.searchTextField}
               value={search}
@@ -333,7 +333,7 @@ export default function PlayerVenuesScreen() {
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch("")}>
-                <Feather name="x" size={16} color={colors.mutedForeground} />
+                <FeatherIcons name="x" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
             )}
           </View>
@@ -471,7 +471,7 @@ export default function PlayerVenuesScreen() {
       ) : venues.length === 0 ? (
         <View style={s.center}>
           <View style={s.emptyIcon}>
-            <Feather name="search" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="search" size={28} color={colors.mutedForeground} />
           </View>
           <Text style={s.emptyTitle}>No venues found</Text>
           <Text style={s.emptySub}>
@@ -508,7 +508,7 @@ export default function PlayerVenuesScreen() {
                 />
               ) : (
                 <View style={s.imagePlaceholder}>
-                  <Feather name="image" size={32} color={colors.mutedForeground} />
+                  <FeatherIcons name="image" size={32} color={colors.mutedForeground} />
                 </View>
               )}
               <View style={s.cardBody}>
@@ -516,7 +516,7 @@ export default function PlayerVenuesScreen() {
                   {item.name}
                 </Text>
                 <View style={s.cardMeta}>
-                  <Feather name="map-pin" size={13} color={colors.mutedForeground} />
+                  <FeatherIcons name="map-pin" size={13} color={colors.mutedForeground} />
                   <Text style={s.cardMetaText}>{item.district}</Text>
                 </View>
 

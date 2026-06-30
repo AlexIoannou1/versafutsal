@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
@@ -287,7 +287,7 @@ export default function AdminSettingsScreen() {
           {/* Fee Enabled Toggle */}
           <View style={[s.row, s.rowBorder]}>
             <View style={s.rowIcon}>
-              <Feather name="toggle-right" size={18} color={colors.primary} />
+              <FeatherIcons name="toggle-right" size={18} color={colors.primary} />
             </View>
             <View style={s.rowContent}>
               <Text style={s.rowLabel}>Charge Convenience Fee</Text>
@@ -307,7 +307,7 @@ export default function AdminSettingsScreen() {
           {/* Fee Amount */}
           <View style={s.feeRow}>
             <View style={s.rowIcon}>
-              <Feather name="euro" size={18} color={colors.primary} />
+              <FeatherIcons name="euro" size={18} color={colors.primary} />
             </View>
             <View style={s.rowContent}>
               <Text style={s.rowLabel}>Fee Amount</Text>
@@ -332,7 +332,7 @@ export default function AdminSettingsScreen() {
                     setFeeAmountInput(String(settings?.feeAmount ?? "1.00"));
                   }}
                 >
-                  <Feather name="x" size={18} color={colors.mutedForeground} />
+                  <FeatherIcons name="x" size={18} color={colors.mutedForeground} />
                 </TouchableOpacity>
               </View>
             ) : (
@@ -387,7 +387,7 @@ export default function AdminSettingsScreen() {
                   onPress={() => handleVenueOverride(venue.id, override)}
                   activeOpacity={0.7}
                 >
-                  <Feather name="map-pin" size={14} color={colors.mutedForeground} />
+                  <FeatherIcons name="map-pin" size={14} color={colors.mutedForeground} />
                   <Text style={s.venueName} numberOfLines={1}>
                     {venue.name} · {venue.district}
                   </Text>
@@ -401,7 +401,7 @@ export default function AdminSettingsScreen() {
                       {overrideLabel}
                     </Text>
                   </View>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                  <FeatherIcons name="chevron-right" size={16} color={colors.mutedForeground} />
                 </TouchableOpacity>
               );
             })
@@ -454,7 +454,7 @@ export default function AdminSettingsScreen() {
                       {venue?.name ?? ""} · {pitch?.name ?? ""} · {formatDateShortAdmin(booking.startAt)} {formatTimeAdmin(booking.startAt)}
                     </Text>
                   </View>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                  <FeatherIcons name="chevron-right" size={16} color={colors.mutedForeground} />
                 </TouchableOpacity>
               );
             })

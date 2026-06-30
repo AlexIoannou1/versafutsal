@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useListOwnerVenues } from "@workspace/api-client-react";
 
@@ -210,7 +210,7 @@ export default function OwnerVenuesScreen() {
       <View style={s.header}>
         <Text style={s.headerTitle}>My Venues</Text>
         <TouchableOpacity style={s.addBtn} onPress={() => router.push("/owner/venue-new")}>
-          <Feather name="plus" size={16} color={colors.primaryForeground} />
+          <FeatherIcons name="plus" size={16} color={colors.primaryForeground} />
           <Text style={s.addBtnText}>New Venue</Text>
         </TouchableOpacity>
       </View>
@@ -218,7 +218,7 @@ export default function OwnerVenuesScreen() {
       {venues.length === 0 ? (
         <View style={s.center}>
           <View style={s.emptyIcon}>
-            <Feather name="map-pin" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="map-pin" size={28} color={colors.mutedForeground} />
           </View>
           <Text style={s.emptyTitle}>No venues yet</Text>
           <Text style={s.emptySub}>
@@ -261,7 +261,7 @@ export default function OwnerVenuesScreen() {
                 </View>
 
                 <View style={s.districtRow}>
-                  <Feather name="map-pin" size={13} color={colors.mutedForeground} />
+                  <FeatherIcons name="map-pin" size={13} color={colors.mutedForeground} />
                   <Text style={s.districtText}>
                     {DISTRICT_LABELS[item.district.toLowerCase()] ?? item.district}
                   </Text>
@@ -283,7 +283,7 @@ export default function OwnerVenuesScreen() {
                     style={s.manageBtn}
                     onPress={() => router.push(`/owner/venue/${item.id}`)}
                   >
-                    <Feather name="settings" size={14} color={colors.foreground} />
+                    <FeatherIcons name="settings" size={14} color={colors.foreground} />
                     <Text style={s.manageBtnText}>Manage</Text>
                   </TouchableOpacity>
                 </View>

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import {
   useGetOwnerBooking,
@@ -113,7 +113,7 @@ function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: Audit
           justifyContent: "center",
         }}
       >
-        <Feather name={icon} size={13} color={color} />
+        <FeatherIcons name={icon} size={13} color={color} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: foreground }}>
@@ -424,7 +424,7 @@ export default function OwnerBookingDetailScreen() {
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.banner}>
           <View style={[s.bannerIcon, { backgroundColor: statusColor + "20" }]}>
-            <Feather name="calendar" size={30} color={statusColor} />
+            <FeatherIcons name="calendar" size={30} color={statusColor} />
           </View>
           <Text style={s.bannerTitle}>Booking #{booking.id.slice(0, 8).toUpperCase()}</Text>
           <Text style={s.bookingId}>
@@ -434,7 +434,7 @@ export default function OwnerBookingDetailScreen() {
 
         <View style={s.statusRow}>
           <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
-            <Feather name="circle" size={8} color={statusColor} />
+            <FeatherIcons name="circle" size={8} color={statusColor} />
             <Text style={[s.statusText, { color: statusColor }]}>
               {STATUS_LABELS[booking.status] ?? booking.status}
             </Text>

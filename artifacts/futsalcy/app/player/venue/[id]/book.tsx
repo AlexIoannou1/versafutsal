@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useGetPitchAvailability } from "@workspace/api-client-react";
 
@@ -352,13 +352,13 @@ export default function BookPitchScreen() {
       <View style={s.calendarSection}>
         <View style={s.monthNav}>
           <TouchableOpacity style={s.navBtn} onPress={prevMonth}>
-            <Feather name="chevron-left" size={18} color={colors.foreground} />
+            <FeatherIcons name="chevron-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
           <Text style={s.monthLabel}>
             {MONTH_NAMES[displayMonth]} {displayYear}
           </Text>
           <TouchableOpacity style={s.navBtn} onPress={nextMonth}>
-            <Feather name="chevron-right" size={18} color={colors.foreground} />
+            <FeatherIcons name="chevron-right" size={18} color={colors.foreground} />
           </TouchableOpacity>
         </View>
 
@@ -414,7 +414,7 @@ export default function BookPitchScreen() {
       <View style={s.slotsSection}>
         {!selectedDate ? (
           <View style={s.noDateWrap}>
-            <Feather name="calendar" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="calendar" size={28} color={colors.mutedForeground} />
             <Text style={s.noDateText}>Pick a date above to see available slots</Text>
           </View>
         ) : (
@@ -432,7 +432,7 @@ export default function BookPitchScreen() {
               </View>
             ) : slots.length === 0 ? (
               <View style={s.noSlots}>
-                <Feather name="moon" size={32} color={colors.mutedForeground} />
+                <FeatherIcons name="moon" size={32} color={colors.mutedForeground} />
                 <Text style={s.noSlotsText}>No slots available</Text>
               </View>
             ) : (

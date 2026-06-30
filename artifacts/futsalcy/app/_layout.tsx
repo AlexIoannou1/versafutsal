@@ -5,9 +5,8 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
-import { Feather } from "@expo/vector-icons";
-// Explicitly require the TTF so Metro bundles it as an asset on Android
-// (spreading Feather.font works on iOS but Android needs a direct require)
+// FeatherIcons font loaded under a unique name to bypass Expo Go's pre-registered
+// 'feather' font (which causes boxed-X glyphs on Android). See components/FeatherIcons.tsx.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const FeatherFont = require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf") as number;
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -102,7 +101,7 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
-    feather: FeatherFont,
+    FeatherIcons: FeatherFont,
   });
 
   useEffect(() => {

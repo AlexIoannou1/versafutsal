@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -540,7 +540,7 @@ export default function VenueNewScreen() {
         {step === 1 && (
           <>
             <View style={s.note}>
-              <Feather name="info" size={16} color={colors.primary} />
+              <FeatherIcons name="info" size={16} color={colors.primary} />
               <Text style={s.noteText}>
                 Add at least one pitch — required before your venue can be submitted for approval. You can add more pitches later from the venue management screen.
               </Text>
@@ -635,7 +635,7 @@ export default function VenueNewScreen() {
         {step === 2 && (
           <>
             <View style={s.note}>
-              <Feather name="clock" size={16} color={colors.primary} />
+              <FeatherIcons name="clock" size={16} color={colors.primary} />
               <Text style={s.noteText}>
                 Set your weekly opening hours. Toggle each day open or closed.
               </Text>
@@ -683,7 +683,7 @@ export default function VenueNewScreen() {
         {step === 3 && (
           <>
             <View style={s.note}>
-              <Feather name="check-circle" size={16} color={colors.primary} />
+              <FeatherIcons name="check-circle" size={16} color={colors.primary} />
               <Text style={s.noteText}>
                 Review your venue details before submitting for admin approval. Approved venues become visible to players.
               </Text>
@@ -775,8 +775,8 @@ export default function VenueNewScreen() {
           ) : (
             <>
               <Text style={s.nextBtnText}>{nextBtnLabel}</Text>
-              {!isLastStep && <Feather name="arrow-right" size={18} color={colors.primaryForeground} />}
-              {isLastStep && <Feather name="send" size={16} color={colors.primaryForeground} />}
+              {!isLastStep && <FeatherIcons name="arrow-right" size={18} color={colors.primaryForeground} />}
+              {isLastStep && <FeatherIcons name="send" size={16} color={colors.primaryForeground} />}
             </>
           )}
         </TouchableOpacity>

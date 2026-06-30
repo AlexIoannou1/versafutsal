@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useGetVenue, type VenueDetail } from "@workspace/api-client-react";
 
@@ -294,7 +294,7 @@ export default function PlayerVenueDetailScreen() {
             </ScrollView>
           ) : (
             <View style={s.photoPlaceholder}>
-              <Feather name="image" size={48} color={colors.mutedForeground} />
+              <FeatherIcons name="image" size={48} color={colors.mutedForeground} />
             </View>
           )}
           {photos.length > 1 && (
@@ -318,11 +318,11 @@ export default function PlayerVenueDetailScreen() {
         <View style={s.body}>
           <Text style={s.venueName}>{String(venue.name)}</Text>
           <View style={s.metaRow}>
-            <Feather name="map-pin" size={14} color={colors.mutedForeground} />
+            <FeatherIcons name="map-pin" size={14} color={colors.mutedForeground} />
             <Text style={s.metaText}>{String(venue.district)}</Text>
           </View>
           <TouchableOpacity style={s.mapLink} onPress={() => Linking.openURL(mapUrl)}>
-            <Feather name="navigation" size={14} color={colors.primary} />
+            <FeatherIcons name="navigation" size={14} color={colors.primary} />
             <Text style={s.mapText}>Open in Maps</Text>
           </TouchableOpacity>
 
@@ -336,7 +336,7 @@ export default function PlayerVenueDetailScreen() {
               <View style={s.amenitiesGrid}>
                 {amenities.map((a) => (
                   <View key={a} style={s.amenityChip}>
-                    <Feather name="check" size={14} color={colors.primary} />
+                    <FeatherIcons name="check" size={14} color={colors.primary} />
                     <Text style={s.amenityText}>{a}</Text>
                   </View>
                 ))}
@@ -386,7 +386,7 @@ export default function PlayerVenueDetailScreen() {
                     )
                   }
                 >
-                  <Feather name="calendar" size={16} color={colors.primaryForeground} />
+                  <FeatherIcons name="calendar" size={16} color={colors.primaryForeground} />
                   <Text style={s.bookPitchBtnText}>Book Slot</Text>
                 </TouchableOpacity>
               </View>

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useAdminGetBooking, useAdminRefundBooking } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -329,21 +329,21 @@ export default function AdminBookingDetailScreen() {
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.banner}>
           <View style={[s.bannerIcon, { backgroundColor: statusColor + "20" }]}>
-            <Feather name="calendar" size={30} color={statusColor} />
+            <FeatherIcons name="calendar" size={30} color={statusColor} />
           </View>
           <Text style={s.bannerTitle}>Booking #{booking.id.slice(0, 8).toUpperCase()}</Text>
           <Text style={s.bookingId}>
             {formatDate(booking.startAt)} · {formatTime(booking.startAt)} – {formatTime(booking.endAt)}
           </Text>
           <View style={s.adminBadge}>
-            <Feather name="shield" size={10} color="#9333EA" />
+            <FeatherIcons name="shield" size={10} color="#9333EA" />
             <Text style={s.adminBadgeText}>Admin View</Text>
           </View>
         </View>
 
         <View style={s.statusRow}>
           <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
-            <Feather name="circle" size={8} color={statusColor} />
+            <FeatherIcons name="circle" size={8} color={statusColor} />
             <Text style={[s.statusText, { color: statusColor }]}>
               {STATUS_LABELS[booking.status] ?? booking.status}
             </Text>
@@ -436,7 +436,7 @@ export default function AdminBookingDetailScreen() {
         <View style={s.modalOverlay}>
           <View style={s.modalSheet}>
             <View style={s.modalTitleRow}>
-              <Feather name="shield" size={18} color="#9333EA" />
+              <FeatherIcons name="shield" size={18} color="#9333EA" />
               <Text style={s.modalTitle}>Issue Manual Refund</Text>
             </View>
             <Text style={s.modalSubtitle}>

@@ -11,14 +11,14 @@ import { useRouter } from "expo-router";
 import { useAuth, AppMode } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
 
 interface ModeOption {
   mode: AppMode;
   label: string;
   subtitle: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: keyof typeof FeatherIcons.glyphMap;
 }
 
 const MODES: ModeOption[] = [
@@ -172,13 +172,13 @@ export default function ModeSelectScreen() {
             testID={`mode-${opt.mode}`}
           >
             <View style={s.cardIcon}>
-              <Feather name={opt.icon} size={22} color={colors.primary} />
+              <FeatherIcons name={opt.icon} size={22} color={colors.primary} />
             </View>
             <View style={s.cardContent}>
               <Text style={s.cardLabel}>{opt.label}</Text>
               <Text style={s.cardSubtitle}>{opt.subtitle}</Text>
             </View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <FeatherIcons name="chevron-right" size={18} color={colors.mutedForeground} />
           </TouchableOpacity>
         ))}
       </View>

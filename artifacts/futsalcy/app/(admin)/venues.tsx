@@ -14,7 +14,7 @@ import {
   Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -350,7 +350,7 @@ export default function AdminVenuesScreen() {
       ) : venues.length === 0 ? (
         <View style={s.center}>
           <View style={s.emptyIcon}>
-            <Feather name="check-square" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="check-square" size={28} color={colors.mutedForeground} />
           </View>
           <Text style={s.emptyTitle}>
             {activeTab === "PENDING" ? "All clear!" : "Nothing here"}
@@ -387,13 +387,13 @@ export default function AdminVenuesScreen() {
                 </View>
 
                 <View style={s.metaRow}>
-                  <Feather name="map-pin" size={13} color={colors.mutedForeground} />
+                  <FeatherIcons name="map-pin" size={13} color={colors.mutedForeground} />
                   <Text style={s.metaText}>{item.district} · {item.address}</Text>
                 </View>
 
                 {item.owner && (
                   <View style={s.ownerBox}>
-                    <Feather name="user" size={14} color={colors.mutedForeground} />
+                    <FeatherIcons name="user" size={14} color={colors.mutedForeground} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.ownerText}>
                         <Text style={s.ownerName}>{item.owner.name}</Text>
@@ -426,7 +426,7 @@ export default function AdminVenuesScreen() {
                         <ActivityIndicator size="small" color={colors.primaryForeground} />
                       ) : (
                         <>
-                          <Feather name="check" size={16} color={colors.primaryForeground} />
+                          <FeatherIcons name="check" size={16} color={colors.primaryForeground} />
                           <Text style={s.approveBtnText}>Approve</Text>
                         </>
                       )}
@@ -436,7 +436,7 @@ export default function AdminVenuesScreen() {
                       onPress={() => openRejectModal(item.id)}
                       disabled={isActioning}
                     >
-                      <Feather name="x" size={16} color={colors.destructive} />
+                      <FeatherIcons name="x" size={16} color={colors.destructive} />
                       <Text style={s.rejectBtnText}>Reject</Text>
                     </TouchableOpacity>
                   </View>
@@ -470,7 +470,7 @@ export default function AdminVenuesScreen() {
                 style={[s.approveBtn, { flex: 1 }]}
                 onPress={confirmApprove}
               >
-                <Feather name="check" size={16} color={colors.primaryForeground} />
+                <FeatherIcons name="check" size={16} color={colors.primaryForeground} />
                 <Text style={s.approveBtnText}>Approve</Text>
               </TouchableOpacity>
             </View>

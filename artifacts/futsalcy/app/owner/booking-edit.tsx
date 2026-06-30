@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import {
   useGetOwnerBooking,
@@ -402,7 +402,7 @@ export default function OwnerBookingEditScreen() {
     if (approvedVenues.length === 0) {
       return (
         <View style={s.noVenues}>
-          <Feather name="home" size={32} color={colors.mutedForeground} />
+          <FeatherIcons name="home" size={32} color={colors.mutedForeground} />
           <Text style={s.noVenuesText}>You have no approved venues.</Text>
         </View>
       );
@@ -431,7 +431,7 @@ export default function OwnerBookingEditScreen() {
               <Text style={s.listItemSub}>{venue.district}</Text>
             </View>
             {selectedVenue?.id === venue.id && (
-              <Feather name="check-circle" size={18} color={colors.primary} />
+              <FeatherIcons name="check-circle" size={18} color={colors.primary} />
             )}
           </TouchableOpacity>
         ))}
@@ -465,7 +465,7 @@ export default function OwnerBookingEditScreen() {
                     <Text style={s.listItemSub}>{pitch.type} · {pitch.size} · {pitch.slotDurationMinutes}min slots</Text>
                   </View>
                   {selectedPitch?.id === pitch.id && (
-                    <Feather name="check-circle" size={18} color={colors.primary} />
+                    <FeatherIcons name="check-circle" size={18} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -481,11 +481,11 @@ export default function OwnerBookingEditScreen() {
       <View style={s.calSection}>
         <View style={s.monthNav}>
           <TouchableOpacity style={s.navBtn} onPress={prevMonth}>
-            <Feather name="chevron-left" size={18} color={colors.foreground} />
+            <FeatherIcons name="chevron-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
           <Text style={s.monthLabel}>{MONTH_NAMES[displayMonth]} {displayYear}</Text>
           <TouchableOpacity style={s.navBtn} onPress={nextMonth}>
-            <Feather name="chevron-right" size={18} color={colors.foreground} />
+            <FeatherIcons name="chevron-right" size={18} color={colors.foreground} />
           </TouchableOpacity>
         </View>
 
@@ -539,7 +539,7 @@ export default function OwnerBookingEditScreen() {
       <View style={s.slotsSection}>
         {!selectedDate ? (
           <View style={s.noDateWrap}>
-            <Feather name="calendar" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="calendar" size={28} color={colors.mutedForeground} />
             <Text style={s.noDateText}>Pick a date to see available slots</Text>
           </View>
         ) : slotsLoading ? (
@@ -548,7 +548,7 @@ export default function OwnerBookingEditScreen() {
           </View>
         ) : slots.length === 0 ? (
           <View style={s.noDateWrap}>
-            <Feather name="moon" size={28} color={colors.mutedForeground} />
+            <FeatherIcons name="moon" size={28} color={colors.mutedForeground} />
             <Text style={s.noDateText}>No slots available on this date</Text>
           </View>
         ) : (

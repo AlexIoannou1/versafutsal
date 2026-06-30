@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import {
   useGetPlayerBooking,
@@ -385,7 +385,7 @@ export default function PlayerBookingDetailScreen() {
 
         <View style={s.statusWrap}>
           <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
-            <Feather name="circle" size={8} color={statusColor} />
+            <FeatherIcons name="circle" size={8} color={statusColor} />
             <Text style={[s.statusText, { color: statusColor }]}>
               {STATUS_LABELS[booking.status] ?? booking.status}
             </Text>
@@ -471,7 +471,7 @@ export default function PlayerBookingDetailScreen() {
           gap: 10,
           padding: 12,
         }}>
-          <Feather name="info" size={16} color={colors.primary} style={{ marginTop: 1 }} />
+          <FeatherIcons name="info" size={16} color={colors.primary} style={{ marginTop: 1 }} />
           <Text style={{
             flex: 1,
             fontSize: 13,

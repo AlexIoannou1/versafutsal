@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
 import { loginUser } from "@workspace/api-client-react";
 import type { AppMode } from "@/context/AuthContext";
@@ -219,7 +219,7 @@ export default function LoginScreen() {
     <View style={s.container}>
       <ScrollView style={s.scroll} contentContainerStyle={s.inner} keyboardShouldPersistTaps="handled">
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={colors.foreground} />
+          <FeatherIcons name="arrow-left" size={24} color={colors.foreground} />
         </TouchableOpacity>
 
         <View style={s.heading}>

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-nati
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
 import EditProfileSheet from "@/components/EditProfileSheet";
 
@@ -136,7 +136,7 @@ export default function OwnerProfileScreen() {
     <View style={s.container}>
       <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.avatar}>
-          <Feather name="briefcase" size={32} color={colors.primary} />
+          <FeatherIcons name="briefcase" size={32} color={colors.primary} />
         </View>
         <Text style={s.name}>{user?.name}</Text>
         <Text style={s.email}>{user?.email}</Text>
@@ -146,7 +146,7 @@ export default function OwnerProfileScreen() {
         </View>
 
         <TouchableOpacity style={s.editBtn} onPress={() => setEditVisible(true)}>
-          <Feather name="edit-2" size={18} color={colors.foreground} />
+          <FeatherIcons name="edit-2" size={18} color={colors.foreground} />
           <Text style={s.editBtnText}>Edit Profile</Text>
         </TouchableOpacity>
 
@@ -156,14 +156,14 @@ export default function OwnerProfileScreen() {
             style={s.menuRow}
             onPress={() => router.push("/(owner)/venues")}
           >
-            <Feather name="grid" size={20} color={colors.primary} />
+            <FeatherIcons name="grid" size={20} color={colors.primary} />
             <Text style={s.menuRowText}>My Venues</Text>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <FeatherIcons name="chevron-right" size={18} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-          <Feather name="log-out" size={18} color={colors.destructive} />
+          <FeatherIcons name="log-out" size={18} color={colors.destructive} />
           <Text style={s.logoutText}>Sign out</Text>
         </TouchableOpacity>
       </ScrollView>

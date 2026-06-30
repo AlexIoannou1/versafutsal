@@ -15,7 +15,7 @@ import {
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useListOwnerBookings } from "@workspace/api-client-react";
@@ -105,7 +105,7 @@ function PickerButton({
         paddingVertical: 8,
       }}
     >
-      <Feather name="calendar" size={12} color={active ? primaryColor : mutedColor} />
+      <FeatherIcons name="calendar" size={12} color={active ? primaryColor : mutedColor} />
       <Text
         numberOfLines={1}
         style={{
@@ -122,7 +122,7 @@ function PickerButton({
           onPress={(e) => { e.stopPropagation(); onClear(); }}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Feather name="x" size={12} color={primaryColor} />
+          <FeatherIcons name="x" size={12} color={primaryColor} />
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -371,11 +371,11 @@ export default function OwnerDashboardScreen() {
           </View>
         </View>
         <View style={s.metaRow}>
-          <Feather name="grid" size={12} color={colors.mutedForeground} />
+          <FeatherIcons name="grid" size={12} color={colors.mutedForeground} />
           <Text style={s.metaText}>{venue?.name ?? ""} · {pitch?.name ?? ""}</Text>
         </View>
         <View style={s.metaRow}>
-          <Feather name="calendar" size={12} color={colors.mutedForeground} />
+          <FeatherIcons name="calendar" size={12} color={colors.mutedForeground} />
           <Text style={s.metaText}>{formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}</Text>
         </View>
       </TouchableOpacity>
@@ -427,7 +427,7 @@ export default function OwnerDashboardScreen() {
       render: () => (
         <View style={s.searchRow}>
           <View style={s.searchInput}>
-            <Feather name="search" size={14} color={colors.mutedForeground} />
+            <FeatherIcons name="search" size={14} color={colors.mutedForeground} />
             <TextInput
               style={s.searchText}
               value={search}
@@ -437,7 +437,7 @@ export default function OwnerDashboardScreen() {
             />
             {search !== "" && (
               <TouchableOpacity onPress={() => setSearch("")}>
-                <Feather name="x" size={14} color={colors.mutedForeground} />
+                <FeatherIcons name="x" size={14} color={colors.mutedForeground} />
               </TouchableOpacity>
             )}
           </View>
@@ -445,7 +445,7 @@ export default function OwnerDashboardScreen() {
             style={s.filterBtn}
             onPress={() => setFiltersExpanded((v) => !v)}
           >
-            <Feather name="sliders" size={16} color={hasActiveFilters ? colors.primary : colors.foreground} />
+            <FeatherIcons name="sliders" size={16} color={hasActiveFilters ? colors.primary : colors.foreground} />
           </TouchableOpacity>
         </View>
       ),
@@ -549,7 +549,7 @@ export default function OwnerDashboardScreen() {
       key: "empty",
       render: () => (
         <View style={s.emptyWrap}>
-          <Feather name="calendar" size={28} color={colors.mutedForeground} />
+          <FeatherIcons name="calendar" size={28} color={colors.mutedForeground} />
           <Text style={s.emptyText}>
             {hasActiveFilters ? "No bookings match your filters" : "No upcoming bookings"}
           </Text>
@@ -639,7 +639,7 @@ export default function OwnerDashboardScreen() {
           elevation: 6,
         }}
       >
-        <Feather name="plus" size={26} color={colors.primaryForeground} />
+        <FeatherIcons name="plus" size={26} color={colors.primaryForeground} />
       </TouchableOpacity>
 
       {/* Android: DateTimePicker renders as a native dialog when visible */}
