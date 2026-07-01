@@ -1,4 +1,4 @@
-import React, { useState, type ComponentProps } from "react";
+import React, { useState, useEffect, useRef, type ComponentProps } from "react";
 import {
   View,
   Text,
@@ -52,12 +52,21 @@ export default function PlayerVenuesScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Pre-seed district from player city; a ref tracks whether user has overridden it
-  const cityDefault = DISTRICTS.some((d) => d.key === user?.city) ? (user?.city ?? "") : "";
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedDistrict, setSelectedDistrict] = useState(cityDefault);
+  const [selectedDistrict, setSelectedDistrict] = useState("");
   const [selectedType, setSelectedType] = useState("");
+  // Track whether the user has manually touched the district filter this session
+  const manualDistrictOverride = useRef(false);
+
+  // Pre-seed district from player city on mount and when city changes,
+  // but only if the user has not manually overridden the filter this session.
+  useEffect(() => {
+    if (manualDistrictOverride.current) return;
+    const cityMatches = DISTRICTS.some((d) => d.key === user?.city && d.key !== "");
+    setSelectedDistrict(cityMatches ? (user!.city!) : "");
+  }, [user?.city]);
+
   const [minPriceText, setMinPriceText] = useState("");
   const [maxPriceText, setMaxPriceText] = useState("");
 
@@ -399,7 +408,10 @@ export default function PlayerVenuesScreen() {
                           borderColor: active ? colors.primary : colors.border,
                         },
                       ]}
-                      onPress={() => setSelectedDistrict(opt.key)}
+                      onPress={() => {
+                        manualDistrictOverride.current = true;
+                        setSelectedDistrict(opt.key);
+                      }}
                     >
                       <Text
                         style={[
@@ -475,6 +487,7 @@ export default function PlayerVenuesScreen() {
               <TouchableOpacity
                 style={s.clearFiltersBtn}
                 onPress={() => {
+                  manualDistrictOverride.current = true;
                   setSelectedDistrict("");
                   setSelectedType("");
                   setMinPriceText("");

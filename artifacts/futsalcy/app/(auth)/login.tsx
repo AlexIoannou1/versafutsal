@@ -68,6 +68,9 @@ export default function LoginScreen() {
                     email: data.user.email,
                     name: data.user.name,
                     role: toAppMode(data.user.role),
+                    phoneNumber: data.user.phoneNumber,
+                    avatarUrl: data.user.avatarUrl,
+                    city: data.user.city,
                   },
                   data.token,
                 );
@@ -85,6 +88,9 @@ export default function LoginScreen() {
           email: data.user.email,
           name: data.user.name,
           role: toAppMode(data.user.role),
+          phoneNumber: data.user.phoneNumber,
+          avatarUrl: data.user.avatarUrl,
+          city: data.user.city,
         },
         data.token,
       );
