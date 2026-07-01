@@ -14,14 +14,44 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import FeatherIcons from "@/components/FeatherIcons";
-import { deleteAccount, clearPushToken } from "@workspace/api-client-react";
+import { deleteAccount, clearPushToken, registerPushToken } from "@workspace/api-client-react";
 import { NOTIFICATIONS_PREF_KEY } from "@/hooks/usePushNotifications";
 
 const TERMS_URL = "https://futsalcy.com/terms";
 const PRIVACY_URL = "https://futsalcy.com/privacy";
+
+const isExpoGoAndroid =
+  Constants.executionEnvironment === "storeClient" && Platform.OS === "android";
+
+async function attemptPushRegistration(): Promise<void> {
+  if (Platform.OS === "web" || isExpoGoAndroid) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Notifications = require("expo-notifications");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Device = require("expo-device");
+    if (!Device.isDevice) return;
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return;
+
+    const expoPushToken = await Notifications.getExpoPushTokenAsync().catch(() => null);
+    if (!expoPushToken?.data) return;
+
+    await registerPushToken({ pushToken: expoPushToken.data });
+  } catch {
+    // Non-fatal
+  }
+}
 
 export default function PlayerSettingsScreen() {
   const colors = useColors();
@@ -33,7 +63,6 @@ export default function PlayerSettingsScreen() {
   const [loadingNotif, setLoadingNotif] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
-  // Load saved notifications preference
   useEffect(() => {
     AsyncStorage.getItem(NOTIFICATIONS_PREF_KEY).then((val) => {
       if (val === "false") setNotificationsEnabled(false);
@@ -48,6 +77,9 @@ export default function PlayerSettingsScreen() {
         await AsyncStorage.setItem(NOTIFICATIONS_PREF_KEY, value ? "true" : "false");
         if (!value) {
           await clearPushToken();
+        } else {
+          // Immediately re-register so the toggle takes effect without a restart
+          await attemptPushRegistration();
         }
         setNotificationsEnabled(value);
       } catch {

@@ -13,6 +13,7 @@ export const usersTable = pgTable("users", {
   phoneNumber: text("phone_number"),
   pushToken: text("push_token"), // Expo push token for native notifications
   deletedAt: timestamp("deleted_at"), // soft-delete; null = active account
+  deletedOriginalEmail: text("deleted_original_email"), // preserved for login-block lookup after anonymisation
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

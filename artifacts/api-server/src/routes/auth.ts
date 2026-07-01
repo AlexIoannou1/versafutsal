@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { signToken, requireAuth } from "../middlewares/auth";
 import type { UserRole } from "@workspace/db";
 
@@ -102,13 +102,29 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
+    const normalised = email.toLowerCase();
+
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, email.toLowerCase()))
+      .where(eq(usersTable.email, normalised))
       .limit(1);
 
     if (!user) {
+      // Check if the address belongs to a soft-deleted account (email was anonymised)
+      const [deletedUser] = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(
+          and(eq(usersTable.deletedOriginalEmail, normalised), isNotNull(usersTable.deletedAt)),
+        )
+        .limit(1);
+
+      if (deletedUser) {
+        res.status(401).json({ error: "This account has been deleted" });
+        return;
+      }
+
       res.status(401).json({ error: "Invalid credentials" });
       return;
     }

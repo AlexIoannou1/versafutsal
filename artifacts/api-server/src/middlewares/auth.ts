@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 import type { UserRole } from "@workspace/db";
 
 const JWT_SECRET = process.env["JWT_SECRET"];
@@ -38,13 +41,33 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
 
   const token = authHeader.slice(7);
 
+  let payload: JwtPayload;
   try {
-    const payload = jwt.verify(token, SECRET) as JwtPayload;
-    req.user = payload;
-    next();
+    payload = jwt.verify(token, SECRET) as JwtPayload;
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
+    return;
   }
+
+  // Verify account is still active (guards against using tokens after soft-delete)
+  (async () => {
+    const [row] = await db
+      .select({ deletedAt: usersTable.deletedAt })
+      .from(usersTable)
+      .where(eq(usersTable.id, payload.userId))
+      .limit(1);
+
+    if (!row || row.deletedAt) {
+      res.status(401).json({ error: "This account has been deleted" });
+      return;
+    }
+
+    req.user = payload;
+    next();
+  })().catch((err) => {
+    console.error("requireAuth DB check error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  });
 }
 
 export function requireRole(...roles: UserRole[]) {

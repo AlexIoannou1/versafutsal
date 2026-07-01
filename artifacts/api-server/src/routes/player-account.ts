@@ -17,10 +17,18 @@ router.delete("/player/account", requireAuth, requireRole("PLAYER"), async (req,
     const anonEmail = `DELETED_${userId}@futsalcy.deleted`;
     const anonName = `DELETED_${userId}`;
 
+    // Fetch current email before anonymising (needed for login-block lookup)
+    const [current] = await db
+      .select({ email: usersTable.email })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
     await db
       .update(usersTable)
       .set({
         deletedAt: new Date(),
+        deletedOriginalEmail: current?.email ?? null,
         email: anonEmail,
         name: anonName,
         phoneNumber: null,
