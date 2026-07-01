@@ -62,6 +62,11 @@ export default function PlayerProfileScreen() {
     const asset = result.assets[0];
     const mimeType = asset.mimeType ?? "image/jpeg";
 
+    if (mimeType !== "image/jpeg" && mimeType !== "image/png") {
+      Alert.alert("Unsupported format", "Please choose a JPG or PNG image.");
+      return;
+    }
+
     setUploading(true);
     try {
       const { avatarUrl } = await uploadAvatar(asset.uri, mimeType);

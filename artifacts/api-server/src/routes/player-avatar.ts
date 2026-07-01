@@ -12,8 +12,8 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB
   fileFilter(_req, file, cb) {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files are allowed"));
+    if (file.mimetype !== "image/jpeg" && file.mimetype !== "image/png") {
+      cb(new Error("Only JPG and PNG files are allowed"));
       return;
     }
     cb(null, true);
