@@ -20,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import FeatherIcons from "@/components/FeatherIcons";
 import { deleteAccount, clearPushToken, registerPushToken } from "@workspace/api-client-react";
 import { NOTIFICATIONS_PREF_KEY } from "@/hooks/usePushNotifications";
+import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 
 const TERMS_URL = "https://futsalcy.com/terms";
 const PRIVACY_URL = "https://futsalcy.com/privacy";
@@ -53,11 +54,18 @@ async function attemptPushRegistration(): Promise<void> {
   }
 }
 
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] = [
+  { value: "light", label: "Light", icon: "sun" },
+  { value: "dark", label: "Dark", icon: "moon" },
+  { value: "system", label: "System", icon: "smartphone" },
+];
+
 export default function PlayerSettingsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { logout } = useAuth();
+  const { preference: themePreference, setPreference: setThemePreference } = useTheme();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [loadingNotif, setLoadingNotif] = useState(false);
@@ -212,6 +220,26 @@ export default function PlayerSettingsScreen() {
       fontFamily: "Inter_600SemiBold",
       color: colors.destructive,
     },
+    themeSegment: {
+      flexDirection: "row",
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
+    },
+    themeChip: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingVertical: 9,
+      borderRadius: 10,
+      borderWidth: 1.5,
+    },
+    themeChipText: {
+      fontSize: 13,
+      fontFamily: "Inter_600SemiBold",
+    },
   });
 
   return (
@@ -224,6 +252,45 @@ export default function PlayerSettingsScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
+
+        {/* Appearance */}
+        <View style={s.section}>
+          <Text style={s.sectionLabel}>Appearance</Text>
+          <View style={s.card}>
+            <View style={s.themeSegment}>
+              {THEME_OPTIONS.map((opt) => {
+                const active = themePreference === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      s.themeChip,
+                      {
+                        backgroundColor: active ? colors.primary : "transparent",
+                        borderColor: active ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => setThemePreference(opt.value)}
+                  >
+                    <FeatherIcons
+                      name={opt.icon as "sun" | "moon" | "smartphone"}
+                      size={14}
+                      color={active ? colors.primaryForeground : colors.mutedForeground}
+                    />
+                    <Text
+                      style={[
+                        s.themeChipText,
+                        { color: active ? colors.primaryForeground : colors.mutedForeground },
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
 
         {/* Notifications */}
         <View style={s.section}>
