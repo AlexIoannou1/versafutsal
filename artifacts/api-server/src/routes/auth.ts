@@ -153,6 +153,8 @@ router.post("/auth/login", async (req, res) => {
         name: user.name,
         role: user.role,
         phoneNumber: user.phoneNumber,
+        avatarUrl: user.avatarUrl,
+        city: user.city,
         createdAt: user.createdAt,
       },
       token,
@@ -185,6 +187,8 @@ router.get("/auth/me", requireAuth, async (req, res) => {
         name: user.name,
         role: user.role,
         phoneNumber: user.phoneNumber,
+        avatarUrl: user.avatarUrl,
+        city: user.city,
       },
     });
   } catch (err) {
@@ -193,13 +197,14 @@ router.get("/auth/me", requireAuth, async (req, res) => {
   }
 });
 
-// PATCH /auth/profile — update name, email, phoneNumber
+// PATCH /auth/profile — update name, email, phoneNumber, city
 router.patch("/auth/profile", requireAuth, async (req, res) => {
   try {
-    const { name, email, phoneNumber } = req.body as {
+    const { name, email, phoneNumber, city } = req.body as {
       name?: string;
       email?: string;
       phoneNumber?: string;
+      city?: string;
     };
 
     const updates: Partial<typeof usersTable.$inferInsert> = {
@@ -208,6 +213,7 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
 
     if (name !== undefined) updates.name = name.trim();
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber.trim() || null;
+    if (city !== undefined) updates.city = city.trim() || null;
 
     if (email !== undefined) {
       const trimmed = email.trim().toLowerCase();
@@ -237,6 +243,8 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
         name: updated.name,
         role: updated.role,
         phoneNumber: updated.phoneNumber,
+        avatarUrl: updated.avatarUrl,
+        city: updated.city,
         createdAt: updated.createdAt,
       },
     });

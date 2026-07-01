@@ -7,6 +7,7 @@ import bookingsRouter from "./bookings";
 import paymentsRouter from "./payments";
 import favouritesRouter from "./favourites";
 import playerAccountRouter from "./player-account";
+import playerAvatarRouter from "./player-avatar";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(bookingsRouter);
 router.use(paymentsRouter);
 router.use(favouritesRouter);
 router.use(playerAccountRouter);
+router.use(playerAvatarRouter);
 
 export default router;

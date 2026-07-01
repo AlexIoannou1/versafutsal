@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 import {
   useListVenues,
   type VenueSummary,
@@ -49,10 +50,13 @@ export default function PlayerVenuesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
 
+  // Pre-seed district from player city; a ref tracks whether user has overridden it
+  const cityDefault = DISTRICTS.some((d) => d.key === user?.city) ? (user?.city ?? "") : "";
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedDistrict, setSelectedDistrict] = useState(cityDefault);
   const [selectedType, setSelectedType] = useState("");
   const [minPriceText, setMinPriceText] = useState("");
   const [maxPriceText, setMaxPriceText] = useState("");

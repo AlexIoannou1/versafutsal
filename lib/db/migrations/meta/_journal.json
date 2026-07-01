@@ -64,6 +64,13 @@
       "when": 1751414520000,
       "tag": "0009_stripe_customer_id",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1751500800000,
+      "tag": "0010_avatar_city",
+      "breakpoints": true
     }
   ]
 }

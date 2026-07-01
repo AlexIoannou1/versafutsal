@@ -12,6 +12,8 @@ export const usersTable = pgTable("users", {
   role: roleEnum("role").notNull().default("PLAYER"),
   phoneNumber: text("phone_number"),
   pushToken: text("push_token"), // Expo push token for native notifications
+  avatarUrl: text("avatar_url"), // profile photo stored in Object Storage
+  city: text("city"), // player's home city for venue auto-filter
   stripeCustomerId: text("stripe_customer_id"), // Stripe customer ID for saved payment methods
   deletedAt: timestamp("deleted_at"), // soft-delete; null = active account
   deletedOriginalEmail: text("deleted_original_email"), // preserved for login-block lookup after anonymisation

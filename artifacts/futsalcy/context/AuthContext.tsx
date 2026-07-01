@@ -16,6 +16,8 @@ export interface AuthUser {
   name: string;
   role: AppMode;
   phoneNumber?: string | null;
+  avatarUrl?: string | null;
+  city?: string | null;
 }
 
 interface AuthState {

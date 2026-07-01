@@ -18,11 +18,25 @@ import { useColors } from "@/hooks/useColors";
 import { updateProfile, changePassword } from "@workspace/api-client-react";
 import type { AuthUser } from "@/context/AuthContext";
 
+const CYPRUS_CITIES = [
+  "Nicosia",
+  "Limassol",
+  "Larnaca",
+  "Paphos",
+  "Famagusta",
+];
+
 interface Props {
   visible: boolean;
   user: AuthUser | null;
   onClose: () => void;
-  onSaved: (updated: { name: string; email: string; phoneNumber?: string | null }) => void;
+  onSaved: (updated: {
+    name: string;
+    email: string;
+    phoneNumber?: string | null;
+    avatarUrl?: string | null;
+    city?: string | null;
+  }) => void;
 }
 
 type Tab = "profile" | "password";
@@ -33,12 +47,11 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
 
   const [tab, setTab] = useState<Tab>("profile");
 
-  // Profile fields
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
-  const [phoneNumber, setPhoneNumber] = useState((user as AuthUser & { phoneNumber?: string | null })?.phoneNumber ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber ?? "");
+  const [city, setCity] = useState(user?.city ?? "");
 
-  // Password fields
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
@@ -51,7 +64,8 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     if (visible) {
       setName(user?.name ?? "");
       setEmail(user?.email ?? "");
-      setPhoneNumber((user as AuthUser & { phoneNumber?: string | null })?.phoneNumber ?? "");
+      setPhoneNumber(user?.phoneNumber ?? "");
+      setCity(user?.city ?? "");
       setCurrentPwd("");
       setNewPwd("");
       setConfirmPwd("");
@@ -74,8 +88,15 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
         name: name.trim(),
         email: email.trim().toLowerCase(),
         phoneNumber: phoneNumber.trim() || undefined,
+        city: city.trim() || undefined,
       });
-      onSaved({ name: res.user.name, email: res.user.email, phoneNumber: res.user.phoneNumber });
+      onSaved({
+        name: res.user.name,
+        email: res.user.email,
+        phoneNumber: res.user.phoneNumber,
+        avatarUrl: res.user.avatarUrl,
+        city: res.user.city,
+      });
       Alert.alert("Saved", "Your profile has been updated.");
       onClose();
     } catch (err: unknown) {
@@ -128,7 +149,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
       borderTopLeftRadius: 20,
       borderTopRightRadius: 20,
       paddingBottom: insets.bottom + 24,
-      maxHeight: "90%",
+      maxHeight: "92%",
     },
     handle: {
       width: 36,
@@ -206,6 +227,22 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
       color: colors.foreground,
     },
     eyeBtn: { padding: 4 },
+    chipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 10,
+    },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 20,
+      borderWidth: 1,
+    },
+    chipText: {
+      fontSize: 13,
+      fontFamily: "Inter_500Medium",
+    },
     saveBtn: {
       marginHorizontal: 20,
       marginTop: 8,
@@ -224,12 +261,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
   });
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={s.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -248,17 +280,13 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
               style={[s.tabBtn, tab === "profile" && s.tabBtnActive]}
               onPress={() => setTab("profile")}
             >
-              <Text style={[s.tabText, tab === "profile" && s.tabTextActive]}>
-                Profile
-              </Text>
+              <Text style={[s.tabText, tab === "profile" && s.tabTextActive]}>Profile</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.tabBtn, tab === "password" && s.tabBtnActive]}
               onPress={() => setTab("password")}
             >
-              <Text style={[s.tabText, tab === "password" && s.tabTextActive]}>
-                Password
-              </Text>
+              <Text style={[s.tabText, tab === "password" && s.tabTextActive]}>Password</Text>
             </TouchableOpacity>
           </View>
 
@@ -308,6 +336,52 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                   </View>
                 </View>
 
+                <View style={s.field}>
+                  <Text style={s.label}>City</Text>
+                  <View style={s.chipsRow}>
+                    {CYPRUS_CITIES.map((c) => {
+                      const active = city === c;
+                      return (
+                        <TouchableOpacity
+                          key={c}
+                          style={[
+                            s.chip,
+                            {
+                              backgroundColor: active ? colors.primary : "transparent",
+                              borderColor: active ? colors.primary : colors.border,
+                            },
+                          ]}
+                          onPress={() => setCity(active ? "" : c)}
+                        >
+                          <Text
+                            style={[
+                              s.chipText,
+                              { color: active ? colors.primaryForeground : colors.mutedForeground },
+                            ]}
+                          >
+                            {c}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <View style={s.inputRow}>
+                    <TextInput
+                      style={s.input}
+                      value={city}
+                      onChangeText={setCity}
+                      placeholder="Or type your city…"
+                      placeholderTextColor={colors.mutedForeground}
+                      autoCapitalize="words"
+                    />
+                    {city ? (
+                      <TouchableOpacity style={s.eyeBtn} onPress={() => setCity("")}>
+                        <FeatherIcons name="x" size={16} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+
                 <View style={{ height: 16 }} />
               </>
             ) : (
@@ -323,8 +397,15 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       placeholderTextColor={colors.mutedForeground}
                       secureTextEntry={!showCurrent}
                     />
-                    <TouchableOpacity style={s.eyeBtn} onPress={() => setShowCurrent((v) => !v)}>
-                      <FeatherIcons name={showCurrent ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
+                    <TouchableOpacity
+                      style={s.eyeBtn}
+                      onPress={() => setShowCurrent((v) => !v)}
+                    >
+                      <FeatherIcons
+                        name={showCurrent ? "eye-off" : "eye"}
+                        size={18}
+                        color={colors.mutedForeground}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -341,7 +422,11 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       secureTextEntry={!showNew}
                     />
                     <TouchableOpacity style={s.eyeBtn} onPress={() => setShowNew((v) => !v)}>
-                      <FeatherIcons name={showNew ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
+                      <FeatherIcons
+                        name={showNew ? "eye-off" : "eye"}
+                        size={18}
+                        color={colors.mutedForeground}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
