@@ -13,6 +13,13 @@ export interface ListPaymentMethodsResponse {
   paymentMethods: SavedCard[];
 }
 
+export async function getStripeConfig(): Promise<{ publishableKey: string | null; demoMode: boolean }> {
+  return customFetch<{ publishableKey: string | null; demoMode: boolean }>(
+    "/api/player/payment-methods/config",
+    { method: "GET" },
+  );
+}
+
 export async function deleteAccount(): Promise<{ ok: boolean }> {
   return customFetch<{ ok: boolean }>("/api/player/account", {
     method: "DELETE",

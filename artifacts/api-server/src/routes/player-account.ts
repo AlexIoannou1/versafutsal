@@ -45,6 +45,14 @@ async function getOrCreateStripeCustomer(
   return customer.id;
 }
 
+// ─── GET /player/payment-methods/config ──────────────────────────────────────
+// Returns the Stripe publishable key so the client can initialise StripeProvider.
+
+router.get("/player/payment-methods/config", requireAuth, requireRole("PLAYER"), (_req, res) => {
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? null;
+  res.json({ publishableKey, demoMode: !publishableKey });
+});
+
 // ─── DELETE /player/account ───────────────────────────────────────────────────
 
 router.delete("/player/account", requireAuth, requireRole("PLAYER"), async (req, res) => {

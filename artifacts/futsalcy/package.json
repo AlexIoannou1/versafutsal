@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "^9.1.0",
+    "@stripe/stripe-react-native": "^0.68.0",
     "expo-device": "^8.0.10",
     "expo-notifications": "^0.32.17"
   }

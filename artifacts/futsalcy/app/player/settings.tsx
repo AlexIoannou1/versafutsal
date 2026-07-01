@@ -8,9 +8,9 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
-  Linking,
   Platform,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -91,10 +91,11 @@ export default function PlayerSettingsScreen() {
     [loadingNotif],
   );
 
-  const openUrl = (url: string) => {
-    Linking.openURL(url).catch(() => {
+  const openUrl = async (url: string) => {
+    const result = await WebBrowser.openBrowserAsync(url).catch(() => null);
+    if (result === null) {
       Alert.alert("Error", "Could not open link.");
-    });
+    }
   };
 
   const handleDeleteAccount = () => {
@@ -256,7 +257,7 @@ export default function PlayerSettingsScreen() {
                 <FeatherIcons name="file-text" size={18} color={colors.primary} />
               </View>
               <Text style={s.rowLabel}>Terms &amp; Conditions</Text>
-              <FeatherIcons name="external-link" size={16} color={colors.mutedForeground} style={s.rowChevron} />
+              <FeatherIcons name="chevron-right" size={16} color={colors.mutedForeground} style={s.rowChevron} />
             </TouchableOpacity>
             <View style={s.rowDivider} />
             <TouchableOpacity style={s.row} onPress={() => openUrl(PRIVACY_URL)}>
@@ -264,7 +265,7 @@ export default function PlayerSettingsScreen() {
                 <FeatherIcons name="shield" size={18} color={colors.primary} />
               </View>
               <Text style={s.rowLabel}>Privacy Policy</Text>
-              <FeatherIcons name="external-link" size={16} color={colors.mutedForeground} style={s.rowChevron} />
+              <FeatherIcons name="chevron-right" size={16} color={colors.mutedForeground} style={s.rowChevron} />
             </TouchableOpacity>
           </View>
         </View>

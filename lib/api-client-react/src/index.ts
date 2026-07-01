@@ -34,6 +34,7 @@ export type {
   FavouriteIdsResponse,
 } from "./favourites-api";
 export {
+  getStripeConfig,
   deleteAccount,
   clearPushToken,
   listPaymentMethods,
