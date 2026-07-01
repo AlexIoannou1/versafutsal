@@ -316,11 +316,11 @@ async function seed() {
       .values({
         ownerId: owner2Id,
         status: "PENDING",
-        name: "Famagusta Futsal Club",
-        district: "Famagusta",
+        name: "Ayia Napa Futsal Club",
+        district: "Ayia Napa",
         address: "3 Salaminos Street, Paralimni 5280",
         description:
-          "New community futsal venue in the Famagusta area. Awaiting approval.",
+          "New community futsal venue in the Ayia Napa area. Awaiting approval.",
         amenities: ["Parking", "Changing Rooms"],
         cancellationWindowHours: 24,
       })

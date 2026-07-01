@@ -30,7 +30,8 @@ const DISTRICTS = [
   { key: "Limassol", label: "Limassol" },
   { key: "Larnaca", label: "Larnaca" },
   { key: "Paphos", label: "Paphos" },
-  { key: "Famagusta", label: "Famagusta" },
+  { key: "Ayia Napa", label: "Ayia Napa" },
+  { key: "Protaras", label: "Protaras" },
 ];
 
 const TYPES = [

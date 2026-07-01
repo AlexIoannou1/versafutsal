@@ -19,7 +19,8 @@ const DISTRICT_LABELS: Record<string, string> = {
   limassol: "Limassol",
   larnaca: "Larnaca",
   paphos: "Paphos",
-  famagusta: "Famagusta",
+  "ayia napa": "Ayia Napa",
+  protaras: "Protaras",
   kyrenia: "Kyrenia",
 };
 

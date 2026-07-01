@@ -4,7 +4,7 @@ export interface UpdateProfileRequest {
   name?: string;
   email?: string;
   phoneNumber?: string;
-  city?: string;
+  city?: string | null;
 }
 
 export interface UpdateProfileResponse {

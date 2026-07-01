@@ -23,7 +23,8 @@ const CYPRUS_CITIES = [
   "Limassol",
   "Larnaca",
   "Paphos",
-  "Famagusta",
+  "Ayia Napa",
+  "Protaras",
 ];
 
 interface Props {
@@ -88,7 +89,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
         name: name.trim(),
         email: email.trim().toLowerCase(),
         phoneNumber: phoneNumber.trim() || undefined,
-        city: city.trim() || undefined,
+        city: city.trim() || null,
       });
       onSaved({
         name: res.user.name,

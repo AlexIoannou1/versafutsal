@@ -28,7 +28,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 
-const DISTRICTS = ["Nicosia", "Limassol", "Larnaca", "Paphos", "Famagusta", "Kyrenia"];
+const DISTRICTS = ["Nicosia", "Limassol", "Larnaca", "Paphos", "Ayia Napa", "Protaras", "Kyrenia"];
 
 const AMENITIES_OPTIONS = [
   "Parking",
