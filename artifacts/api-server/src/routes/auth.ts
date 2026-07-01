@@ -213,7 +213,7 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
 
     if (name !== undefined) updates.name = name.trim();
     if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber.trim() || null;
-    if (city !== undefined) updates.city = city.trim() || null;
+    if (city !== undefined) updates.city = city?.trim() || null;
 
     if (email !== undefined) {
       const trimmed = email.trim().toLowerCase();

@@ -366,21 +366,6 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       );
                     })}
                   </View>
-                  <View style={s.inputRow}>
-                    <TextInput
-                      style={s.input}
-                      value={city}
-                      onChangeText={setCity}
-                      placeholder="Or type your city…"
-                      placeholderTextColor={colors.mutedForeground}
-                      autoCapitalize="words"
-                    />
-                    {city ? (
-                      <TouchableOpacity style={s.eyeBtn} onPress={() => setCity("")}>
-                        <FeatherIcons name="x" size={16} color={colors.mutedForeground} />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
                 </View>
 
                 <View style={{ height: 16 }} />
