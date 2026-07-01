@@ -33,3 +33,13 @@ export type {
   ListFavouritesResponse,
   FavouriteIdsResponse,
 } from "./favourites-api";
+export {
+  deleteAccount,
+  clearPushToken,
+  listPaymentMethods,
+  removePaymentMethod,
+} from "./account-api";
+export type {
+  SavedCard,
+  ListPaymentMethodsResponse,
+} from "./account-api";

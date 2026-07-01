@@ -6,6 +6,7 @@ import adminRouter from "./admin";
 import bookingsRouter from "./bookings";
 import paymentsRouter from "./payments";
 import favouritesRouter from "./favourites";
+import playerAccountRouter from "./player-account";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(adminRouter);
 router.use(bookingsRouter);
 router.use(paymentsRouter);
 router.use(favouritesRouter);
+router.use(playerAccountRouter);
 
 export default router;

@@ -3,6 +3,9 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { useAuth } from "@/context/AuthContext";
 import { registerPushToken } from "@workspace/api-client-react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+export const NOTIFICATIONS_PREF_KEY = "@futsalcy/notificationsEnabled";
 
 // expo-notifications Android push support was removed from Expo Go in SDK 53.
 // The module throws during initialization on Android Expo Go — static imports
@@ -20,6 +23,10 @@ export function usePushNotifications() {
 
     (async () => {
       try {
+        // Respect the user's notification opt-out preference
+        const pref = await AsyncStorage.getItem(NOTIFICATIONS_PREF_KEY);
+        if (pref === "false") return;
+
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const Notifications = require("expo-notifications");
         // eslint-disable-next-line @typescript-eslint/no-require-imports

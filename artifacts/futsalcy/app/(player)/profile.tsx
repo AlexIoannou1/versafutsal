@@ -87,6 +87,23 @@ export default function PlayerProfileScreen() {
       fontFamily: "Inter_600SemiBold",
       color: colors.foreground,
     },
+    settingsBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 12,
+    },
+    settingsBtnText: {
+      fontSize: 15,
+      fontFamily: "Inter_600SemiBold",
+      color: colors.foreground,
+    },
     logoutBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -119,6 +136,14 @@ export default function PlayerProfileScreen() {
         <TouchableOpacity style={s.editBtn} onPress={() => setEditVisible(true)}>
           <FeatherIcons name="edit-2" size={18} color={colors.foreground} />
           <Text style={s.editBtnText}>Edit Profile</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.settingsBtn}
+          onPress={() => router.push("/player/settings")}
+        >
+          <FeatherIcons name="settings" size={18} color={colors.foreground} />
+          <Text style={s.settingsBtnText}>Settings</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>

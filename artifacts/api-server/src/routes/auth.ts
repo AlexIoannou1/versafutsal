@@ -113,6 +113,11 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
+    if (user.deletedAt) {
+      res.status(401).json({ error: "This account has been deleted" });
+      return;
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       res.status(401).json({ error: "Invalid credentials" });

@@ -12,6 +12,7 @@ export const usersTable = pgTable("users", {
   role: roleEnum("role").notNull().default("PLAYER"),
   phoneNumber: text("phone_number"),
   pushToken: text("push_token"), // Expo push token for native notifications
+  deletedAt: timestamp("deleted_at"), // soft-delete; null = active account
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
