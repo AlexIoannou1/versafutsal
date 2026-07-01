@@ -9,6 +9,7 @@ import {
   numeric,
   boolean,
   time,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -114,6 +115,22 @@ export const maintenanceBlocksTable = pgTable("maintenance_blocks", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── Player Favourites ─────────────────────────────────────────────────────
+
+export const playerFavouritesTable = pgTable(
+  "player_favourites",
+  {
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    venueId: uuid("venue_id")
+      .notNull()
+      .references(() => venuesTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.playerId, t.venueId], name: "player_favourites_pk" })],
+);
+
 // ─── Relations ─────────────────────────────────────────────────────────────
 
 export const venuesRelations = relations(venuesTable, ({ one, many }) => ({
@@ -124,6 +141,7 @@ export const venuesRelations = relations(venuesTable, ({ one, many }) => ({
   photos: many(venuePhotosTable),
   pitches: many(pitchesTable),
   openingHours: many(openingHoursTable),
+  favouritedBy: many(playerFavouritesTable),
 }));
 
 export const pitchesRelations = relations(pitchesTable, ({ one, many }) => ({

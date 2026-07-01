@@ -14,6 +14,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
         <Label>Venues</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="favourites">
+        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
+        <Label>Favourites</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="bookings">
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>Bookings</Label>
@@ -69,6 +73,13 @@ function ClassicTabLayout() {
         options={{
           title: "Venues",
           tabBarIcon: ({ color }) => <FeatherIcons name="search" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="favourites"
+        options={{
+          title: "Favourites",
+          tabBarIcon: ({ color }) => <FeatherIcons name="heart" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

@@ -13,7 +13,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
-import { useGetVenue, type VenueDetail } from "@workspace/api-client-react";
+import {
+  useGetVenue,
+  type VenueDetail,
+  useFavouriteIds,
+  useToggleFavourite,
+} from "@workspace/api-client-react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -48,6 +53,10 @@ export default function PlayerVenueDetailScreen() {
 
   const { data, isLoading, error } = useGetVenue(id!);
   const venue: VenueDetail | undefined = data?.venue;
+
+  const { data: favouriteIdsData } = useFavouriteIds();
+  const isFavourited = (favouriteIdsData?.venueIds ?? []).includes(id!);
+  const toggleFavourite = useToggleFavourite();
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -226,6 +235,17 @@ export default function PlayerVenueDetailScreen() {
       backgroundColor: colors.border,
       marginTop: 20,
     },
+    venueHeaderRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
+    venueTitleFlex: { flex: 1 },
+    heartBtn: {
+      padding: 6,
+      marginLeft: 12,
+      marginTop: 2,
+    },
   });
 
   if (isLoading) {
@@ -316,7 +336,23 @@ export default function PlayerVenueDetailScreen() {
         </View>
 
         <View style={s.body}>
-          <Text style={s.venueName}>{String(venue.name)}</Text>
+          <View style={s.venueHeaderRow}>
+            <View style={s.venueTitleFlex}>
+              <Text style={s.venueName}>{String(venue.name)}</Text>
+            </View>
+            <TouchableOpacity
+              style={s.heartBtn}
+              onPress={() => toggleFavourite.mutate({ venueId: id!, isFavourited })}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={isFavourited ? "Remove from favourites" : "Add to favourites"}
+            >
+              <FeatherIcons
+                name="heart"
+                size={24}
+                color={isFavourited ? colors.destructive : colors.mutedForeground}
+              />
+            </TouchableOpacity>
+          </View>
           <View style={s.metaRow}>
             <FeatherIcons name="map-pin" size={14} color={colors.mutedForeground} />
             <Text style={s.metaText}>{String(venue.district)}</Text>

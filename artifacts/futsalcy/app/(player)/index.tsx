@@ -14,7 +14,12 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
-import { useListVenues, type VenueSummary } from "@workspace/api-client-react";
+import {
+  useListVenues,
+  type VenueSummary,
+  useFavouriteIds,
+  useToggleFavourite,
+} from "@workspace/api-client-react";
 
 type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
 
@@ -51,6 +56,10 @@ export default function PlayerVenuesScreen() {
   const [selectedType, setSelectedType] = useState("");
   const [minPriceText, setMinPriceText] = useState("");
   const [maxPriceText, setMaxPriceText] = useState("");
+
+  const { data: favouriteIdsData } = useFavouriteIds();
+  const favouriteIds = new Set(favouriteIdsData?.venueIds ?? []);
+  const toggleFavourite = useToggleFavourite();
 
   const minPrice = minPriceText.trim() !== "" ? parseFloat(minPriceText) : undefined;
   const maxPrice = maxPriceText.trim() !== "" ? parseFloat(maxPriceText) : undefined;
@@ -241,11 +250,22 @@ export default function PlayerVenuesScreen() {
       justifyContent: "center",
     },
     cardBody: { padding: 14 },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+    },
     cardName: {
       fontSize: 16,
       fontFamily: "Inter_600SemiBold",
       color: colors.foreground,
+      flex: 1,
       marginBottom: 4,
+    },
+    heartBtn: {
+      padding: 4,
+      marginLeft: 8,
+      marginTop: -2,
     },
     cardMeta: {
       flexDirection: "row",
@@ -512,9 +532,28 @@ export default function PlayerVenuesScreen() {
                 </View>
               )}
               <View style={s.cardBody}>
-                <Text style={s.cardName} numberOfLines={1}>
-                  {item.name}
-                </Text>
+                <View style={s.cardHeader}>
+                  <Text style={s.cardName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <TouchableOpacity
+                    style={s.heartBtn}
+                    onPress={() =>
+                      toggleFavourite.mutate({
+                        venueId: item.id,
+                        isFavourited: favouriteIds.has(item.id),
+                      })
+                    }
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel={favouriteIds.has(item.id) ? "Remove from favourites" : "Add to favourites"}
+                  >
+                    <FeatherIcons
+                      name="heart"
+                      size={20}
+                      color={favouriteIds.has(item.id) ? colors.destructive : colors.mutedForeground}
+                    />
+                  </TouchableOpacity>
+                </View>
                 <View style={s.cardMeta}>
                   <FeatherIcons name="map-pin" size={13} color={colors.mutedForeground} />
                   <Text style={s.cardMetaText}>{item.district}</Text>

@@ -23,3 +23,13 @@ export type {
   OwnerStatsParams,
   OwnerStatsResponse,
 } from "./manual-booking-api";
+export {
+  useListFavourites,
+  useFavouriteIds,
+  useToggleFavourite,
+} from "./favourites-api";
+export type {
+  FavouriteVenueSummary,
+  ListFavouritesResponse,
+  FavouriteIdsResponse,
+} from "./favourites-api";

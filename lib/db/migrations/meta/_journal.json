@@ -36,6 +36,13 @@
       "when": 1751155200000,
       "tag": "0004_partial_slot_constraint",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782890916721,
+      "tag": "0005_player_favourites",
+      "breakpoints": true
     }
   ]
 }
