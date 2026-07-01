@@ -57,6 +57,13 @@
       "when": 1751414460000,
       "tag": "0008_deleted_original_email",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1751414520000,
+      "tag": "0009_stripe_customer_id",
+      "breakpoints": true
     }
   ]
 }

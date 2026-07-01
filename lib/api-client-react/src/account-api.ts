@@ -31,6 +31,12 @@ export async function listPaymentMethods(): Promise<ListPaymentMethodsResponse> 
   });
 }
 
+export async function createSetupIntent(): Promise<{ clientSecret: string }> {
+  return customFetch<{ clientSecret: string }>("/api/player/payment-methods/setup-intent", {
+    method: "POST",
+  });
+}
+
 export async function removePaymentMethod(pmId: string): Promise<{ ok: boolean }> {
   return customFetch<{ ok: boolean }>(`/api/player/payment-methods/${pmId}`, {
     method: "DELETE",

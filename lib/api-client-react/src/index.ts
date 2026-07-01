@@ -37,6 +37,7 @@ export {
   deleteAccount,
   clearPushToken,
   listPaymentMethods,
+  createSetupIntent,
   removePaymentMethod,
 } from "./account-api";
 export type {
