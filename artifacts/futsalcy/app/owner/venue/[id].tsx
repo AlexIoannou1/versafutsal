@@ -1077,9 +1077,9 @@ export default function OwnerVenueDetailScreen() {
                   <View key={blk.id} style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.muted, borderRadius: 8, padding: 10, marginBottom: 6 }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.foreground }}>
-                        {new Date(blk.startAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {new Date(blk.startAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
                         {" – "}
-                        {new Date(blk.endAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        {new Date(blk.endAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
                       </Text>
                       {blk.reason && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>{blk.reason}</Text>}
                     </View>

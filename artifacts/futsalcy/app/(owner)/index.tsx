@@ -43,12 +43,13 @@ function formatDateShort(iso: string) {
     weekday: "short",
     day: "numeric",
     month: "short",
+    timeZone: "UTC",
   });
 }
 
 function formatTimeRange(startIso: string, endIso: string) {
   const fmt = (d: Date) =>
-    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
   return `${fmt(new Date(startIso))} – ${fmt(new Date(endIso))}`;
 }
 

@@ -36,11 +36,11 @@ const BOOKING_STATUS_COLORS: Record<string, string> = {
 };
 
 function formatDateShortAdmin(iso: string) {
-  return new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 function formatTimeAdmin(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
 }
 
 export default function AdminSettingsScreen() {

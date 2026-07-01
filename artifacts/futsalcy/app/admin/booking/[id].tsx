@@ -40,6 +40,7 @@ function formatDate(iso: string) {
     day: "numeric",
     month: "long",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -48,6 +49,7 @@ function formatTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone: "UTC",
   });
 }
 
