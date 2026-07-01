@@ -62,16 +62,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const user = userJson ? (JSON.parse(userJson) as AuthUser) : null;
 
+        // Set token getter BEFORE setState so that when the re-render fires
+        // (triggered by isLoaded: true) any auth-gated queries already have
+        // the getter available and won't race to a 401.
+        if (token) {
+          setAuthTokenGetter(() => token);
+        }
+
         setState({
           user,
           token,
           selectedMode: (mode as AppMode) || null,
           isLoaded: true,
         });
-
-        if (token) {
-          setAuthTokenGetter(() => token);
-        }
       } catch {
         setState((s) => ({ ...s, isLoaded: true }));
       }

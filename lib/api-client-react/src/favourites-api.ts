@@ -84,10 +84,10 @@ export function useToggleFavourite() {
       const prevList = queryClient.getQueryData<ListFavouritesResponse>([FAVOURITES_KEY]);
 
       queryClient.setQueryData<FavouriteIdsResponse>([FAVOURITES_IDS_KEY], (old) => {
-        if (!old) return old;
+        const currentIds = old?.venueIds ?? [];
         const ids = isFavourited
-          ? old.venueIds.filter((id) => id !== venueId)
-          : [...old.venueIds, venueId];
+          ? currentIds.filter((id) => id !== venueId)
+          : [...currentIds, venueId];
         return { venueIds: ids };
       });
 
@@ -105,10 +105,9 @@ export function useToggleFavourite() {
       return { prevIds, prevList };
     },
     onError: (_err, _vars, context) => {
-      if (context?.prevIds) {
-        queryClient.setQueryData([FAVOURITES_IDS_KEY], context.prevIds);
-      }
-      if (context?.prevList) {
+      // Always restore previous state (undefined clears optimistic data if cache was cold)
+      queryClient.setQueryData([FAVOURITES_IDS_KEY], context?.prevIds);
+      if (context?.prevList !== undefined) {
         queryClient.setQueryData([FAVOURITES_KEY], context.prevList);
       }
     },
