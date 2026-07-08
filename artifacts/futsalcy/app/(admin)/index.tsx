@@ -64,13 +64,13 @@ export default function AdminSettingsScreen() {
   const setVenueOverride = useSetVenueFeeOverride();
 
   const [editingFee, setEditingFee] = useState(false);
-  const [feeAmountInput, setFeeAmountInput] = useState("");
+  const [feePercentInput, setFeePercentInput] = useState("");
 
   useEffect(() => {
-    if (settings?.feeAmount) {
-      setFeeAmountInput(String(settings.feeAmount));
+    if (settings?.feePercent) {
+      setFeePercentInput(String(settings.feePercent));
     }
-  }, [settings?.feeAmount]);
+  }, [settings?.feePercent]);
 
   function invalidateSettings() {
     queryClient.invalidateQueries({ queryKey: getGetAdminSettingsQueryKey() });
@@ -83,20 +83,20 @@ export default function AdminSettingsScreen() {
     );
   }
 
-  function handleSaveFeeAmount() {
-    const parsed = parseFloat(feeAmountInput);
-    if (isNaN(parsed) || parsed < 0) {
-      Alert.alert("Invalid", "Please enter a valid fee amount (e.g. 1.00)");
+  function handleSaveFeePercent() {
+    const parsed = parseFloat(feePercentInput);
+    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+      Alert.alert("Invalid", "Please enter a valid percentage between 0 and 100 (e.g. 6.00)");
       return;
     }
     updateSettings.mutate(
-      { data: { feeAmount: parsed.toFixed(2) } },
+      { data: { feePercent: parsed.toFixed(2) } },
       {
         onSuccess: () => {
           invalidateSettings();
           setEditingFee(false);
         },
-        onError: () => Alert.alert("Error", "Failed to save fee amount."),
+        onError: () => Alert.alert("Error", "Failed to save fee percentage."),
       },
     );
   }
@@ -303,32 +303,32 @@ export default function AdminSettingsScreen() {
             />
           </View>
 
-          {/* Fee Amount */}
+          {/* Fee Percentage */}
           <View style={s.feeRow}>
             <View style={s.rowIcon}>
-              <FeatherIcons name="euro" size={18} color={colors.primary} />
+              <FeatherIcons name="percent" size={18} color={colors.primary} />
             </View>
             <View style={s.rowContent}>
-              <Text style={s.rowLabel}>Fee Amount</Text>
-              <Text style={s.rowSub}>Charged per booking (EUR)</Text>
+              <Text style={s.rowLabel}>Fee Percentage</Text>
+              <Text style={s.rowSub}>Charged as % of booking subtotal</Text>
             </View>
             {editingFee ? (
               <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
                 <TextInput
                   style={s.feeInput}
-                  value={feeAmountInput}
-                  onChangeText={setFeeAmountInput}
+                  value={feePercentInput}
+                  onChangeText={setFeePercentInput}
                   keyboardType="decimal-pad"
                   selectTextOnFocus
                   autoFocus
                 />
-                <TouchableOpacity style={s.saveBtn} onPress={handleSaveFeeAmount}>
+                <TouchableOpacity style={s.saveBtn} onPress={handleSaveFeePercent}>
                   <Text style={s.saveBtnText}>Save</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   onPress={() => {
                     setEditingFee(false);
-                    setFeeAmountInput(String(settings?.feeAmount ?? "1.00"));
+                    setFeePercentInput(String(settings?.feePercent ?? "6.00"));
                   }}
                 >
                   <FeatherIcons name="x" size={18} color={colors.mutedForeground} />
@@ -336,7 +336,7 @@ export default function AdminSettingsScreen() {
               </View>
             ) : (
               <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                <Text style={s.feeValue}>€{settings?.feeAmount ?? "1.00"}</Text>
+                <Text style={s.feeValue}>{settings?.feePercent ?? "6.00"}%</Text>
                 <TouchableOpacity style={s.editBtn} onPress={() => setEditingFee(true)}>
                   <Text style={s.editBtnText}>Edit</Text>
                 </TouchableOpacity>

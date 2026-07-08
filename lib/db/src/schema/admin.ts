@@ -16,9 +16,10 @@ import { relations } from "drizzle-orm";
 export const adminSettingsTable = pgTable("admin_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
   feeEnabled: boolean("fee_enabled").notNull().default(true),
-  feeAmount: numeric("fee_amount", { precision: 10, scale: 2 })
+  // Percentage of the booking subtotal charged as a platform service fee, e.g. "6.00" = 6%
+  feePercent: numeric("fee_percent", { precision: 5, scale: 2 })
     .notNull()
-    .default("1.00"),
+    .default("6.00"),
   // JSON: { [venueId: string]: boolean } — venue-level fee overrides
   perVenueOverrides: jsonb("per_venue_overrides")
     .$type<Record<string, boolean>>()

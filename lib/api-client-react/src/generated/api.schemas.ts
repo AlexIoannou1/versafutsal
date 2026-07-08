@@ -385,8 +385,8 @@ export interface CancelBookingResponse {
 
 export interface CheckoutFeeResponse {
   feeEnabled: boolean;
-  /** EUR amount string, e.g. "1.00" or "0.00" */
-  feeAmount: string;
+  /** Percentage of the booking subtotal charged as a service fee, e.g. "6.00" or "0.00" */
+  feePercent: string;
 }
 
 export type CheckoutRequestPaymentType =
@@ -457,8 +457,8 @@ export type AdminSettingsRecordPerVenueOverrides = { [key: string]: boolean };
 export interface AdminSettingsRecord {
   id: string;
   feeEnabled: boolean;
-  /** EUR amount string */
-  feeAmount: string;
+  /** Percentage of the booking subtotal charged as a service fee, e.g. "6.00" */
+  feePercent: string;
   /** Map of venueId to feeEnabled override */
   perVenueOverrides: AdminSettingsRecordPerVenueOverrides;
   updatedAt: string;
@@ -466,7 +466,7 @@ export interface AdminSettingsRecord {
 
 export interface UpdateAdminSettingsRequest {
   feeEnabled?: boolean;
-  feeAmount?: string;
+  feePercent?: string;
 }
 
 export interface VenueFeeOverrideRequest {

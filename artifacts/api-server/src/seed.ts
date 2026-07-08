@@ -32,7 +32,7 @@ async function seed() {
   if (existing.length === 0) {
     const [settings] = await db
       .insert(adminSettingsTable)
-      .values({ feeEnabled: true, feeAmount: "1.00", perVenueOverrides: {} })
+      .values({ feeEnabled: true, feePercent: "6.00", perVenueOverrides: {} })
       .returning();
     adminSettingsId = settings.id;
     console.log("✅ Admin settings created");

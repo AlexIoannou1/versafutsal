@@ -41,7 +41,4 @@ export {
   createSetupIntent,
   removePaymentMethod,
 } from "./account-api";
-export type {
-  SavedCard,
-  ListPaymentMethodsResponse,
-} from "./account-api";
+export type { SavedCard, ListPaymentMethodsResponse } from "./account-api";

@@ -2066,10 +2066,10 @@ components:
       properties:
         feeEnabled:
           type: boolean
-        feeAmount:
+        feePercent:
           type: string
-          description: EUR amount string, e.g. "1.00" or "0.00"
-      required: [feeEnabled, feeAmount]
+          description: Percentage of the booking subtotal charged as a service fee, e.g. "6.00" or "0.00"
+      required: [feeEnabled, feePercent]
 
     CheckoutRequest:
       type: object
@@ -2148,9 +2148,9 @@ components:
           format: uuid
         feeEnabled:
           type: boolean
-        feeAmount:
+        feePercent:
           type: string
-          description: EUR amount string
+          description: Percentage of the booking subtotal charged as a service fee, e.g. "6.00"
         perVenueOverrides:
           type: object
           additionalProperties:
@@ -2159,14 +2159,14 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, feeEnabled, feeAmount, perVenueOverrides, updatedAt]
+      required: [id, feeEnabled, feePercent, perVenueOverrides, updatedAt]
 
     UpdateAdminSettingsRequest:
       type: object
       properties:
         feeEnabled:
           type: boolean
-        feeAmount:
+        feePercent:
           type: string
 
     VenueFeeOverrideRequest:

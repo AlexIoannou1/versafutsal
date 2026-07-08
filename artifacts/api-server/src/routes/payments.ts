@@ -487,9 +487,9 @@ router.get("/admin/settings", requireAuth, requireRole("ADMIN"), async (_req, re
 
 router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { feeEnabled, feeAmount } = req.body as {
+    const { feeEnabled, feePercent } = req.body as {
       feeEnabled?: boolean;
-      feeAmount?: string;
+      feePercent?: string;
     };
 
     const settings = await getOrSeedAdminSettings();
@@ -498,7 +498,7 @@ router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, r
       updatedAt: new Date(),
     };
     if (typeof feeEnabled === "boolean") updates.feeEnabled = feeEnabled;
-    if (feeAmount !== undefined) updates.feeAmount = feeAmount;
+    if (feePercent !== undefined) updates.feePercent = feePercent;
 
     const [updated] = await db
       .update(adminSettingsTable)
@@ -567,7 +567,7 @@ router.get("/checkout/fee", requireAuth, async (req, res) => {
 
     res.json({
       feeEnabled,
-      feeAmount: feeEnabled ? settings.feeAmount : "0.00",
+      feePercent: feeEnabled ? settings.feePercent : "0.00",
     });
   } catch (err) {
     console.error("GET /checkout/fee error:", err);

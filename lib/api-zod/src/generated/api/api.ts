@@ -117,6 +117,7 @@ export const GetVenueResponse = zod.object({
       description: zod.string().nullish(),
       amenities: zod.array(zod.string()),
       cancellationWindowHours: zod.number(),
+      contactPhone: zod.string().nullish(),
       rejectionReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -227,6 +228,7 @@ export const CreateVenueBody = zod.object({
   cancellationWindowHours: zod
     .number()
     .default(createVenueBodyCancellationWindowHoursDefault),
+  contactPhone: zod.string(),
 });
 
 /**
@@ -251,6 +253,7 @@ export const GetOwnerVenueResponse = zod.object({
       description: zod.string().nullish(),
       amenities: zod.array(zod.string()),
       cancellationWindowHours: zod.number(),
+      contactPhone: zod.string().nullish(),
       rejectionReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -333,6 +336,7 @@ export const UpdateVenueBody = zod.object({
   description: zod.string().optional(),
   amenities: zod.array(zod.string()).optional(),
   cancellationWindowHours: zod.number().optional(),
+  contactPhone: zod.string().optional(),
 });
 
 export const UpdateVenueResponse = zod.object({
@@ -346,6 +350,7 @@ export const UpdateVenueResponse = zod.object({
     description: zod.string().nullish(),
     amenities: zod.array(zod.string()),
     cancellationWindowHours: zod.number(),
+    contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -377,6 +382,7 @@ export const SubmitVenueForApprovalResponse = zod.object({
     description: zod.string().nullish(),
     amenities: zod.array(zod.string()),
     cancellationWindowHours: zod.number(),
+    contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -888,6 +894,7 @@ export const AdminListVenuesResponse = zod.object({
         description: zod.string().nullish(),
         amenities: zod.array(zod.string()),
         cancellationWindowHours: zod.number(),
+        contactPhone: zod.string().nullish(),
         rejectionReason: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
@@ -925,6 +932,7 @@ export const AdminGetVenueResponse = zod.object({
       description: zod.string().nullish(),
       amenities: zod.array(zod.string()),
       cancellationWindowHours: zod.number(),
+      contactPhone: zod.string().nullish(),
       rejectionReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
@@ -960,6 +968,7 @@ export const ApproveVenueResponse = zod.object({
     description: zod.string().nullish(),
     amenities: zod.array(zod.string()),
     cancellationWindowHours: zod.number(),
+    contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -988,6 +997,7 @@ export const RejectVenueResponse = zod.object({
     description: zod.string().nullish(),
     amenities: zod.array(zod.string()),
     cancellationWindowHours: zod.number(),
+    contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1160,9 +1170,11 @@ export const GetCheckoutFeeQueryParams = zod.object({
 
 export const GetCheckoutFeeResponse = zod.object({
   feeEnabled: zod.boolean(),
-  feeAmount: zod
+  feePercent: zod
     .string()
-    .describe('EUR amount string, e.g. \"1.00\" or \"0.00\"'),
+    .describe(
+      'Percentage of the booking subtotal charged as a service fee, e.g. \"6.00\" or \"0.00\"',
+    ),
 });
 
 /**
@@ -1253,7 +1265,11 @@ export const GetAdminSettingsResponse = zod.object({
   settings: zod.object({
     id: zod.string().uuid(),
     feeEnabled: zod.boolean(),
-    feeAmount: zod.string().describe("EUR amount string"),
+    feePercent: zod
+      .string()
+      .describe(
+        'Percentage of the booking subtotal charged as a service fee, e.g. \"6.00\"',
+      ),
     perVenueOverrides: zod
       .record(zod.string(), zod.boolean())
       .describe("Map of venueId to feeEnabled override"),
@@ -1266,14 +1282,18 @@ export const GetAdminSettingsResponse = zod.object({
  */
 export const UpdateAdminSettingsBody = zod.object({
   feeEnabled: zod.boolean().optional(),
-  feeAmount: zod.string().optional(),
+  feePercent: zod.string().optional(),
 });
 
 export const UpdateAdminSettingsResponse = zod.object({
   settings: zod.object({
     id: zod.string().uuid(),
     feeEnabled: zod.boolean(),
-    feeAmount: zod.string().describe("EUR amount string"),
+    feePercent: zod
+      .string()
+      .describe(
+        'Percentage of the booking subtotal charged as a service fee, e.g. \"6.00\"',
+      ),
     perVenueOverrides: zod
       .record(zod.string(), zod.boolean())
       .describe("Map of venueId to feeEnabled override"),
@@ -1299,7 +1319,11 @@ export const SetVenueFeeOverrideResponse = zod.object({
   settings: zod.object({
     id: zod.string().uuid(),
     feeEnabled: zod.boolean(),
-    feeAmount: zod.string().describe("EUR amount string"),
+    feePercent: zod
+      .string()
+      .describe(
+        'Percentage of the booking subtotal charged as a service fee, e.g. \"6.00\"',
+      ),
     perVenueOverrides: zod
       .record(zod.string(), zod.boolean())
       .describe("Map of venueId to feeEnabled override"),

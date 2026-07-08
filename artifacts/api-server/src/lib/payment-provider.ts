@@ -38,14 +38,14 @@ export interface PaymentProvider {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getEffectiveFee(venueId: string): Promise<{ feeAmount: string; feeWaived: boolean }> {
+async function getEffectiveFeePercent(venueId: string): Promise<{ feePercent: string; feeWaived: boolean }> {
   const [settings] = await db
     .select()
     .from(adminSettingsTable)
     .limit(1);
 
   if (!settings || !settings.feeEnabled) {
-    return { feeAmount: "0.00", feeWaived: true };
+    return { feePercent: "0.00", feeWaived: true };
   }
 
   // Check per-venue override
@@ -53,11 +53,17 @@ async function getEffectiveFee(venueId: string): Promise<{ feeAmount: string; fe
   if (Object.prototype.hasOwnProperty.call(overrides, venueId)) {
     const venueEnabled = overrides[venueId];
     if (!venueEnabled) {
-      return { feeAmount: "0.00", feeWaived: true };
+      return { feePercent: "0.00", feeWaived: true };
     }
   }
 
-  return { feeAmount: settings.feeAmount, feeWaived: false };
+  return { feePercent: settings.feePercent, feeWaived: false };
+}
+
+// Computes the EUR fee amount charged for a given base amount, as a percentage of that amount.
+function computeFeeAmount(baseAmount: string, feePercent: string): string {
+  const fee = parseFloat(baseAmount) * (parseFloat(feePercent) / 100);
+  return fee.toFixed(2);
 }
 
 function computeDepositAmount(subtotal: string): string {
@@ -81,12 +87,14 @@ export class MockPaymentProvider implements PaymentProvider {
   }): Promise<PaymentIntentResult> {
     const { bookingId, venueId, subtotalAmount, paymentType, idempotencyKey, depositAmountOverride } = opts;
 
-    const { feeAmount, feeWaived } = await getEffectiveFee(venueId);
+    const { feePercent, feeWaived } = await getEffectiveFeePercent(venueId);
 
     const baseAmount =
       paymentType === "DEPOSIT"
         ? (depositAmountOverride ?? computeDepositAmount(subtotalAmount))
         : subtotalAmount;
+
+    const feeAmount = feeWaived ? "0.00" : computeFeeAmount(baseAmount, feePercent);
 
     const totalAmount = feeWaived
       ? baseAmount

@@ -106,10 +106,14 @@ export default function BookSummaryScreen() {
   })();
 
   const feeEnabled = feeData?.feeEnabled ?? true;
-  const feeAmount = feeEnabled ? parseFloat(feeData?.feeAmount ?? "1.00") : 0;
-  const feeLabel = feeEnabled ? `€${feeAmount.toFixed(2)}` : "Waived";
+  const feePercent = feeEnabled ? parseFloat(feeData?.feePercent ?? "6.00") : 0;
 
   const baseAmount = paymentType === "DEPOSIT" && depositAmount != null ? depositAmount : subtotal;
+  const feeAmount = feeEnabled && baseAmount != null ? baseAmount * (feePercent / 100) : 0;
+  const feeLabel = feeEnabled
+    ? `€${feeAmount.toFixed(2)} (${feePercent}%)`
+    : "Waived";
+
   const totalDue = baseAmount != null ? baseAmount + feeAmount : null;
 
   const { mutate: createBooking } = useCreateBooking();
