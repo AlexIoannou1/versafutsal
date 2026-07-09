@@ -7,8 +7,9 @@ import {
   pricingRulesTable,
   venuePhotosTable,
   maintenanceBlocksTable,
+  bookingsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, inArray, sql } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql, gt } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -595,11 +596,81 @@ router.put<{ id: string; pitchId: string }>(
         slotDurationMinutes: number;
       }>;
 
+      // Validate provided fields
+      if (name !== undefined && !name.trim()) {
+        res.status(400).json({ error: "name cannot be empty" });
+        return;
+      }
+      if (size !== undefined && !size.trim()) {
+        res.status(400).json({ error: "size cannot be empty" });
+        return;
+      }
+      if (type !== undefined && !["INDOOR", "OUTDOOR", "HYBRID"].includes(type)) {
+        res.status(400).json({ error: "type must be INDOOR, OUTDOOR, or HYBRID" });
+        return;
+      }
+      if (slotDurationMinutes !== undefined) {
+        if (!Number.isInteger(slotDurationMinutes) || slotDurationMinutes < 15 || slotDurationMinutes > 240) {
+          res.status(400).json({ error: "slotDurationMinutes must be an integer between 15 and 240" });
+          return;
+        }
+      }
+
+      // Fetch the current pitch
+      const [existing] = await db
+        .select()
+        .from(pitchesTable)
+        .where(
+          and(
+            eq(pitchesTable.id, req.params.pitchId),
+            eq(pitchesTable.venueId, req.params.id),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Pitch not found" });
+        return;
+      }
+
+      // Booking conflict check: if slotDurationMinutes is changing, ensure no future active bookings
+      if (slotDurationMinutes !== undefined && slotDurationMinutes !== existing.slotDurationMinutes) {
+        const now = new Date();
+        const conflictingBookings = await db
+          .select({
+            id: bookingsTable.id,
+            startAt: bookingsTable.startAt,
+            endAt: bookingsTable.endAt,
+            status: bookingsTable.status,
+          })
+          .from(bookingsTable)
+          .where(
+            and(
+              eq(bookingsTable.pitchId, req.params.pitchId),
+              gt(bookingsTable.startAt, now),
+              sql`(${bookingsTable.status} = 'PENDING' OR ${bookingsTable.status} = 'CONFIRMED')`,
+            ),
+          );
+
+        if (conflictingBookings.length > 0) {
+          res.status(409).json({
+            error: "Cannot change slot duration: this pitch has existing future bookings that would be affected.",
+            conflictingBookings: conflictingBookings.map((b) => ({
+              id: b.id,
+              startAt: b.startAt.toISOString(),
+              endAt: b.endAt.toISOString(),
+              status: b.status,
+            })),
+          });
+          return;
+        }
+      }
+
       const [updated] = await db
         .update(pitchesTable)
         .set({
-          ...(name !== undefined && { name }),
-          ...(size !== undefined && { size }),
+          ...(name !== undefined && { name: name.trim() }),
+          ...(size !== undefined && { size: size.trim() }),
           ...(type !== undefined && { type }),
           ...(slotDurationMinutes !== undefined && { slotDurationMinutes }),
         })
@@ -610,11 +681,6 @@ router.put<{ id: string; pitchId: string }>(
           ),
         )
         .returning();
-
-      if (!updated) {
-        res.status(404).json({ error: "Pitch not found" });
-        return;
-      }
 
       res.json({ pitch: updated });
     } catch (err) {

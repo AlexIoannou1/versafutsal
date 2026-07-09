@@ -12,7 +12,7 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
@@ -22,7 +22,6 @@ import {
   useGetOwnerVenue,
   getGetOwnerVenueQueryKey,
   getListOwnerVenuesQueryKey,
-  updateVenue,
   submitVenueForApproval,
   addVenuePhoto,
   deleteVenuePhoto,
@@ -103,19 +102,11 @@ export default function OwnerVenueDetailScreen() {
   const navigation = useNavigation();
   const queryClient = useQueryClient();
 
+  const router = useRouter();
   const { data, isLoading, refetch } = useGetOwnerVenue(id!);
   const venue = (data as { venue?: VenueDetail })?.venue;
 
   const [submitting, setSubmitting] = useState(false);
-
-  // ─── Edit details modal state ─────────────────────────────────────────────
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editAddress, setEditAddress] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editContactPhone, setEditContactPhone] = useState("");
-  const [editCancellationWindowHours, setEditCancellationWindowHours] = useState("24");
-  const [editSaving, setEditSaving] = useState(false);
 
   // ─── Photo state ──────────────────────────────────────────────────────────
   const [photoUrl, setPhotoUrl] = useState("");
@@ -252,46 +243,9 @@ export default function OwnerVenueDetailScreen() {
   };
 
   // ─── Edit venue details ───────────────────────────────────────────────────
-  const openEditModal = () => {
-    if (!venue) return;
-    setEditName(venue.name);
-    setEditAddress(venue.address);
-    setEditDescription(venue.description ?? "");
-    setEditContactPhone((venue as VenueDetail & { contactPhone?: string | null }).contactPhone ?? "");
-    setEditCancellationWindowHours(String(venue.cancellationWindowHours ?? 24));
-    setEditModalVisible(true);
-  };
-
-  const handleSaveDetails = async () => {
-    if (!editName.trim()) {
-      Alert.alert("Error", "Venue name is required.");
-      return;
-    }
-    if (!editContactPhone.trim()) {
-      Alert.alert("Error", "Contact phone number is required.");
-      return;
-    }
-    const windowHours = parseInt(editCancellationWindowHours, 10);
-    if (isNaN(windowHours) || windowHours < 0) {
-      Alert.alert("Error", "Cancellation window must be a non-negative number of hours.");
-      return;
-    }
-    setEditSaving(true);
-    try {
-      await updateVenue(id!, {
-        name: editName.trim(),
-        address: editAddress.trim(),
-        description: editDescription.trim() || undefined,
-        contactPhone: editContactPhone.trim(),
-        cancellationWindowHours: windowHours,
-      });
-      setEditModalVisible(false);
-      invalidate();
-    } catch {
-      Alert.alert("Error", "Failed to save changes.");
-    } finally {
-      setEditSaving(false);
-    }
+  const openEditVenue = () => {
+    if (!id) return;
+    router.push(`/owner/venue/${id}/edit`);
   };
 
   // ─── Photos ───────────────────────────────────────────────────────────────
@@ -763,7 +717,7 @@ export default function OwnerVenueDetailScreen() {
         <View style={s.section}>
           <View style={s.sectionHeader}>
             <Text style={s.sectionTitle}>Venue Details</Text>
-            <TouchableOpacity style={s.editBtn} onPress={openEditModal}>
+            <TouchableOpacity style={s.editBtn} onPress={openEditVenue}>
               <FeatherIcons name="edit-2" size={14} color={colors.primary} />
               <Text style={s.editBtnText}>Edit</Text>
             </TouchableOpacity>
@@ -871,13 +825,20 @@ export default function OwnerVenueDetailScreen() {
                 <Text style={s.noPricingText}>No pricing set</Text>
               )}
               <View style={s.pitchActions}>
+                <TouchableOpacity
+                  style={[s.pitchActionBtn, { borderColor: colors.primary + "60" }]}
+                  onPress={() => router.push(`/owner/venue/${id}/pitch/${pitch.id}/edit`)}
+                >
+                  <FeatherIcons name="edit-2" size={12} color={colors.primary} />
+                  <Text style={[s.pitchActionText, { color: colors.primary }]}>Edit</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={s.pitchActionBtn} onPress={() => openPricingModal(pitch)}>
                   <FeatherIcons name="dollar-sign" size={12} color={colors.foreground} />
-                  <Text style={s.pitchActionText}>Set Pricing</Text>
+                  <Text style={s.pitchActionText}>Pricing</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.pitchActionBtn, { borderColor: colors.primary + "60" }]} onPress={() => openBlockModal(pitch)}>
+                <TouchableOpacity style={[s.pitchActionBtn, { borderColor: colors.primary + "40" }]} onPress={() => openBlockModal(pitch)}>
                   <FeatherIcons name="slash" size={12} color={colors.primary} />
-                  <Text style={[s.pitchActionText, { color: colors.primary }]}>Maintenance</Text>
+                  <Text style={[s.pitchActionText, { color: colors.primary }]}>Block</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.pitchActionBtn, { borderColor: colors.destructive + "40" }]}
@@ -954,70 +915,6 @@ export default function OwnerVenueDetailScreen() {
           )}
         </View>
       </ScrollView>
-
-      {/* Edit Details Modal */}
-      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
-        <KeyboardAvoidingView style={s.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={s.modalSheet} keyboardShouldPersistTaps="handled">
-            <Text style={s.modalTitle}>Edit Venue Details</Text>
-            <View style={s.mField}>
-              <Text style={s.mLabel}>Venue Name</Text>
-              <TextInput style={s.mInput} value={editName} onChangeText={setEditName} />
-            </View>
-            <View style={s.mField}>
-              <Text style={s.mLabel}>Address</Text>
-              <TextInput style={s.mInput} value={editAddress} onChangeText={setEditAddress} />
-            </View>
-            <View style={s.mField}>
-              <Text style={s.mLabel}>Contact Phone Number *</Text>
-              <TextInput
-                style={s.mInput}
-                value={editContactPhone}
-                onChangeText={setEditContactPhone}
-                placeholder="e.g. +357 99 123456"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="phone-pad"
-                autoComplete="tel"
-              />
-              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
-                Use the number listed on Google Maps or social media.
-              </Text>
-            </View>
-            <View style={s.mField}>
-              <Text style={s.mLabel}>Description</Text>
-              <TextInput
-                style={s.mTextArea}
-                value={editDescription}
-                onChangeText={setEditDescription}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-            <View style={s.mField}>
-              <Text style={s.mLabel}>Cancellation Window (hours)</Text>
-              <TextInput
-                style={s.mInput}
-                value={editCancellationWindowHours}
-                onChangeText={setEditCancellationWindowHours}
-                keyboardType="numeric"
-                placeholder="24"
-                placeholderTextColor={colors.mutedForeground}
-              />
-              <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
-                Players can cancel up to this many hours before the booking starts.
-              </Text>
-            </View>
-            <View style={s.mActions}>
-              <TouchableOpacity style={s.mCancelBtn} onPress={() => setEditModalVisible(false)}>
-                <Text style={s.mCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.mSaveBtn, editSaving && { opacity: 0.5 }]} onPress={handleSaveDetails} disabled={editSaving}>
-                <Text style={s.mSaveText}>{editSaving ? "Saving…" : "Save"}</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* Add Pitch Modal */}
       <Modal visible={pitchModalVisible} transparent animationType="slide" onRequestClose={() => setPitchModalVisible(false)}>
