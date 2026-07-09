@@ -77,13 +77,13 @@ export default function ModeSelectScreen() {
     badgeText: {
       color: colors.primaryForeground,
       fontSize: 11,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       letterSpacing: 1.5,
       textTransform: "uppercase",
     },
     title: {
       fontSize: 40,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       lineHeight: 46,
     },
@@ -92,7 +92,7 @@ export default function ModeSelectScreen() {
     },
     subtitle: {
       fontSize: 16,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       lineHeight: 24,
       marginTop: 4,
@@ -125,13 +125,13 @@ export default function ModeSelectScreen() {
     },
     cardLabel: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       marginBottom: 2,
     },
     cardSubtitle: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     adminLink: {
@@ -140,7 +140,7 @@ export default function ModeSelectScreen() {
     },
     adminText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textDecorationLine: "underline",
     },
@@ -151,7 +151,7 @@ export default function ModeSelectScreen() {
       <StatusBar barStyle="light-content" />
       <View style={s.hero}>
         <View style={s.badge}>
-          <Text style={s.badgeText}>FutsalCY</Text>
+          <Text style={s.badgeText}>Versa</Text>
         </View>
         <Text style={s.title}>
           Book your{"\n"}

@@ -203,17 +203,17 @@ export default function OwnerBookingNewScreen() {
     },
     progressLabel: {
       fontSize: 10,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     progressLabelActive: {
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
     },
 
     sectionTitle: {
       fontSize: 16,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       paddingHorizontal: 16,
       paddingBottom: 12,
@@ -239,12 +239,12 @@ export default function OwnerBookingNewScreen() {
     },
     listItemTitle: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     listItemSub: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 1,
     },
@@ -267,10 +267,10 @@ export default function OwnerBookingNewScreen() {
       borderWidth: 1, borderColor: colors.border,
       alignItems: "center", justifyContent: "center",
     },
-    monthLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: colors.foreground },
+    monthLabel: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
     dayNamesRow: { flexDirection: "row", paddingHorizontal: 8, marginBottom: 4 },
     dayNameCell: { flex: 1, alignItems: "center", paddingVertical: 4 },
-    dayNameText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    dayNameText: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground },
     gridRow: { flexDirection: "row", paddingHorizontal: 8 },
     dayCell: {
       flex: 1, aspectRatio: 1, alignItems: "center", justifyContent: "center",
@@ -278,17 +278,17 @@ export default function OwnerBookingNewScreen() {
     },
     dayCellToday: { borderWidth: 1, borderColor: colors.primary },
     dayCellSelected: { backgroundColor: colors.primary },
-    dayText: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground },
+    dayText: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.foreground },
     dayTextAdjacent: { opacity: 0.3 },
     dayTextPast: { color: colors.mutedForeground, opacity: 0.4 },
-    dayTextToday: { color: colors.primary, fontFamily: "Inter_600SemiBold" },
-    dayTextSelected: { color: colors.primaryForeground, fontFamily: "Inter_600SemiBold" },
+    dayTextToday: { color: colors.primary, fontFamily: "PlusJakartaSans_600SemiBold" },
+    dayTextSelected: { color: colors.primaryForeground, fontFamily: "PlusJakartaSans_600SemiBold" },
 
     // Slot grid
     slotsSection: { flex: 1 },
     slotsHeader: { padding: 16, paddingBottom: 8 },
-    slotsTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: colors.foreground },
-    slotsSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
+    slotsTitle: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
+    slotsSub: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 },
     slotsGrid: { flexDirection: "row", flexWrap: "wrap", padding: 12, gap: 10 },
     slot: {
       width: "30%", minWidth: 88, paddingVertical: 12, paddingHorizontal: 8,
@@ -298,15 +298,15 @@ export default function OwnerBookingNewScreen() {
     slotAvailable: { borderColor: colors.primary + "60" },
     slotSelected: { borderColor: colors.primary, backgroundColor: colors.primary + "20" },
     slotUnavailable: { opacity: 0.4 },
-    slotTime: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground },
+    slotTime: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.mutedForeground },
     slotTimeAvailable: { color: colors.foreground },
     slotTimeSelected: { color: colors.primary },
     noDateWrap: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 32, gap: 8 },
-    noDateText: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" },
+    noDateText: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, textAlign: "center" },
 
     // Guest details
     formSection: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
-    fieldLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, marginBottom: 6 },
+    fieldLabel: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.mutedForeground, marginBottom: 6 },
     textInput: {
       backgroundColor: colors.card,
       borderRadius: 10,
@@ -315,7 +315,7 @@ export default function OwnerBookingNewScreen() {
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
 
@@ -331,7 +331,7 @@ export default function OwnerBookingNewScreen() {
     },
     reviewCardTitle: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
       letterSpacing: 0.8,
       paddingHorizontal: 16,
@@ -348,8 +348,8 @@ export default function OwnerBookingNewScreen() {
       gap: 10,
     },
     reviewRowFirst: { borderTopWidth: 0 },
-    reviewLabel: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, width: 70 },
-    reviewValue: { fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground, flex: 1 },
+    reviewLabel: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, width: 70 },
+    reviewValue: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground, flex: 1 },
 
     // Bottom bar
     bottomBar: {
@@ -368,7 +368,7 @@ export default function OwnerBookingNewScreen() {
       justifyContent: "center",
     },
     primaryBtnDisabled: { opacity: 0.5 },
-    primaryBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground },
+    primaryBtnText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
     secondaryBtn: {
       borderRadius: 12,
       height: 44,
@@ -377,7 +377,7 @@ export default function OwnerBookingNewScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    secondaryBtnText: { fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground },
+    secondaryBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
 
     noVenues: {
       flex: 1,
@@ -388,7 +388,7 @@ export default function OwnerBookingNewScreen() {
     },
     noVenuesText: {
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },

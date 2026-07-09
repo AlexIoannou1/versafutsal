@@ -1,10 +1,10 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
   useFonts,
-} from "@expo-google-fonts/inter";
+} from "@expo-google-fonts/plus-jakarta-sans";
 // FeatherIcons font loaded under a unique name to bypass Expo Go's pre-registered
 // 'feather' font (which causes boxed-X glyphs on Android). See components/FeatherIcons.tsx.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -43,7 +43,7 @@ function RootLayoutNav() {
         headerShown: false,
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+        headerTitleStyle: { fontFamily: "PlusJakartaSans_600SemiBold" },
       }}
     >
       <Stack.Screen name="index" />
@@ -98,10 +98,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
     FeatherIcons: FeatherFont,
   });
 

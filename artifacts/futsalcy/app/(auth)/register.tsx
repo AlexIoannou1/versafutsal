@@ -58,7 +58,7 @@ export default function RegisterScreen() {
       >
         <Text
           style={{
-            fontFamily: "Inter_700Bold",
+            fontFamily: "PlusJakartaSans_700Bold",
             fontSize: 18,
             color: colors.foreground,
             textAlign: "center",
@@ -69,7 +69,7 @@ export default function RegisterScreen() {
         </Text>
         <Text
           style={{
-            fontFamily: "Inter_400Regular",
+            fontFamily: "PlusJakartaSans_400Regular",
             fontSize: 14,
             color: colors.mutedForeground,
             textAlign: "center",
@@ -90,7 +90,7 @@ export default function RegisterScreen() {
         >
           <Text
             style={{
-              fontFamily: "Inter_600SemiBold",
+              fontFamily: "PlusJakartaSans_600SemiBold",
               fontSize: 15,
               color: colors.primaryForeground,
             }}
@@ -162,7 +162,7 @@ export default function RegisterScreen() {
     backBtn: { marginBottom: 32 },
     mode: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.primary,
       marginBottom: 4,
       textTransform: "uppercase",
@@ -170,20 +170,20 @@ export default function RegisterScreen() {
     },
     title: {
       fontSize: 28,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 8,
     },
     subtitle: {
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginBottom: 32,
     },
     field: { marginBottom: 16 },
     label: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       marginBottom: 6,
     },
@@ -203,13 +203,13 @@ export default function RegisterScreen() {
       flex: 1,
       height: 48,
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     eyeBtn: { padding: 4 },
     hint: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 4,
     },
@@ -224,18 +224,18 @@ export default function RegisterScreen() {
     },
     submitText: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     loginLink: { alignItems: "center" },
     loginText: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     loginBold: {
       color: colors.primary,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
   });
 
@@ -252,7 +252,7 @@ export default function RegisterScreen() {
 
         <Text style={s.mode}>{MODE_LABELS[selectedMode || "PLAYER"] || "Player"} Mode</Text>
         <Text style={s.title}>Create account</Text>
-        <Text style={s.subtitle}>Join FutsalCY and start booking</Text>
+        <Text style={s.subtitle}>Join Versa and start booking</Text>
 
         <View style={s.field}>
           <Text style={s.label}>Full name</Text>

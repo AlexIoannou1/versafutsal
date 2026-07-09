@@ -211,14 +211,14 @@ export default function BookSummaryScreen() {
     },
     heroTitle: {
       fontSize: 20,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 4,
       textAlign: "center",
     },
     heroSub: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -233,7 +233,7 @@ export default function BookSummaryScreen() {
     },
     cardTitle: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
       letterSpacing: 0.8,
       paddingHorizontal: 16,
@@ -254,13 +254,13 @@ export default function BookSummaryScreen() {
     rowIcon: { width: 20, alignItems: "center" },
     rowLabel: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       width: 80,
     },
     rowValue: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       flex: 1,
     },
@@ -285,17 +285,17 @@ export default function BookSummaryScreen() {
     breakdownRowFirst: { borderTopWidth: 0 },
     breakdownLabel: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     breakdownValue: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     breakdownFeeWaived: {
       fontSize: 12,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.primary,
     },
     totalRow: {
@@ -310,12 +310,12 @@ export default function BookSummaryScreen() {
     },
     totalLabel: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     totalValue: {
       fontSize: 20,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.primary,
     },
     selectorCard: {
@@ -325,7 +325,7 @@ export default function BookSummaryScreen() {
     },
     selectorLabel: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.8,
@@ -350,13 +350,13 @@ export default function BookSummaryScreen() {
     },
     selectorBtnTitle: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
     },
     selectorBtnTitleActive: { color: colors.primary },
     selectorBtnSub: {
       fontSize: 11,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -369,7 +369,7 @@ export default function BookSummaryScreen() {
     },
     disclaimerText: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       flex: 1,
       lineHeight: 18,
@@ -384,7 +384,7 @@ export default function BookSummaryScreen() {
     },
     errorText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: "#EF4444",
       textAlign: "center",
     },
@@ -400,7 +400,7 @@ export default function BookSummaryScreen() {
     primaryBtnDisabled: { opacity: 0.6 },
     primaryBtnText: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     secondaryBtn: {
@@ -413,7 +413,7 @@ export default function BookSummaryScreen() {
     },
     secondaryBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
   });

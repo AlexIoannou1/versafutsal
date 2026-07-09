@@ -122,7 +122,7 @@ export default function AdminVenuesScreen() {
     },
     headerTitle: {
       fontSize: 20,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 12,
     },
@@ -133,7 +133,7 @@ export default function AdminVenuesScreen() {
       borderRadius: 20,
       borderWidth: 1,
     },
-    tabText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+    tabText: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     emptyIcon: {
       width: 64,
@@ -146,13 +146,13 @@ export default function AdminVenuesScreen() {
     },
     emptyTitle: {
       fontSize: 18,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       marginBottom: 8,
     },
     emptySub: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -173,7 +173,7 @@ export default function AdminVenuesScreen() {
     },
     venueName: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       flex: 1,
       marginRight: 8,
@@ -183,9 +183,9 @@ export default function AdminVenuesScreen() {
       paddingHorizontal: 10,
       paddingVertical: 4,
     },
-    badgeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+    badgeText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold" },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
-    metaText: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    metaText: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
     ownerBox: {
       backgroundColor: colors.muted,
       borderRadius: 8,
@@ -197,10 +197,10 @@ export default function AdminVenuesScreen() {
     },
     ownerText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
-    ownerName: { fontFamily: "Inter_500Medium", color: colors.foreground },
+    ownerName: { fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     rejBox: {
       backgroundColor: colors.destructive + "15",
       borderRadius: 8,
@@ -209,11 +209,11 @@ export default function AdminVenuesScreen() {
     },
     rejLabel: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.destructive,
       marginBottom: 2,
     },
-    rejText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.destructive },
+    rejText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.destructive },
     actions: { flexDirection: "row", gap: 8, marginTop: 12 },
     approveBtn: {
       flex: 1,
@@ -227,7 +227,7 @@ export default function AdminVenuesScreen() {
     },
     approveBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     rejectBtn: {
@@ -242,7 +242,7 @@ export default function AdminVenuesScreen() {
       borderWidth: 1,
       borderColor: colors.destructive + "40",
     },
-    rejectBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.destructive },
+    rejectBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.destructive },
     modalOverlay: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.5)",
@@ -257,13 +257,13 @@ export default function AdminVenuesScreen() {
     },
     modalTitle: {
       fontSize: 18,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 8,
     },
     modalSub: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginBottom: 16,
     },
@@ -274,7 +274,7 @@ export default function AdminVenuesScreen() {
       borderColor: colors.border,
       padding: 14,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       minHeight: 80,
       textAlignVertical: "top",
@@ -289,7 +289,7 @@ export default function AdminVenuesScreen() {
       borderColor: colors.border,
       alignItems: "center",
     },
-    cancelBtnText: { fontSize: 15, fontFamily: "Inter_500Medium", color: colors.foreground },
+    cancelBtnText: { fontSize: 15, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     confirmRejectBtn: {
       flex: 1,
       backgroundColor: colors.destructive,
@@ -299,7 +299,7 @@ export default function AdminVenuesScreen() {
     },
     confirmRejectText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: "#FFFFFF",
     },
   });

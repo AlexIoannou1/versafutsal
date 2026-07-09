@@ -121,28 +121,28 @@ export default function PlayerProfileScreen() {
     },
     name: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       textAlign: "center",
       marginBottom: 4,
     },
     email: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
     },
     phone: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
     },
     city: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
@@ -157,7 +157,7 @@ export default function PlayerProfileScreen() {
     },
     roleText: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
     },
     editBtn: {
@@ -174,7 +174,7 @@ export default function PlayerProfileScreen() {
     },
     editBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     settingsBtn: {
@@ -191,7 +191,7 @@ export default function PlayerProfileScreen() {
     },
     settingsBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     logoutBtn: {
@@ -205,7 +205,7 @@ export default function PlayerProfileScreen() {
     },
     logoutText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.destructive,
     },
   });

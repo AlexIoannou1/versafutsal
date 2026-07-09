@@ -22,8 +22,8 @@ import { deleteAccount, clearPushToken, registerPushToken } from "@workspace/api
 import { NOTIFICATIONS_PREF_KEY } from "@/hooks/usePushNotifications";
 import { useTheme, type ThemePreference } from "@/context/ThemeContext";
 
-const TERMS_URL = "https://futsalcy.com/terms";
-const PRIVACY_URL = "https://futsalcy.com/privacy";
+const TERMS_URL = "https://versafutsal.com/terms";
+const PRIVACY_URL = "https://versafutsal.com/privacy";
 
 const isExpoGoAndroid =
   Constants.executionEnvironment === "storeClient" && Platform.OS === "android";
@@ -152,7 +152,7 @@ export default function PlayerSettingsScreen() {
     },
     headerTitle: {
       fontSize: 18,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     scroll: { flex: 1 },
@@ -162,7 +162,7 @@ export default function PlayerSettingsScreen() {
     },
     sectionLabel: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       letterSpacing: 0.8,
       textTransform: "uppercase",
@@ -195,7 +195,7 @@ export default function PlayerSettingsScreen() {
     rowLabel: {
       flex: 1,
       fontSize: 15,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     rowChevron: {
@@ -217,7 +217,7 @@ export default function PlayerSettingsScreen() {
     },
     deleteText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.destructive,
     },
     themeSegment: {
@@ -238,7 +238,7 @@ export default function PlayerSettingsScreen() {
     },
     themeChipText: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
   });
 

@@ -170,7 +170,7 @@ export default function BookPitchScreen() {
     },
     monthLabel: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     dayNamesRow: {
@@ -185,7 +185,7 @@ export default function BookPitchScreen() {
     },
     dayNameText: {
       fontSize: 11,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.mutedForeground,
     },
     gridRow: {
@@ -215,16 +215,16 @@ export default function BookPitchScreen() {
     },
     dayText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     dayTextToday: {
       color: colors.primary,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     dayTextSelected: {
       color: colors.primaryForeground,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     dayTextPast: {
       color: colors.mutedForeground,
@@ -236,12 +236,12 @@ export default function BookPitchScreen() {
     },
     slotsTitle: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     slotsSub: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -268,14 +268,14 @@ export default function BookPitchScreen() {
     slotUnavailable: { opacity: 0.4 },
     slotTime: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
     },
     slotTimeAvailable: { color: colors.foreground },
     slotTimeSelected: { color: colors.primary },
     slotReason: {
       fontSize: 10,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -288,7 +288,7 @@ export default function BookPitchScreen() {
     },
     noDateText: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -301,7 +301,7 @@ export default function BookPitchScreen() {
     },
     noSlotsText: {
       fontSize: 15,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -315,7 +315,7 @@ export default function BookPitchScreen() {
     selectedInfo: { marginBottom: 10 },
     selectedInfoText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       textAlign: "center",
     },
@@ -331,7 +331,7 @@ export default function BookPitchScreen() {
     confirmBtnDisabled: { backgroundColor: colors.muted },
     confirmBtnText: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     confirmBtnTextDisabled: { color: colors.mutedForeground },

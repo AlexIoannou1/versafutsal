@@ -170,7 +170,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     },
     title: {
       fontSize: 18,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     tabRow: {
@@ -192,12 +192,12 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     },
     tabText: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.mutedForeground,
     },
     tabTextActive: {
       color: colors.foreground,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     body: {
       paddingHorizontal: 20,
@@ -207,7 +207,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     },
     label: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       marginBottom: 6,
     },
@@ -224,7 +224,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
       flex: 1,
       height: 48,
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     eyeBtn: { padding: 4 },
@@ -242,7 +242,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     },
     chipText: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
     },
     saveBtn: {
       marginHorizontal: 20,
@@ -256,7 +256,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     saveBtnDisabled: { opacity: 0.6 },
     saveBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
   });

@@ -116,10 +116,10 @@ function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: Audit
         <FeatherIcons name={icon} size={13} color={color} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: foreground }}>
+        <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: foreground }}>
           {label}
         </Text>
-        <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: muted, marginTop: 2 }}>
+        <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: muted, marginTop: 2 }}>
           {timeAgo(entry.createdAt)}
         </Text>
       </View>
@@ -169,7 +169,7 @@ export default function OwnerBookingDetailScreen() {
     scroll: { flex: 1 },
     errorText: {
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -188,13 +188,13 @@ export default function OwnerBookingDetailScreen() {
     },
     bannerTitle: {
       fontSize: 20,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 4,
     },
     bookingId: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     statusRow: {
@@ -211,7 +211,7 @@ export default function OwnerBookingDetailScreen() {
     },
     statusText: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     card: {
       backgroundColor: colors.card,
@@ -224,7 +224,7 @@ export default function OwnerBookingDetailScreen() {
     },
     cardTitle: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
       letterSpacing: 0.8,
       paddingHorizontal: 16,
@@ -244,13 +244,13 @@ export default function OwnerBookingDetailScreen() {
     rowFirst: { borderTopWidth: 0 },
     rowLabel: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       width: 70,
     },
     rowValue: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       flex: 1,
     },
@@ -272,7 +272,7 @@ export default function OwnerBookingDetailScreen() {
     },
     backBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     editBtn: {
@@ -284,7 +284,7 @@ export default function OwnerBookingDetailScreen() {
     },
     editBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     dangerBtn: {
@@ -297,7 +297,7 @@ export default function OwnerBookingDetailScreen() {
     },
     dangerBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: "#EF4444",
     },
     modalOverlay: {
@@ -315,12 +315,12 @@ export default function OwnerBookingDetailScreen() {
     },
     modalTitle: {
       fontSize: 18,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     modalSubtitle: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       lineHeight: 20,
       marginTop: -8,
@@ -332,7 +332,7 @@ export default function OwnerBookingDetailScreen() {
       borderColor: colors.border,
       padding: 12,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       minHeight: 80,
       textAlignVertical: "top",
@@ -360,7 +360,7 @@ export default function OwnerBookingDetailScreen() {
     },
     modalBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
   });
 
@@ -457,7 +457,7 @@ export default function OwnerBookingDetailScreen() {
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
               <Text style={[s.cardTitle, { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 }]}>Walk-in / Phone Booking</Text>
               <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>MANUAL</Text>
+                <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary }}>MANUAL</Text>
               </View>
             </View>
             <View style={[s.row, s.rowFirst]}>
@@ -526,7 +526,7 @@ export default function OwnerBookingDetailScreen() {
             </View>
           ) : auditEntries.length === 0 ? (
             <View style={[s.row, s.rowFirst]}>
-              <Text style={[s.rowValue, { color: colors.mutedForeground, fontFamily: "Inter_400Regular" }]}>
+              <Text style={[s.rowValue, { color: colors.mutedForeground, fontFamily: "PlusJakartaSans_400Regular" }]}>
                 No activity recorded yet
               </Text>
             </View>

@@ -131,7 +131,7 @@ export default function LoginScreen() {
     },
     mode: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.primary,
       marginBottom: 4,
       textTransform: "uppercase",
@@ -139,13 +139,13 @@ export default function LoginScreen() {
     },
     title: {
       fontSize: 28,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 8,
     },
     subtitle: {
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginBottom: 32,
     },
@@ -154,7 +154,7 @@ export default function LoginScreen() {
     },
     label: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       marginBottom: 6,
     },
@@ -171,7 +171,7 @@ export default function LoginScreen() {
       flex: 1,
       height: 48,
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     eyeBtn: {
@@ -188,7 +188,7 @@ export default function LoginScreen() {
     },
     loginText: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     divider: {
@@ -204,7 +204,7 @@ export default function LoginScreen() {
     },
     divText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     registerBtn: {
@@ -212,12 +212,12 @@ export default function LoginScreen() {
     },
     registerText: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     registerLink: {
       color: colors.primary,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
   });
 

@@ -58,7 +58,7 @@ router.get("/player/payment-methods/config", requireAuth, requireRole("PLAYER"),
 router.delete("/player/account", requireAuth, requireRole("PLAYER"), async (req, res) => {
   try {
     const userId = req.user!.userId;
-    const anonEmail = `DELETED_${userId}@futsalcy.deleted`;
+    const anonEmail = `DELETED_${userId}@versa.deleted`;
     const anonName = `DELETED_${userId}`;
 
     const [current] = await db

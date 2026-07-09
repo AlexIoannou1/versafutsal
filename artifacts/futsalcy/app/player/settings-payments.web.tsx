@@ -84,7 +84,7 @@ export default function PaymentMethodsScreen() {
     backBtn: { padding: 4 },
     headerTitle: {
       fontSize: 18,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     scroll: { flex: 1 },
@@ -98,13 +98,13 @@ export default function PaymentMethodsScreen() {
     },
     demoTitle: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       textAlign: "center",
     },
     demoSubtitle: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       lineHeight: 20,
@@ -124,13 +124,13 @@ export default function PaymentMethodsScreen() {
     cardInfo: { flex: 1 },
     cardBrand: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       textTransform: "capitalize",
     },
     cardLast4: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -144,7 +144,7 @@ export default function PaymentMethodsScreen() {
     },
     nativeNoteText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -156,7 +156,7 @@ export default function PaymentMethodsScreen() {
     },
     emptyText: {
       color: colors.mutedForeground,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       fontSize: 14,
       textAlign: "center",
       marginBottom: 16,
@@ -222,7 +222,7 @@ export default function PaymentMethodsScreen() {
 
           <View style={s.nativeNote}>
             <Text style={s.nativeNoteText}>
-              Adding cards requires the FutsalCY mobile app on iOS or Android.
+              Adding cards requires the Versa mobile app on iOS or Android.
             </Text>
           </View>
         </ScrollView>

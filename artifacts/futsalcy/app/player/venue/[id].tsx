@@ -63,7 +63,7 @@ export default function PlayerVenueDetailScreen() {
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     errorText: {
       fontSize: 16,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -101,32 +101,32 @@ export default function PlayerVenueDetailScreen() {
     },
     venueName: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 6,
     },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
     metaText: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     mapLink: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 16 },
     mapText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.primary,
     },
     sectionTitle: {
       fontSize: 16,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 12,
       marginTop: 20,
     },
     description: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       lineHeight: 20,
       marginTop: 8,
@@ -143,7 +143,7 @@ export default function PlayerVenueDetailScreen() {
     },
     amenityText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     pitchCard: {
@@ -157,7 +157,7 @@ export default function PlayerVenueDetailScreen() {
     pitchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     pitchName: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       flex: 1,
     },
@@ -170,10 +170,10 @@ export default function PlayerVenueDetailScreen() {
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    pitchTypeText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.foreground },
+    pitchTypeText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     pitchSize: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 4,
     },
@@ -186,7 +186,7 @@ export default function PlayerVenueDetailScreen() {
     },
     priceText: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
     },
     bookPitchBtn: {
@@ -201,7 +201,7 @@ export default function PlayerVenueDetailScreen() {
     },
     bookPitchBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     hoursGrid: { gap: 6 },
@@ -216,18 +216,18 @@ export default function PlayerVenueDetailScreen() {
     },
     dayText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       width: 40,
     },
     timeText: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     closedText: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.destructive,
     },
     divider: {

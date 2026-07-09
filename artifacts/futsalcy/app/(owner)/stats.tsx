@@ -87,7 +87,7 @@ function formatHour(hour: number) {
 function EmptySection({ label, color }: { label: string; color: string }) {
   return (
     <View style={{ paddingVertical: 16, alignItems: "center" }}>
-      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color }}>{label}</Text>
+      <Text style={{ fontFamily: "PlusJakartaSans_400Regular", fontSize: 14, color }}>{label}</Text>
     </View>
   );
 }
@@ -177,7 +177,7 @@ function TrendBars({
               <Text
                 style={{
                   fontSize: 8,
-                  fontFamily: "Inter_400Regular",
+                  fontFamily: "PlusJakartaSans_400Regular",
                   color: mutedColor,
                   width: barW,
                   textAlign: "center",
@@ -213,13 +213,13 @@ export default function StatsScreen() {
       paddingBottom: 8,
     },
     headerTitle: {
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       fontSize: 26,
       color: colors.foreground,
       marginBottom: 4,
     },
     headerSub: {
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       fontSize: 13,
       color: colors.mutedForeground,
     },
@@ -241,7 +241,7 @@ export default function StatsScreen() {
       borderColor: colors.primary,
     },
     pillText: {
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       fontSize: 13,
       color: colors.mutedForeground,
     },
@@ -256,7 +256,7 @@ export default function StatsScreen() {
       padding: 16,
     },
     cardTitle: {
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       fontSize: 14,
       color: colors.foreground,
       marginBottom: 12,
@@ -270,13 +270,13 @@ export default function StatsScreen() {
       alignItems: "flex-start",
     },
     overviewLabel: {
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       fontSize: 11,
       color: colors.mutedForeground,
       marginBottom: 4,
     },
     overviewValue: {
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       fontSize: 18,
       color: colors.foreground,
     },
@@ -288,24 +288,24 @@ export default function StatsScreen() {
       borderTopColor: colors.border,
     },
     listLabel: {
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       fontSize: 13,
       color: colors.foreground,
       flex: 1,
     },
     listCount: {
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       fontSize: 13,
       color: colors.foreground,
     },
     listSub: {
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       fontSize: 11,
       color: colors.mutedForeground,
     },
     center: { alignItems: "center", justifyContent: "center", paddingVertical: 48 },
     loadingText: {
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       fontSize: 14,
       color: colors.mutedForeground,
       marginTop: 10,
@@ -432,10 +432,10 @@ export default function StatsScreen() {
             topHours.map((item, i) => (
               <View key={item.hour} style={{ paddingVertical: 8, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.foreground }}>
+                  <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 13, color: colors.foreground }}>
                     {formatHour(item.hour)} – {formatHour(item.hour + 1)}
                   </Text>
-                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.foreground }}>
+                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 13, color: colors.foreground }}>
                     {item.count} bookings
                   </Text>
                 </View>
@@ -454,10 +454,10 @@ export default function StatsScreen() {
             sortedDow.map((item, i) => (
               <View key={item.day} style={{ paddingVertical: 8, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.foreground }}>
+                  <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 13, color: colors.foreground }}>
                     {DAY_NAMES[item.day]}
                   </Text>
-                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.foreground }}>
+                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 13, color: colors.foreground }}>
                     {item.count}
                   </Text>
                 </View>
@@ -477,12 +477,12 @@ export default function StatsScreen() {
               <View key={item.pitchId} style={{ paddingVertical: 8, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
                   <Text
-                    style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.foreground, flex: 1, marginRight: 8 }}
+                    style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 13, color: colors.foreground, flex: 1, marginRight: 8 }}
                     numberOfLines={1}
                   >
                     {item.pitchName}
                   </Text>
-                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.foreground }}>
+                  <Text style={{ fontFamily: "PlusJakartaSans_600SemiBold", fontSize: 13, color: colors.foreground }}>
                     {item.count} · {formatEuro(item.revenue)}
                   </Text>
                 </View>

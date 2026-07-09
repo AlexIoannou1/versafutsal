@@ -466,10 +466,10 @@ export default function OwnerVenueDetailScreen() {
       alignItems: "center",
       gap: 10,
     },
-    statusText: { fontSize: 15, fontFamily: "Inter_600SemiBold", flex: 1 },
+    statusText: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold", flex: 1 },
     rejectionNote: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       marginTop: 4,
     },
     submitBtn: {
@@ -478,7 +478,7 @@ export default function OwnerVenueDetailScreen() {
       paddingHorizontal: 16,
       paddingVertical: 8,
     },
-    submitBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground },
+    submitBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
     section: {
       backgroundColor: colors.card,
       borderRadius: 12,
@@ -493,12 +493,12 @@ export default function OwnerVenueDetailScreen() {
       justifyContent: "space-between",
       marginBottom: 12,
     },
-    sectionTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: colors.foreground },
+    sectionTitle: { fontSize: 15, fontFamily: "PlusJakartaSans_700Bold", color: colors.foreground },
     editBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
-    editBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: colors.primary },
+    editBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: colors.primary },
     infoRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
-    infoLabel: { fontSize: 13, fontFamily: "Inter_500Medium", color: colors.mutedForeground, width: 72 },
-    infoValue: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground, flex: 1 },
+    infoLabel: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground, width: 72 },
+    infoValue: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.foreground, flex: 1 },
     photoRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -510,7 +510,7 @@ export default function OwnerVenueDetailScreen() {
     },
     photoUrl: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       flex: 1,
     },
@@ -524,7 +524,7 @@ export default function OwnerVenueDetailScreen() {
       paddingHorizontal: 12,
       height: 40,
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     addPhotoBtn: {
@@ -535,7 +535,7 @@ export default function OwnerVenueDetailScreen() {
       alignItems: "center",
       justifyContent: "center",
     },
-    addPhotoBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground },
+    addPhotoBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
     pitchCard: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -544,8 +544,8 @@ export default function OwnerVenueDetailScreen() {
       marginBottom: 10,
     },
     pitchHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
-    pitchName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground, flex: 1 },
-    pitchMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginBottom: 6 },
+    pitchName: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground, flex: 1 },
+    pitchMeta: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginBottom: 6 },
     pitchActions: { flexDirection: "row", gap: 6 },
     pitchActionBtn: {
       flexDirection: "row",
@@ -557,7 +557,7 @@ export default function OwnerVenueDetailScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
-    pitchActionText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.foreground },
+    pitchActionText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     pricingChips: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 6 },
     pricingChip: {
       backgroundColor: colors.primary + "15",
@@ -565,8 +565,8 @@ export default function OwnerVenueDetailScreen() {
       paddingHorizontal: 8,
       paddingVertical: 4,
     },
-    pricingChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.primary },
-    noPricingText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, fontStyle: "italic" },
+    pricingChipText: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
+    noPricingText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, fontStyle: "italic" },
     addBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -579,7 +579,7 @@ export default function OwnerVenueDetailScreen() {
       paddingVertical: 12,
       marginTop: 4,
     },
-    addBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.primary },
+    addBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
     dayRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -588,14 +588,14 @@ export default function OwnerVenueDetailScreen() {
       borderBottomColor: colors.border,
       gap: 8,
     },
-    dayLabel: { fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, width: 36 },
+    dayLabel: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground, width: 36 },
     closedToggle: {
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 6,
       borderWidth: 1,
     },
-    closedToggleText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+    closedToggleText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium" },
     timeInput: {
       backgroundColor: colors.muted,
       borderRadius: 6,
@@ -603,7 +603,7 @@ export default function OwnerVenueDetailScreen() {
       paddingVertical: 4,
       width: 72,
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       textAlign: "center",
     },
@@ -615,7 +615,7 @@ export default function OwnerVenueDetailScreen() {
       alignItems: "center",
       marginTop: 12,
     },
-    saveHoursBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground },
+    saveHoursBtnText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
     // Modals
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
     modalSheet: {
@@ -625,9 +625,9 @@ export default function OwnerVenueDetailScreen() {
       padding: 24,
       paddingBottom: insets.bottom + 24,
     },
-    modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 16 },
+    modalTitle: { fontSize: 18, fontFamily: "PlusJakartaSans_700Bold", color: colors.foreground, marginBottom: 16 },
     mField: { marginBottom: 14 },
-    mLabel: { fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, marginBottom: 6 },
+    mLabel: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground, marginBottom: 6 },
     mInput: {
       backgroundColor: colors.muted,
       borderRadius: 8,
@@ -636,7 +636,7 @@ export default function OwnerVenueDetailScreen() {
       paddingHorizontal: 12,
       height: 44,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     mTextArea: {
@@ -647,7 +647,7 @@ export default function OwnerVenueDetailScreen() {
       paddingHorizontal: 12,
       paddingVertical: 10,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       minHeight: 72,
       textAlignVertical: "top",
@@ -659,7 +659,7 @@ export default function OwnerVenueDetailScreen() {
       borderRadius: 8,
       borderWidth: 1,
     },
-    typeChipText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+    typeChipText: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
     toggleRow: { flexDirection: "row", gap: 10, marginBottom: 14 },
     toggleBtn: {
       flex: 1,
@@ -668,7 +668,7 @@ export default function OwnerVenueDetailScreen() {
       borderWidth: 1,
       alignItems: "center",
     },
-    toggleBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+    toggleBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium" },
     mActions: { flexDirection: "row", gap: 8, marginTop: 6 },
     mCancelBtn: {
       flex: 1,
@@ -678,7 +678,7 @@ export default function OwnerVenueDetailScreen() {
       borderColor: colors.border,
       alignItems: "center",
     },
-    mCancelText: { fontSize: 15, fontFamily: "Inter_500Medium", color: colors.foreground },
+    mCancelText: { fontSize: 15, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     mSaveBtn: {
       flex: 1,
       backgroundColor: colors.primary,
@@ -686,7 +686,7 @@ export default function OwnerVenueDetailScreen() {
       paddingVertical: 12,
       alignItems: "center",
     },
-    mSaveText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground },
+    mSaveText: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
   });
 
   if (isLoading) {
@@ -700,7 +700,7 @@ export default function OwnerVenueDetailScreen() {
   if (!venue) {
     return (
       <View style={s.center}>
-        <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>
+        <Text style={{ color: colors.mutedForeground, fontFamily: "PlusJakartaSans_400Regular" }}>
           Venue not found.
         </Text>
       </View>
@@ -1076,12 +1076,12 @@ export default function OwnerVenueDetailScreen() {
                 {blockModalPitch.maintenanceBlocks.map((blk) => (
                   <View key={blk.id} style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.muted, borderRadius: 8, padding: 10, marginBottom: 6 }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.foreground }}>
+                      <Text style={{ fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground }}>
                         {new Date(blk.startAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
                         {" – "}
                         {new Date(blk.endAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
                       </Text>
-                      {blk.reason && <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 }}>{blk.reason}</Text>}
+                      {blk.reason && <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 }}>{blk.reason}</Text>}
                     </View>
                     <TouchableOpacity onPress={() => handleDeleteBlock(blk.id, blockModalPitch.id)} style={{ padding: 6 }}>
                       <FeatherIcons name="trash-2" size={14} color={colors.destructive} />

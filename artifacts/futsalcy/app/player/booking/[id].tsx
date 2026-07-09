@@ -112,7 +112,7 @@ export default function PlayerBookingDetailScreen() {
     scroll: { flex: 1 },
     errorText: {
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -131,13 +131,13 @@ export default function PlayerBookingDetailScreen() {
     },
     successTitle: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 4,
     },
     bookingId: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     statusWrap: {
@@ -154,7 +154,7 @@ export default function PlayerBookingDetailScreen() {
     },
     statusText: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     card: {
       backgroundColor: colors.card,
@@ -167,7 +167,7 @@ export default function PlayerBookingDetailScreen() {
     },
     cardTitle: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
       letterSpacing: 0.8,
       paddingHorizontal: 16,
@@ -187,13 +187,13 @@ export default function PlayerBookingDetailScreen() {
     rowFirst: { borderTopWidth: 0 },
     rowLabel: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       width: 70,
     },
     rowValue: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       flex: 1,
     },
@@ -214,7 +214,7 @@ export default function PlayerBookingDetailScreen() {
     },
     primaryBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     secondaryBtn: {
@@ -227,7 +227,7 @@ export default function PlayerBookingDetailScreen() {
     },
     secondaryBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     dangerBtn: {
@@ -240,12 +240,12 @@ export default function PlayerBookingDetailScreen() {
     },
     dangerBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: "#EF4444",
     },
     policyNote: {
       fontSize: 11,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginTop: -4,
@@ -265,12 +265,12 @@ export default function PlayerBookingDetailScreen() {
     },
     modalTitle: {
       fontSize: 18,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     modalSubtitle: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       lineHeight: 20,
       marginTop: -8,
@@ -282,7 +282,7 @@ export default function PlayerBookingDetailScreen() {
       borderColor: colors.border,
       padding: 12,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       minHeight: 80,
       textAlignVertical: "top",
@@ -310,7 +310,7 @@ export default function PlayerBookingDetailScreen() {
     },
     modalBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
   });
 
@@ -477,7 +477,7 @@ export default function PlayerBookingDetailScreen() {
           <Text style={{
             flex: 1,
             fontSize: 13,
-            fontFamily: "Inter_400Regular",
+            fontFamily: "PlusJakartaSans_400Regular",
             color: colors.foreground,
             lineHeight: 19,
           }}>

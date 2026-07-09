@@ -55,12 +55,12 @@ export default function FavouritesScreen() {
     },
     headerTitle: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     headerSub: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -77,14 +77,14 @@ export default function FavouritesScreen() {
     },
     emptyTitle: {
       fontSize: 18,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       marginBottom: 8,
       textAlign: "center",
     },
     emptySub: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       lineHeight: 20,
@@ -113,7 +113,7 @@ export default function FavouritesScreen() {
     },
     cardName: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       flex: 1,
       marginBottom: 4,
@@ -131,7 +131,7 @@ export default function FavouritesScreen() {
     },
     cardMetaText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     pitchTypeRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
@@ -144,14 +144,14 @@ export default function FavouritesScreen() {
       paddingHorizontal: 8,
       paddingVertical: 3,
     },
-    pitchTypeText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.primary },
+    pitchTypeText: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium", color: colors.primary },
     cardBottom: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       marginTop: 8,
     },
-    priceText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.primary },
+    priceText: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
     viewBtn: {
       backgroundColor: colors.primary,
       borderRadius: 8,
@@ -160,7 +160,7 @@ export default function FavouritesScreen() {
     },
     viewBtnText: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     amenitiesRow: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 6 },
@@ -172,7 +172,7 @@ export default function FavouritesScreen() {
     },
     amenityText: {
       fontSize: 11,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
   });

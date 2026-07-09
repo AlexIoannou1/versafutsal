@@ -120,12 +120,12 @@ export default function AdminSettingsScreen() {
     },
     headerTitle: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     headerSub: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -135,7 +135,7 @@ export default function AdminSettingsScreen() {
     },
     sectionTitle: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.8,
@@ -170,12 +170,12 @@ export default function AdminSettingsScreen() {
     rowContent: { flex: 1 },
     rowLabel: {
       fontSize: 15,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     rowSub: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginTop: 2,
     },
@@ -189,7 +189,7 @@ export default function AdminSettingsScreen() {
     feeInput: {
       width: 90,
       fontSize: 15,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       borderWidth: 1,
       borderColor: colors.primary,
@@ -200,7 +200,7 @@ export default function AdminSettingsScreen() {
     },
     feeValue: {
       fontSize: 15,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     editBtn: {
@@ -212,7 +212,7 @@ export default function AdminSettingsScreen() {
     },
     editBtnText: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
     },
     saveBtn: {
@@ -223,7 +223,7 @@ export default function AdminSettingsScreen() {
     },
     saveBtnText: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     venueRow: {
@@ -235,7 +235,7 @@ export default function AdminSettingsScreen() {
     },
     venueName: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
       flex: 1,
     },
@@ -247,7 +247,7 @@ export default function AdminSettingsScreen() {
     },
     overrideChipText: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     center: { flex: 1, alignItems: "center", justifyContent: "center" },
     footer: { height: insets.bottom + (Platform.OS === "web" ? 16 : 80) },

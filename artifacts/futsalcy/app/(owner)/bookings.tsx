@@ -287,7 +287,7 @@ export default function OwnerBookingsScreen() {
     searchInput: {
       flex: 1,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
 
@@ -295,7 +295,7 @@ export default function OwnerBookingsScreen() {
     filterSection: { paddingBottom: 8 },
     filterLabel: {
       fontSize: 10,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.5,
@@ -313,7 +313,7 @@ export default function OwnerBookingsScreen() {
       backgroundColor: colors.card,
     },
     pillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    pillText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    pillText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground },
     pillTextActive: { color: "#fff" },
 
     divider: { height: 1, backgroundColor: colors.border, marginBottom: 6 },
@@ -327,8 +327,8 @@ export default function OwnerBookingsScreen() {
       alignItems: "center",
       justifyContent: "space-between",
     },
-    countText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
-    clearText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.primary },
+    countText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
+    clearText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.primary },
 
     // List
     listContent: { paddingHorizontal: 16, paddingBottom: insets.bottom + 100 },
@@ -351,7 +351,7 @@ export default function OwnerBookingsScreen() {
     playerName: {
       flex: 1,
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       minWidth: 0,
     },
@@ -361,23 +361,23 @@ export default function OwnerBookingsScreen() {
       paddingVertical: 3,
       flexShrink: 0,
     },
-    manualBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
+    manualBadgeText: { fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold" },
     statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-    statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+    statusText: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
     metaText: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       flex: 1,
     },
 
     // Empty
     emptyWrap: { alignItems: "center", paddingTop: 60, gap: 10 },
-    emptyTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.foreground },
+    emptyTitle: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
     emptySubtitle: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       paddingHorizontal: 24,

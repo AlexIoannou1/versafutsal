@@ -38,21 +38,21 @@ export default function AdminProfileScreen() {
     },
     name: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       textAlign: "center",
       marginBottom: 4,
     },
     email: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
     },
     phone: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
@@ -65,7 +65,7 @@ export default function AdminProfileScreen() {
       paddingVertical: 4,
       marginBottom: 32,
     },
-    roleText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.warning },
+    roleText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.warning },
     editBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -80,7 +80,7 @@ export default function AdminProfileScreen() {
     },
     editBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     logoutBtn: {
@@ -94,7 +94,7 @@ export default function AdminProfileScreen() {
     },
     logoutText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.destructive,
     },
   });

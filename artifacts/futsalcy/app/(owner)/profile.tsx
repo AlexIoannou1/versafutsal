@@ -28,7 +28,7 @@ export default function OwnerProfileScreen() {
     scroll: { flex: 1, padding: 24 },
     sectionTitle: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.8,
@@ -56,7 +56,7 @@ export default function OwnerProfileScreen() {
     menuRowText: {
       flex: 1,
       fontSize: 15,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     avatar: {
@@ -71,21 +71,21 @@ export default function OwnerProfileScreen() {
     },
     name: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       textAlign: "center",
       marginBottom: 4,
     },
     email: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
     },
     phone: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       marginBottom: 4,
@@ -98,7 +98,7 @@ export default function OwnerProfileScreen() {
       paddingVertical: 4,
       marginBottom: 32,
     },
-    roleText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary },
+    roleText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
     editBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -113,7 +113,7 @@ export default function OwnerProfileScreen() {
     },
     editBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
     },
     logoutBtn: {
@@ -127,7 +127,7 @@ export default function OwnerProfileScreen() {
     },
     logoutText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.destructive,
     },
   });

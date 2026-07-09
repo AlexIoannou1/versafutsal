@@ -116,7 +116,7 @@ export default function PlayerVenuesScreen() {
     },
     headerTitle: {
       fontSize: 22,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
       marginBottom: 12,
     },
@@ -140,7 +140,7 @@ export default function PlayerVenuesScreen() {
     searchTextField: {
       flex: 1,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     filterToggleBtn: {
@@ -156,7 +156,7 @@ export default function PlayerVenuesScreen() {
     },
     filterToggleBtnText: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: activeFilterCount > 0 ? colors.primary : colors.foreground,
     },
     filterBadge: {
@@ -170,7 +170,7 @@ export default function PlayerVenuesScreen() {
     },
     filterBadgeText: {
       fontSize: 10,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.primaryForeground,
     },
     filtersPanel: {
@@ -181,7 +181,7 @@ export default function PlayerVenuesScreen() {
     },
     filterLabel: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.5,
@@ -193,7 +193,7 @@ export default function PlayerVenuesScreen() {
     },
     clearFiltersBtnText: {
       fontSize: 12,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.destructive,
     },
     filterSection: { marginBottom: 10 },
@@ -204,7 +204,7 @@ export default function PlayerVenuesScreen() {
       borderRadius: 20,
       borderWidth: 1,
     },
-    filterChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+    filterChipText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium" },
     priceRow: { flexDirection: "row", gap: 6, alignItems: "center" },
     priceInput: {
       width: 80,
@@ -215,13 +215,13 @@ export default function PlayerVenuesScreen() {
       paddingHorizontal: 10,
       paddingVertical: 7,
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       textAlign: "center",
     },
     priceSep: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     list: { padding: 16, paddingBottom: insets.bottom + 100 },
@@ -237,13 +237,13 @@ export default function PlayerVenuesScreen() {
     },
     emptyTitle: {
       fontSize: 18,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       marginBottom: 8,
     },
     emptySub: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
@@ -271,7 +271,7 @@ export default function PlayerVenuesScreen() {
     },
     cardName: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       flex: 1,
       marginBottom: 4,
@@ -289,7 +289,7 @@ export default function PlayerVenuesScreen() {
     },
     cardMetaText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     pitchTypeRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
@@ -304,7 +304,7 @@ export default function PlayerVenuesScreen() {
     },
     pitchTypeText: {
       fontSize: 11,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.primary,
     },
     cardBottom: {
@@ -315,7 +315,7 @@ export default function PlayerVenuesScreen() {
     },
     priceText: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
     },
     amenitiesRow: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 6 },
@@ -327,7 +327,7 @@ export default function PlayerVenuesScreen() {
     },
     amenityText: {
       fontSize: 11,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     viewBtn: {
@@ -338,7 +338,7 @@ export default function PlayerVenuesScreen() {
     },
     viewBtnText: {
       fontSize: 13,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
   });

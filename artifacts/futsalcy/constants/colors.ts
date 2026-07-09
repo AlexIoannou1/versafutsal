@@ -27,7 +27,6 @@ const colors = {
     border: "#E2E8F0",
     input: "#E2E8F0",
 
-    // FutsalCY extras
     surface: "#FFFFFF",
     surfaceSecondary: "#F0F2F5",
     success: "#00C851",
@@ -63,7 +62,6 @@ const colors = {
     border: "#243547",
     input: "#243547",
 
-    // FutsalCY extras
     surface: "#1C2B39",
     surfaceSecondary: "#243547",
     success: "#00C851",

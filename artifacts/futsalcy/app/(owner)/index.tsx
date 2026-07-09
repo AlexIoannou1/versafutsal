@@ -112,7 +112,7 @@ function PickerButton({
         style={{
           flex: 1,
           fontSize: 12,
-          fontFamily: active ? "Inter_500Medium" : "Inter_400Regular",
+          fontFamily: active ? "PlusJakartaSans_500Medium" : "PlusJakartaSans_400Regular",
           color: active ? foregroundColor : mutedColor,
         }}
       >
@@ -246,21 +246,21 @@ export default function OwnerDashboardScreen() {
     container: { flex: 1, backgroundColor: colors.background },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     greeting: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
-    greetingText: { fontSize: 20, fontFamily: "Inter_700Bold", color: colors.foreground },
-    greetingSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
+    greetingText: { fontSize: 20, fontFamily: "PlusJakartaSans_700Bold", color: colors.foreground },
+    greetingSub: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 },
     statsRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, marginBottom: 16 },
     statCard: {
       flex: 1, backgroundColor: colors.card, borderRadius: 10, padding: 12,
       alignItems: "center", borderWidth: 1, borderColor: colors.border,
     },
-    statNum: { fontSize: 24, fontFamily: "Inter_700Bold", color: colors.primary },
-    statLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2, textAlign: "center" },
+    statNum: { fontSize: 24, fontFamily: "PlusJakartaSans_700Bold", color: colors.primary },
+    statLabel: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2, textAlign: "center" },
     sectionHeader: {
       paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6,
       flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     },
     sectionTitle: {
-      fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground,
+      fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground,
       textTransform: "uppercase", letterSpacing: 0.6,
     },
     searchRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
@@ -269,7 +269,7 @@ export default function OwnerDashboardScreen() {
       backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
       borderRadius: 10, paddingHorizontal: 10, gap: 6,
     },
-    searchText: { flex: 1, height: 38, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground },
+    searchText: { flex: 1, height: 38, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.foreground },
     filterBtn: {
       padding: 8, borderRadius: 8, borderWidth: 1,
       borderColor: hasActiveFilters ? colors.primary : colors.border,
@@ -277,27 +277,27 @@ export default function OwnerDashboardScreen() {
     },
     filterPanel: { paddingHorizontal: 16, paddingBottom: 10, gap: 10 },
     filterLabel: {
-      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
+      fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.mutedForeground,
       textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 5,
     },
     chipRow: { flexDirection: "row", gap: 6 },
     chip: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    chipText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    chipText: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground },
     chipTextActive: { color: "#fff" },
     dateRow: { flexDirection: "row", gap: 8 },
     clearBtn: { alignSelf: "flex-end" },
-    clearBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.destructive },
+    clearBtnText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.destructive },
     divider: { height: 1, backgroundColor: colors.border, marginHorizontal: 16, marginVertical: 8 },
     sectionDivider: {
       flexDirection: "row", alignItems: "center", gap: 10,
       marginHorizontal: 16, marginTop: 4, marginBottom: 12,
     },
     sectionDividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-    sectionDividerText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    sectionDividerText: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground },
     subHeader: {
       paddingHorizontal: 16, paddingBottom: 6, paddingTop: 4,
-      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground,
+      fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.mutedForeground,
       textTransform: "uppercase", letterSpacing: 0.6,
     },
     list: { paddingHorizontal: 16, paddingBottom: insets.bottom + 100 },
@@ -306,14 +306,14 @@ export default function OwnerDashboardScreen() {
       marginBottom: 10, borderWidth: 1, borderColor: colors.border,
     },
     cardHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 },
-    playerName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: colors.foreground, flex: 1, marginRight: 8 },
+    playerName: { fontSize: 15, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground, flex: 1, marginRight: 8 },
     statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-    statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+    statusText: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
     metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
-    metaText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    metaText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
     emptyWrap: { alignItems: "center", paddingVertical: 24, gap: 8 },
-    emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
-    resultCount: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    emptyText: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
+    resultCount: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
     // iOS picker modal
     pickerOverlay: {
       flex: 1, backgroundColor: "rgba(0,0,0,0.4)",
@@ -329,8 +329,8 @@ export default function OwnerDashboardScreen() {
       paddingHorizontal: 16, paddingVertical: 12,
       borderBottomWidth: 1, borderBottomColor: colors.border,
     },
-    pickerSheetLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground },
-    pickerDoneBtn: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.primary },
+    pickerSheetLabel: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
+    pickerDoneBtn: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
   });
 
   if (isLoading) {
@@ -361,7 +361,7 @@ export default function OwnerDashboardScreen() {
             </Text>
             {isManual && (
               <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 }}>
-                <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary }}>MANUAL</Text>
+                <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary }}>MANUAL</Text>
               </View>
             )}
           </View>

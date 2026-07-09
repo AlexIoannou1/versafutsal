@@ -1,5 +1,5 @@
 /**
- * FutsalCY Demo Seed Script
+ * Versa Demo Seed Script
  *
  * Creates demo data for piloting with venues.
  * Run: pnpm --filter @workspace/api-server run seed
@@ -23,7 +23,7 @@ import {
 import { eq } from "drizzle-orm";
 
 async function seed() {
-  console.log("🌱 Seeding FutsalCY database...\n");
+  console.log("🌱 Seeding Versa database...\n");
 
   // ─── Admin Settings ──────────────────────────────────────────────────────
   const existing = await db.select().from(adminSettingsTable).limit(1);

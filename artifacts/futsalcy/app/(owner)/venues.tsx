@@ -67,7 +67,7 @@ export default function OwnerVenuesScreen() {
     },
     headerTitle: {
       fontSize: 20,
-      fontFamily: "Inter_700Bold",
+      fontFamily: "PlusJakartaSans_700Bold",
       color: colors.foreground,
     },
     addBtn: {
@@ -81,7 +81,7 @@ export default function OwnerVenuesScreen() {
     },
     addBtnText: {
       fontSize: 14,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
@@ -96,14 +96,14 @@ export default function OwnerVenuesScreen() {
     },
     emptyTitle: {
       fontSize: 18,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       marginBottom: 8,
       textAlign: "center",
     },
     emptySub: {
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
       lineHeight: 20,
@@ -117,7 +117,7 @@ export default function OwnerVenuesScreen() {
     },
     emptyBtnText: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primaryForeground,
     },
     list: { padding: 16 },
@@ -132,7 +132,7 @@ export default function OwnerVenuesScreen() {
     cardRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
     venueName: {
       fontSize: 16,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       flex: 1,
       marginRight: 8,
@@ -144,17 +144,17 @@ export default function OwnerVenuesScreen() {
     },
     statusText: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     districtRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 4 },
     districtText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     pitchText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     rejectionBox: {
@@ -165,13 +165,13 @@ export default function OwnerVenuesScreen() {
     },
     rejectionLabel: {
       fontSize: 12,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.destructive,
       marginBottom: 2,
     },
     rejectionText: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.destructive,
     },
     manageRow: {
@@ -193,7 +193,7 @@ export default function OwnerVenuesScreen() {
     },
     manageBtnText: {
       fontSize: 13,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
   });

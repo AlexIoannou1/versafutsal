@@ -35,7 +35,7 @@
       [
         "@stripe/stripe-react-native",
         {
-          "merchantIdentifier": "merchant.com.futsalcy",
+          "merchantIdentifier": "merchant.com.versafutsalapp",
           "enableGooglePay": false
         }
       ]

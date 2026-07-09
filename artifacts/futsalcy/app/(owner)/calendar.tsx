@@ -133,13 +133,13 @@ function BookingRow({
     bar: { width: 4 },
     content: { flex: 1, padding: 10 },
     header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
-    time: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground },
+    time: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
     badge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-    badgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-    pitchText: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
-    playerText: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
+    badgeText: { fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold" },
+    pitchText: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
+    playerText: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 },
     manualBadge: { backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: "flex-start" },
-    manualBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.primary },
+    manualBadgeText: { fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
   });
 
   return (
@@ -256,8 +256,8 @@ export default function OwnerCalendarScreen() {
     },
     modeBtn: { flex: 1, paddingVertical: 7, alignItems: "center", borderRadius: 8 },
     modeBtnActive: { backgroundColor: colors.primary + "20" },
-    modeBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
-    modeBtnTextActive: { color: colors.primary, fontFamily: "Inter_600SemiBold" },
+    modeBtnText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground },
+    modeBtnTextActive: { color: colors.primary, fontFamily: "PlusJakartaSans_600SemiBold" },
     navRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -271,7 +271,7 @@ export default function OwnerCalendarScreen() {
       alignItems: "center", justifyContent: "center",
     },
     navLabel: {
-      flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold",
+      flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground, textAlign: "center",
     },
     todayBtn: {
@@ -279,15 +279,15 @@ export default function OwnerCalendarScreen() {
       borderWidth: 1, borderColor: colors.primary + "60",
       backgroundColor: colors.primary + "10",
     },
-    todayBtnText: { fontSize: 11, fontFamily: "Inter_500Medium", color: colors.primary },
+    todayBtnText: { fontSize: 11, fontFamily: "PlusJakartaSans_500Medium", color: colors.primary },
 
     // Day view
     dayScroll: { flex: 1 },
     dayContent: { padding: 16, paddingBottom: insets.bottom + 80 },
-    dayDate: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginBottom: 12 },
+    dayDate: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground, marginBottom: 12 },
     noBookings: {
       textAlign: "center", paddingVertical: 40,
-      fontSize: 14, fontFamily: "Inter_400Regular", color: colors.mutedForeground,
+      fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground,
     },
 
     // Shared booking card
@@ -298,34 +298,34 @@ export default function OwnerCalendarScreen() {
     statusBar: { width: 4 },
     bookingContent: { flex: 1, padding: 10 },
     bookingHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
-    bookingTime: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground },
+    bookingTime: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
     statusBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-    statusBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
-    bookingPitch: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
-    bookingPlayer: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 2 },
+    statusBadgeText: { fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold" },
+    bookingPitch: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
+    bookingPlayer: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 },
 
     // Month view
     monthDayNamesRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border },
     monthDayName: {
-      flex: 1, textAlign: "center", fontSize: 10, fontFamily: "Inter_500Medium",
+      flex: 1, textAlign: "center", fontSize: 10, fontFamily: "PlusJakartaSans_500Medium",
       color: colors.mutedForeground, paddingVertical: 6,
     },
     monthGridScroll: { flex: 1 },
     monthRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border + "60" },
     monthCell: { flex: 1, minHeight: 64, borderRightWidth: 1, borderRightColor: colors.border + "60", padding: 3 },
     monthCellLastCol: { borderRightWidth: 0 },
-    monthCellNum: { fontSize: 11, fontFamily: "Inter_400Regular", color: colors.foreground, marginBottom: 2 },
+    monthCellNum: { fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.foreground, marginBottom: 2 },
     monthCellNumTodayWrap: {
       width: 18, height: 18, borderRadius: 9, backgroundColor: colors.primary,
       alignItems: "center", justifyContent: "center", marginBottom: 2, overflow: "hidden",
     },
     monthCellNumToday: {
-      fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground,
+      fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground,
     },
     monthCellNumOther: { color: colors.mutedForeground },
     monthDot: { width: "100%", borderRadius: 3, paddingVertical: 1, paddingHorizontal: 2, marginBottom: 1 },
-    monthDotText: { fontSize: 8, fontFamily: "Inter_500Medium", color: "#fff" },
-    moreText: { fontSize: 8, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    monthDotText: { fontSize: 8, fontFamily: "PlusJakartaSans_500Medium", color: "#fff" },
+    moreText: { fontSize: 8, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
 
   });
 

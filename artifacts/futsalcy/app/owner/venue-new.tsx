@@ -240,10 +240,10 @@ export default function VenueNewScreen() {
     inner: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: insets.bottom + 40 },
     stepBar: { flexDirection: "row", gap: 6, marginBottom: 8 },
     stepDot: { height: 4, flex: 1, borderRadius: 2 },
-    stepMeta: { fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginBottom: 4 },
-    stepTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 24 },
+    stepMeta: { fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginBottom: 4 },
+    stepTitle: { fontSize: 22, fontFamily: "PlusJakartaSans_700Bold", color: colors.foreground, marginBottom: 24 },
     field: { marginBottom: 18 },
-    label: { fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, marginBottom: 6 },
+    label: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground, marginBottom: 6 },
     input: {
       backgroundColor: colors.card,
       borderWidth: 1,
@@ -252,7 +252,7 @@ export default function VenueNewScreen() {
       paddingHorizontal: 14,
       height: 48,
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     textArea: {
@@ -263,14 +263,14 @@ export default function VenueNewScreen() {
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 15,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       minHeight: 80,
       textAlignVertical: "top",
     },
     chipGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     chip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
-    chipText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+    chipText: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
     typeChip: {
       flexDirection: "row",
       alignItems: "center",
@@ -281,7 +281,7 @@ export default function VenueNewScreen() {
       borderWidth: 2,
       marginBottom: 8,
     },
-    typeChipText: { fontSize: 14, fontFamily: "Inter_500Medium" },
+    typeChipText: { fontSize: 14, fontFamily: "PlusJakartaSans_500Medium" },
     dayRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -290,7 +290,7 @@ export default function VenueNewScreen() {
       borderBottomColor: colors.border,
       gap: 10,
     },
-    dayLabel: { width: 36, fontSize: 14, fontFamily: "Inter_500Medium", color: colors.foreground },
+    dayLabel: { width: 36, fontSize: 14, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     timeInput: {
       flex: 1,
       backgroundColor: colors.card,
@@ -300,12 +300,12 @@ export default function VenueNewScreen() {
       paddingHorizontal: 10,
       height: 38,
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
       textAlign: "center",
     },
     timeSep: { fontSize: 14, color: colors.mutedForeground },
-    closedText: { flex: 2, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground },
+    closedText: { flex: 2, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
     reviewCard: {
       backgroundColor: colors.card,
       borderRadius: 12,
@@ -317,16 +317,16 @@ export default function VenueNewScreen() {
     reviewRow: { marginBottom: 10 },
     reviewLabel: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       marginBottom: 2,
     },
-    reviewValue: { fontSize: 14, fontFamily: "Inter_400Regular", color: colors.foreground },
+    reviewValue: { fontSize: 14, fontFamily: "PlusJakartaSans_400Regular", color: colors.foreground },
     reviewSectionTitle: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       marginBottom: 10,
     },
@@ -339,7 +339,7 @@ export default function VenueNewScreen() {
       alignItems: "flex-start",
       gap: 10,
     },
-    noteText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: colors.primary, lineHeight: 18 },
+    noteText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.primary, lineHeight: 18 },
     footer: {
       flexDirection: "row",
       gap: 12,
@@ -359,7 +359,7 @@ export default function VenueNewScreen() {
       alignItems: "center",
       justifyContent: "center",
     },
-    backBtnText: { fontSize: 15, fontFamily: "Inter_500Medium", color: colors.foreground },
+    backBtnText: { fontSize: 15, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground },
     nextBtn: {
       flex: 1,
       borderRadius: 12,
@@ -369,7 +369,7 @@ export default function VenueNewScreen() {
       flexDirection: "row",
       gap: 8,
     },
-    nextBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: colors.primaryForeground },
+    nextBtnText: { fontSize: 16, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
   });
 
   const STEP_TITLES = ["Venue Details", "First Pitch", "Opening Hours", "Review & Submit"];
@@ -557,7 +557,7 @@ export default function VenueNewScreen() {
                 autoCapitalize="words"
               />
               {!!pitchNameError && (
-                <Text style={{ fontSize: 12, color: colors.destructive, marginTop: 4, fontFamily: "Inter_400Regular" }}>
+                <Text style={{ fontSize: 12, color: colors.destructive, marginTop: 4, fontFamily: "PlusJakartaSans_400Regular" }}>
                   {pitchNameError}
                 </Text>
               )}

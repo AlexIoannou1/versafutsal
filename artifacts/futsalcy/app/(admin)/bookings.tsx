@@ -167,7 +167,7 @@ export default function AdminBookingsScreen() {
       flex: 1,
       height: 42,
       fontSize: 14,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     filterToggleBtn: {
@@ -191,7 +191,7 @@ export default function AdminBookingsScreen() {
     },
     filterLabel: {
       fontSize: 11,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.mutedForeground,
       textTransform: "uppercase",
       letterSpacing: 0.5,
@@ -207,7 +207,7 @@ export default function AdminBookingsScreen() {
       backgroundColor: colors.card,
     },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    chipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.mutedForeground },
+    chipText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground },
     chipTextActive: { color: "#fff" },
     dateRow: { flexDirection: "row", gap: 8 },
     dateField: { flex: 1 },
@@ -219,7 +219,7 @@ export default function AdminBookingsScreen() {
       paddingHorizontal: 12,
       paddingVertical: 8,
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     playerSearchRow: {
@@ -236,13 +236,13 @@ export default function AdminBookingsScreen() {
       flex: 1,
       height: 36,
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
     clearBtn: {
       alignSelf: "flex-end",
     },
-    clearBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: colors.destructive },
+    clearBtnText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.destructive },
     resultRow: {
       paddingHorizontal: 16,
       paddingVertical: 8,
@@ -252,7 +252,7 @@ export default function AdminBookingsScreen() {
     },
     resultText: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     list: { paddingHorizontal: 16, paddingBottom: insets.bottom + 100 },
@@ -272,13 +272,13 @@ export default function AdminBookingsScreen() {
     },
     cardTitle: {
       fontSize: 15,
-      fontFamily: "Inter_600SemiBold",
+      fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.foreground,
       flex: 1,
       marginRight: 8,
     },
     statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-    statusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+    statusText: { fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold" },
     metaRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -287,7 +287,7 @@ export default function AdminBookingsScreen() {
     },
     metaText: {
       fontSize: 12,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
     },
     emptyWrap: {
@@ -299,12 +299,12 @@ export default function AdminBookingsScreen() {
     },
     emptyText: {
       fontSize: 14,
-      fontFamily: "Inter_500Medium",
+      fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
     emptySub: {
       fontSize: 13,
-      fontFamily: "Inter_400Regular",
+      fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       textAlign: "center",
     },
