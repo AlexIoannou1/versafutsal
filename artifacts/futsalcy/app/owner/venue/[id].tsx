@@ -285,7 +285,7 @@ export default function OwnerVenueDetailScreen() {
   const openPitchModal = () => {
     setPitchName("");
     setPitchSize("5v5");
-    setPitchType("INDOOR");
+    setPitchType("OUTDOOR");
     setPitchSlot("60");
     setPitchModalVisible(true);
   };
@@ -932,7 +932,7 @@ export default function OwnerVenueDetailScreen() {
             <View style={s.mField}>
               <Text style={s.mLabel}>Type</Text>
               <View style={s.typeRow}>
-                {(["INDOOR", "OUTDOOR", "HYBRID"] as const).map((t) => {
+                {(["OUTDOOR", "INDOOR", "HYBRID"] as const).map((t) => {
                   const active = pitchType === t;
                   return (
                     <TouchableOpacity

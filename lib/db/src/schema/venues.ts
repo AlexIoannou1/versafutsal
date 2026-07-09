@@ -71,7 +71,7 @@ export const pitchesTable = pgTable("pitches", {
     .references(() => venuesTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   size: text("size").notNull(), // e.g. "5v5", "7v7", "Futsal"
-  type: pitchTypeEnum("type").notNull().default("INDOOR"),
+  type: pitchTypeEnum("type").notNull().default("OUTDOOR"),
   slotDurationMinutes: integer("slot_duration_minutes").notNull().default(60),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

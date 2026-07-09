@@ -92,6 +92,13 @@
       "when": 1752019200000,
       "tag": "0013_stripe_connect_account_id",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1752105600000,
+      "tag": "0014_pitch_type_default_outdoor",
+      "breakpoints": true
     }
   ]
 }

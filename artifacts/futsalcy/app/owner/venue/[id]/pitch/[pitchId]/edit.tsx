@@ -319,7 +319,7 @@ export default function EditPitchScreen() {
         <View style={s.field}>
           <Text style={s.label}>Type</Text>
           <View style={s.typeRow}>
-            {(["INDOOR", "OUTDOOR", "HYBRID"] as const).map((t) => {
+            {(["OUTDOOR", "INDOOR", "HYBRID"] as const).map((t) => {
               const active = pitchType === t;
               return (
                 <TouchableOpacity
