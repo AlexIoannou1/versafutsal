@@ -326,6 +326,8 @@ export default function StatsScreen() {
     totalBookings: 0,
     totalRevenue: 0,
     avgRevenue: 0,
+    platformFees: 0,
+    netRevenue: 0,
     byDay: [],
     byHour: [],
     byDayOfWeek: [],
@@ -383,6 +385,29 @@ export default function StatsScreen() {
             <View style={s.overviewCell}>
               <Text style={s.overviewLabel}>Avg / booking</Text>
               <Text style={s.overviewValue}>{formatEuro(stats.avgRevenue)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Revenue Breakdown */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Revenue Breakdown</Text>
+          <View style={s.overviewRow}>
+            <View style={s.overviewCell}>
+              <Text style={s.overviewLabel}>Gross revenue</Text>
+              <Text style={s.overviewValue}>{formatEuro(stats.totalRevenue)}</Text>
+            </View>
+            <View style={s.overviewCell}>
+              <Text style={s.overviewLabel}>Platform fees</Text>
+              <Text style={[s.overviewValue, { color: "#EF4444" }]}>
+                −{formatEuro(stats.platformFees)}
+              </Text>
+            </View>
+            <View style={s.overviewCell}>
+              <Text style={s.overviewLabel}>Net revenue</Text>
+              <Text style={[s.overviewValue, { color: colors.primary }]}>
+                {formatEuro(stats.netRevenue)}
+              </Text>
             </View>
           </View>
         </View>

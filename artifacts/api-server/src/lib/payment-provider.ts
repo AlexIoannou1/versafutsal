@@ -12,6 +12,7 @@ export interface PaymentIntentResult {
   providerPaymentId: string;
   amount: string;
   feeAmount: string;
+  feePercent: string;
   feeWaived: boolean;
   currency: string;
 }
@@ -94,6 +95,7 @@ export class MockPaymentProvider implements PaymentProvider {
         ? (depositAmountOverride ?? computeDepositAmount(subtotalAmount))
         : subtotalAmount;
 
+    const appliedFeePercent = feeWaived ? "0.00" : feePercent;
     const feeAmount = feeWaived ? "0.00" : computeFeeAmount(baseAmount, feePercent);
 
     const totalAmount = feeWaived
@@ -109,13 +111,14 @@ export class MockPaymentProvider implements PaymentProvider {
       amount: totalAmount,
       currency: "EUR",
       feeAmount,
+      feePercent: appliedFeePercent,
       feeWaived,
       status: "PENDING",
       paymentType,
       idempotencyKey,
     });
 
-    return { providerPaymentId, amount: totalAmount, feeAmount, feeWaived, currency: "EUR" };
+    return { providerPaymentId, amount: totalAmount, feeAmount, feePercent: appliedFeePercent, feeWaived, currency: "EUR" };
   }
 
   async confirmPayment(providerPaymentId: string): Promise<{ success: boolean; errorMessage?: string }> {

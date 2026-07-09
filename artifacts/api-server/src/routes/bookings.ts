@@ -767,6 +767,8 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       totalBookings: 0,
       totalRevenue: 0,
       avgRevenue: 0,
+      platformFees: 0,
+      netRevenue: 0,
       byDay: [] as { date: string; count: number }[],
       byHour: [] as { hour: number; count: number }[],
       byDayOfWeek: [] as { day: number; count: number }[],
@@ -826,6 +828,23 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
     const totalRevenue = confirmedRows.reduce((sum, r) => sum + computeRevenue(r), 0);
     const avgRevenue = confirmedRows.length > 0 ? totalRevenue / confirmedRows.length : 0;
 
+    // ── Platform fees (from stored payment records, not recalculated) ────────
+    const bookingIds = rows.map((r) => r.id);
+    const paymentRows = bookingIds.length
+      ? await db
+          .select({
+            bookingId: paymentsTable.bookingId,
+            feeAmount: paymentsTable.feeAmount,
+            status: paymentsTable.status,
+          })
+          .from(paymentsTable)
+          .where(inArray(paymentsTable.bookingId, bookingIds))
+      : [];
+    const platformFees = paymentRows
+      .filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED")
+      .reduce((sum, p) => sum + (parseFloat(p.feeAmount) || 0), 0);
+    const netRevenue = totalRevenue - platformFees;
+
     // ── By day (YYYY-MM-DD) ──────────────────────────────────────────────────
     const dayMap = new Map<string, number>();
     for (const r of rows) {
@@ -883,6 +902,8 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       totalBookings,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
       avgRevenue: Math.round(avgRevenue * 100) / 100,
+      platformFees: Math.round(platformFees * 100) / 100,
+      netRevenue: Math.round(netRevenue * 100) / 100,
       byDay,
       byHour,
       byDayOfWeek,
@@ -1100,7 +1121,32 @@ router.get<{ id: string }>(
         return;
       }
 
-      res.json({ booking: enrichBooking(row) });
+      // Include the payment record (if any) so the owner sees the price/fee breakdown
+      const [payment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.bookingId, row.booking.id))
+        .limit(1);
+
+      res.json({
+        booking: {
+          ...enrichBooking(row),
+          payment: payment
+            ? {
+                id: payment.id,
+                amount: payment.amount,
+                feeAmount: payment.feeAmount,
+                feePercent: payment.feePercent,
+                feeWaived: payment.feeWaived,
+                paymentType: payment.paymentType,
+                currency: payment.currency,
+                status: payment.status,
+                provider: payment.provider,
+                createdAt: payment.createdAt.toISOString(),
+              }
+            : null,
+        },
+      });
     } catch (err) {
       console.error("GET /owner/bookings/:id error:", err);
       res.status(500).json({ error: "Internal server error" });

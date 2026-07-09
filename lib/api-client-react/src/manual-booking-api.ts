@@ -109,6 +109,8 @@ export interface OwnerStatsResponse {
   totalBookings: number;
   totalRevenue: number;
   avgRevenue: number;
+  platformFees: number;
+  netRevenue: number;
   byDay: { date: string; count: number }[];
   byHour: { hour: number; count: number }[];
   byDayOfWeek: { day: number; count: number }[];

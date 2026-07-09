@@ -40,7 +40,11 @@ export const paymentsTable = pgTable("payments", {
   currency: text("currency").notNull().default("EUR"),
   feeAmount: numeric("fee_amount", { precision: 10, scale: 2 })
     .notNull()
-    .default("1.00"),
+    .default("0.00"),
+  // The percentage rate that was applied to compute feeAmount at checkout time, e.g. "6.00"
+  feePercent: numeric("fee_percent", { precision: 5, scale: 2 })
+    .notNull()
+    .default("0.00"),
   feeWaived: boolean("fee_waived").notNull().default(false),
   status: paymentStatusEnum("status").notNull().default("PENDING"),
   paymentType: text("payment_type").notNull().default("FULL"), // "FULL" | "DEPOSIT"

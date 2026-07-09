@@ -385,6 +385,19 @@ export default function OwnerBookingDetailScreen() {
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
   const isManual = !!(booking as { guestName?: string | null }).guestName;
+  const payment = (booking as {
+    payment?: {
+      amount: string;
+      feeAmount: string;
+      feePercent: string;
+      feeWaived: boolean;
+      status: string;
+    } | null;
+  }).payment ?? null;
+  const paymentTotal = payment ? parseFloat(payment.amount) : null;
+  const paymentFee = payment ? parseFloat(payment.feeAmount) : null;
+  const ownerPayout =
+    paymentTotal != null && paymentFee != null ? paymentTotal - paymentFee : null;
   const guestName = (booking as { guestName?: string | null }).guestName ?? null;
   const guestPhone = (booking as { guestPhone?: string | null }).guestPhone ?? null;
 
@@ -498,6 +511,30 @@ export default function OwnerBookingDetailScreen() {
             <Text style={s.rowValue}>{pitch?.type ?? "—"} · {pitch?.size ?? "—"}</Text>
           </View>
         </View>
+
+        {payment && paymentTotal != null && paymentFee != null && ownerPayout != null && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Price Summary</Text>
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={[s.rowLabel, { width: 130 }]}>Booking price</Text>
+              <Text style={[s.rowValue, { textAlign: "right" }]}>€{paymentTotal.toFixed(2)}</Text>
+            </View>
+            <View style={s.row}>
+              <Text style={[s.rowLabel, { width: 130 }]}>
+                Platform fee{payment.feeWaived ? " (waived)" : ` (${parseFloat(payment.feePercent).toFixed(2).replace(/\.00$/, "")}%)`}
+              </Text>
+              <Text style={[s.rowValue, { textAlign: "right" }]}>−€{paymentFee.toFixed(2)}</Text>
+            </View>
+            <View style={s.row}>
+              <Text style={[s.rowLabel, { width: 130, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground }]}>
+                Your payout
+              </Text>
+              <Text style={[s.rowValue, { textAlign: "right", fontFamily: "PlusJakartaSans_700Bold", color: colors.primary }]}>
+                €{ownerPayout.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={s.card}>
           <Text style={s.cardTitle}>Booking Details</Text>

@@ -779,7 +779,14 @@ paths:
                 type: object
                 properties:
                   booking:
-                    $ref: "#/components/schemas/BookingWithDetails"
+                    allOf:
+                      - $ref: "#/components/schemas/BookingWithDetails"
+                      - type: object
+                        properties:
+                          payment:
+                            nullable: true
+                            allOf:
+                              - $ref: "#/components/schemas/PaymentRecord"
                 required: [booking]
         "403":
           description: Not your venue
@@ -2093,6 +2100,9 @@ components:
           type: string
         feeAmount:
           type: string
+        feePercent:
+          type: string
+          description: The percentage rate applied to compute feeAmount at checkout time, e.g. "6.00"
         feeWaived:
           type: boolean
         paymentType:
@@ -2108,7 +2118,7 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, amount, feeAmount, feeWaived, paymentType, currency, status, provider, createdAt]
+      required: [id, amount, feeAmount, feePercent, feeWaived, paymentType, currency, status, provider, createdAt]
 
     CheckoutResponse:
       type: object
