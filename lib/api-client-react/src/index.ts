@@ -42,3 +42,12 @@ export {
   removePaymentMethod,
 } from "./account-api";
 export type { SavedCard, ListPaymentMethodsResponse } from "./account-api";
+export {
+  getOwnerConnectConfig,
+  createOwnerConnectAccount,
+  getOwnerConnectOnboardingLink,
+  getOwnerConnectStatus,
+  disconnectOwnerConnectAccount,
+  deleteOwnerAccount,
+} from "./owner-connect-api";
+export type { OwnerConnectConfig, OwnerConnectStatus } from "./owner-connect-api";

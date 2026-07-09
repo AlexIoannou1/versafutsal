@@ -85,6 +85,13 @@
       "when": 1751673600000,
       "tag": "0012_payment_fee_percent",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1752019200000,
+      "tag": "0013_stripe_connect_account_id",
+      "breakpoints": true
     }
   ]
 }
