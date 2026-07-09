@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
-import { useListOwnerBookings } from "@workspace/api-client-react";
+import { useListOwnerBookings, useListOwnerVenues } from "@workspace/api-client-react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_STATUS_KEY, type OnboardingStatus } from "../owner/onboarding";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -138,6 +140,20 @@ export default function OwnerDashboardScreen() {
 
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
   const bookings = data?.bookings ?? [];
+
+  const { data: venuesData, isLoading: venuesLoading } = useListOwnerVenues();
+  const hasNoVenues = !venuesLoading && (venuesData?.venues?.length ?? 0) === 0;
+
+  const [onboardingStatus, setOnboardingStatus] = useState<OnboardingStatus | null | "loading">("loading");
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_STATUS_KEY)
+      .then((val) => setOnboardingStatus((val as OnboardingStatus) ?? null))
+      .catch(() => setOnboardingStatus(null));
+  }, []);
+
+  // Show setup banner only when onboarding is mid-flow AND no venue has been
+  // created yet. Once a venue exists the owner can manage it via normal flows.
+  const showSetupBanner = onboardingStatus === "in_progress" && hasNoVenues;
 
   const todayStart = useMemo(() => startOfDay(new Date()), []);
 
@@ -394,6 +410,68 @@ export default function OwnerDashboardScreen() {
         </View>
       ),
     },
+    ...(showSetupBanner
+      ? [
+          {
+            key: "setupBanner",
+            render: () => (
+              <TouchableOpacity
+                onPress={() => router.push("/owner/onboarding" as never)}
+                activeOpacity={0.85}
+                style={{
+                  marginHorizontal: 16,
+                  marginBottom: 12,
+                  backgroundColor: colors.primary + "12",
+                  borderWidth: 1.5,
+                  borderColor: colors.primary + "60",
+                  borderRadius: 14,
+                  padding: 16,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 14,
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: colors.primary + "20",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <FeatherIcons name="map-pin" size={18} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontFamily: "PlusJakartaSans_600SemiBold",
+                      color: colors.primary,
+                      marginBottom: 2,
+                    }}
+                  >
+                    Complete your venue setup
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontFamily: "PlusJakartaSans_400Regular",
+                      color: colors.primary + "cc",
+                      lineHeight: 16,
+                    }}
+                  >
+                    Add your venue and first pitch so players can find and book with you.
+                  </Text>
+                </View>
+                <FeatherIcons name="arrow-right" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            ),
+          },
+        ]
+      : []),
     {
       key: "stats",
       render: () => (
