@@ -325,6 +325,7 @@ export interface BookingPlayerSummary {
   id: string;
   name: string;
   email: string;
+  phoneNumber?: string | null;
 }
 
 export type BookingWithDetails = BookingRecord & {

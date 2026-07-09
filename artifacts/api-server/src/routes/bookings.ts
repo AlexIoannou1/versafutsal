@@ -983,6 +983,7 @@ router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (re
           id: usersTable.id,
           name: usersTable.name,
           email: usersTable.email,
+          phoneNumber: usersTable.phoneNumber,
         },
       })
       .from(bookingsTable)

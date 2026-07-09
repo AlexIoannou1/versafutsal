@@ -113,12 +113,18 @@ type Booking = {
   startAt: string;
   endAt: string;
   status: string;
-  player?: { name: string; email: string };
+  player?: { name: string; email: string; phoneNumber?: string | null };
   venue?: { id: string; name: string };
   pitch?: { name: string };
   guestName?: string | null;
+  guestPhone?: string | null;
   [key: string]: unknown;
 };
+
+function normalizePhone(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.replace(/\D/g, "");
+}
 
 type CardStyles = ReturnType<typeof StyleSheet.create>;
 
@@ -242,16 +248,21 @@ export default function OwnerBookingsScreen() {
         if (v?.id !== venueId) return false;
       }
 
-      // Search: guest name, player name/email, booking ID prefix
+      // Search: guest name, player name/email, phone numbers, booking ID prefix
       if (search.trim()) {
         const q = search.trim().toLowerCase();
-        const player = b.player as { name: string; email: string } | undefined;
+        const qDigits = normalizePhone(search.trim());
+        const player = b.player as { name: string; email: string; phoneNumber?: string | null } | undefined;
         const matchGuest = b.guestName?.toLowerCase().includes(q);
         const matchPlayer =
           player?.name?.toLowerCase().includes(q) ||
           player?.email?.toLowerCase().includes(q);
         const matchId = b.id.slice(0, 8).toLowerCase().includes(q);
-        if (!matchGuest && !matchPlayer && !matchId) return false;
+        const matchPhone =
+          qDigits.length > 0 &&
+          (normalizePhone(player?.phoneNumber).includes(qDigits) ||
+            normalizePhone(b.guestPhone as string | null | undefined).includes(qDigits));
+        if (!matchGuest && !matchPlayer && !matchId && !matchPhone) return false;
       }
 
       return true;
@@ -396,7 +407,7 @@ export default function OwnerBookingsScreen() {
             style={s.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by name or booking ID…"
+            placeholder="Search name, email, phone or ID…"
             placeholderTextColor={colors.mutedForeground}
             returnKeyType="search"
             clearButtonMode="while-editing"
