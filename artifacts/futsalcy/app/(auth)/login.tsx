@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   Platform,
   ScrollView,
 } from "react-native";
@@ -29,6 +28,11 @@ function toAppMode(role: string): AppMode {
   return VALID_ROLES.includes(role as AppMode) ? (role as AppMode) : "PLAYER";
 }
 
+type WrongModeState = {
+  actualLabel: string;
+  onContinue: () => Promise<void>;
+};
+
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -39,10 +43,20 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [wrongMode, setWrongMode] = useState<WrongModeState | null>(null);
+
+  const clearError = () => {
+    if (error) setError(null);
+    if (wrongMode) setWrongMode(null);
+  };
 
   const handleLogin = async () => {
+    setError(null);
+    setWrongMode(null);
+
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Missing fields", "Please enter your email and password.");
+      setError("Please enter your email and password.");
       return;
     }
 
@@ -50,35 +64,34 @@ export default function LoginScreen() {
     try {
       const data = await loginUser({ email: email.trim().toLowerCase(), password });
 
-      // Validate role matches selected mode
       if (data.user.role !== selectedMode) {
         const actualLabel = MODE_LABELS[data.user.role] || data.user.role;
         const selectedLabel = MODE_LABELS[selectedMode || ""] || selectedMode;
-        Alert.alert(
-          "Wrong mode",
-          `This account is a ${actualLabel} account, but you selected ${selectedLabel} mode.\n\nGo back to switch mode or continue as ${actualLabel}.`,
-          [
-            { text: "Go back", onPress: () => router.back() },
+
+        const onContinue = async () => {
+          await login(
             {
-              text: `Continue as ${actualLabel}`,
-              onPress: async () => {
-                await login(
-                  {
-                    id: data.user.id,
-                    email: data.user.email,
-                    name: data.user.name,
-                    role: toAppMode(data.user.role),
-                    phoneNumber: data.user.phoneNumber,
-                    avatarUrl: data.user.avatarUrl,
-                    city: data.user.city,
-                  },
-                  data.token,
-                );
-                router.replace("/");
-              },
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.name,
+              role: toAppMode(data.user.role),
+              phoneNumber: data.user.phoneNumber,
+              avatarUrl: data.user.avatarUrl,
+              city: data.user.city,
             },
-          ],
+            data.token,
+          );
+          router.replace("/");
+        };
+
+        setWrongMode({
+          actualLabel,
+          onContinue,
+        });
+        setError(
+          `This is a ${actualLabel} account, but you selected ${selectedLabel} mode.`,
         );
+        setLoading(false);
         return;
       }
 
@@ -101,8 +114,8 @@ export default function LoginScreen() {
       const message =
         (e?.data as Record<string, unknown>)?.error as string ||
         (e?.message as string) ||
-        "Login failed. Please try again.";
-      Alert.alert("Login failed", message);
+        "Login failed. Please check your credentials and try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -119,8 +132,7 @@ export default function LoginScreen() {
     inner: {
       flex: 1,
       paddingHorizontal: 24,
-      paddingTop:
-        insets.top + (Platform.OS === "web" ? 67 : 20),
+      paddingTop: insets.top + (Platform.OS === "web" ? 67 : 20),
       paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 24),
     },
     backBtn: {
@@ -148,6 +160,40 @@ export default function LoginScreen() {
       fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginBottom: 32,
+    },
+    errorBanner: {
+      backgroundColor: colors.destructive + "18",
+      borderWidth: 1,
+      borderColor: colors.destructive + "40",
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+    },
+    errorText: {
+      flex: 1,
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_500Medium",
+      color: colors.destructive,
+      lineHeight: 18,
+    },
+    wrongModeActions: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 10,
+    },
+    wrongModeBtn: {
+      flex: 1,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    wrongModeBtnText: {
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
     field: {
       marginBottom: 16,
@@ -234,13 +280,42 @@ export default function LoginScreen() {
           <Text style={s.subtitle}>Sign in to continue</Text>
         </View>
 
+        {error && (
+          <View style={s.errorBanner}>
+            <FeatherIcons name="alert-circle" size={16} color={colors.destructive} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.errorText}>{error}</Text>
+              {wrongMode && (
+                <View style={s.wrongModeActions}>
+                  <TouchableOpacity
+                    style={[s.wrongModeBtn, { backgroundColor: colors.muted }]}
+                    onPress={() => router.back()}
+                  >
+                    <Text style={[s.wrongModeBtnText, { color: colors.foreground }]}>
+                      Go back
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.wrongModeBtn, { backgroundColor: colors.primary }]}
+                    onPress={wrongMode.onContinue}
+                  >
+                    <Text style={[s.wrongModeBtnText, { color: colors.primaryForeground }]}>
+                      Continue as {wrongMode.actualLabel}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
         <View style={s.field}>
           <Text style={s.label}>Email</Text>
           <View style={s.inputRow}>
             <TextInput
               style={s.input}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(v) => { setEmail(v); clearError(); }}
               placeholder="you@example.com"
               placeholderTextColor={colors.mutedForeground}
               keyboardType="email-address"
@@ -257,7 +332,7 @@ export default function LoginScreen() {
             <TextInput
               style={s.input}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => { setPassword(v); clearError(); }}
               placeholder="••••••••"
               placeholderTextColor={colors.mutedForeground}
               secureTextEntry={!showPassword}

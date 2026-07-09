@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   Platform,
   ScrollView,
 } from "react-native";
@@ -41,8 +40,11 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isOwner = selectedMode === "VENUE_OWNER";
+
+  const clearError = () => { if (error) setError(null); };
 
   // Admin accounts cannot be self-registered.
   if (selectedMode === "ADMIN") {
@@ -103,16 +105,18 @@ export default function RegisterScreen() {
   }
 
   const handleRegister = async () => {
+    setError(null);
+
     if (!name.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Missing fields", "Please fill in all required fields.");
+      setError("Please fill in all required fields.");
       return;
     }
     if (isOwner && !phoneNumber.trim()) {
-      Alert.alert("Missing field", "Phone number is required for venue owners so we can verify your account.");
+      setError("Phone number is required for venue owners so we can verify your account.");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Weak password", "Password must be at least 6 characters.");
+      setError("Password must be at least 6 characters.");
       return;
     }
 
@@ -144,7 +148,7 @@ export default function RegisterScreen() {
         (e?.data as Record<string, unknown>)?.error as string ||
         (e?.message as string) ||
         "Registration failed. Please try again.";
-      Alert.alert("Error", message);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -179,6 +183,24 @@ export default function RegisterScreen() {
       fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
       marginBottom: 32,
+    },
+    errorBanner: {
+      backgroundColor: colors.destructive + "18",
+      borderWidth: 1,
+      borderColor: colors.destructive + "40",
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    errorText: {
+      flex: 1,
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_500Medium",
+      color: colors.destructive,
+      lineHeight: 18,
     },
     field: { marginBottom: 16 },
     label: {
@@ -254,13 +276,20 @@ export default function RegisterScreen() {
         <Text style={s.title}>Create account</Text>
         <Text style={s.subtitle}>Join Versa and start booking</Text>
 
+        {error && (
+          <View style={s.errorBanner}>
+            <FeatherIcons name="alert-circle" size={16} color={colors.destructive} />
+            <Text style={s.errorText}>{error}</Text>
+          </View>
+        )}
+
         <View style={s.field}>
           <Text style={s.label}>Full name</Text>
           <View style={s.inputRow}>
             <TextInput
               style={s.input}
               value={name}
-              onChangeText={setName}
+              onChangeText={(v) => { setName(v); clearError(); }}
               placeholder="Your name"
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="words"
@@ -275,7 +304,7 @@ export default function RegisterScreen() {
             <TextInput
               style={s.input}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(v) => { setEmail(v); clearError(); }}
               placeholder="you@example.com"
               placeholderTextColor={colors.mutedForeground}
               keyboardType="email-address"
@@ -294,7 +323,7 @@ export default function RegisterScreen() {
             <TextInput
               style={s.input}
               value={phoneNumber}
-              onChangeText={setPhoneNumber}
+              onChangeText={(v) => { setPhoneNumber(v); clearError(); }}
               placeholder="+357 99 000000"
               placeholderTextColor={colors.mutedForeground}
               keyboardType="phone-pad"
@@ -314,7 +343,7 @@ export default function RegisterScreen() {
             <TextInput
               style={s.input}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => { setPassword(v); clearError(); }}
               placeholder="Min. 6 characters"
               placeholderTextColor={colors.mutedForeground}
               secureTextEntry={!showPassword}
