@@ -17,6 +17,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { Platform } from "react-native";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -24,8 +25,19 @@ import { useColors } from "@/hooks/useColors";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { setBaseUrl } from "@workspace/api-client-react";
 
-// Set API base URL for Expo (mobile needs absolute URL)
-if (process.env.EXPO_PUBLIC_DOMAIN) {
+// Set API base URL so the client knows where to send requests.
+//
+// On web (Replit): the Expo app runs on *.expo.<host> but the API server is
+// at /api on *.<host>. Strip the ".expo." segment from the hostname so
+// relative /api/... paths resolve correctly — no env var needed, no stale URLs.
+//
+// On native: use EXPO_PUBLIC_DOMAIN which is set in .env.local for dev builds.
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  const hostname = window.location.hostname;
+  const apiHostname = hostname.replace(/\.expo\./, ".");
+  const base = `${window.location.protocol}//${apiHostname !== hostname ? apiHostname : hostname}`;
+  setBaseUrl(base);
+} else if (process.env.EXPO_PUBLIC_DOMAIN) {
   setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 }
 
