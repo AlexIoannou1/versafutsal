@@ -2,7 +2,8 @@ import { Router, type IRouter, type Response } from "express";
 import multer from "multer";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
-import { Client as StorageClient } from "@replit/object-storage";
+import fs from "node:fs";
+import path from "node:path";
 import { db } from "@workspace/db";
 import {
   venuesTable,
@@ -54,36 +55,33 @@ function applyPhotoUpload(req: any, res: any): Promise<boolean> {
   });
 }
 
-// ─── Object storage helpers ───────────────────────────────────────────────────
+// ─── Filesystem photo storage helpers ────────────────────────────────────────
+//
+// Photos are stored in <cwd>/uploads/venue-photos/<venueId>/<uuid>.webp and
+// served via express.static mounted at /api/uploads (see app.ts).
+// The DB stores the relative key: "venue-photos/<venueId>/<uuid>.webp"
+//
 
 const PHOTO_KEY_PREFIX = "venue-photos/";
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const VENUE_PHOTOS_DIR = path.join(UPLOADS_DIR, "venue-photos");
 
-/**
- * Create a StorageClient with the bucket ID passed explicitly.
- * @replit/object-storage v1 fetches the bucket ID from a Replit sidecar endpoint
- * which may not be available in development — passing it directly bypasses that.
- */
-function makeStorageClient() {
-  return new StorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID } as any);
+/** Construct the public HTTPS URL for a stored photo key. */
+function resolvePhotoUrl(key: string): string {
+  // Already a full external URL (legacy or external) — return unchanged
+  if (key.startsWith("http://") || key.startsWith("https://")) return key;
+  // Local filesystem key → construct via REPLIT_DEV_DOMAIN
+  const domain = process.env.REPLIT_DEV_DOMAIN;
+  if (!domain) return key;
+  return `https://${domain}/api/uploads/${key}`;
 }
 
-/**
- * If the url is an object-storage key (starts with "venue-photos/"), resolve it
- * to a signed download URL. External URLs are returned unchanged.
- */
 async function signPhotoUrl(url: string): Promise<string> {
-  if (!url.startsWith(PHOTO_KEY_PREFIX)) return url;
-  try {
-    const client = makeStorageClient();
-    const { url: signedUrl } = await client.downloadAsUrl(url);
-    return signedUrl ?? url;
-  } catch {
-    return url;
-  }
+  return resolvePhotoUrl(url);
 }
 
 async function signPhotoList<T extends { url: string }>(photos: T[]): Promise<T[]> {
-  return Promise.all(photos.map(async (p) => ({ ...p, url: await signPhotoUrl(p.url) })));
+  return photos.map((p) => ({ ...p, url: resolvePhotoUrl(p.url) }));
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -581,26 +579,27 @@ router.post<{ id: string }>(
         return;
       }
 
-      const objectKey = `${PHOTO_KEY_PREFIX}${req.params.id}/${randomUUID()}.webp`;
-      const client = makeStorageClient();
-      const { ok, error } = await client.uploadFromBytes(objectKey, processed, {
-        contentType: "image/webp",
-      });
+      const uuid = randomUUID();
+      const photoKey = `${PHOTO_KEY_PREFIX}${req.params.id}/${uuid}.webp`;
+      const venueDir = path.join(VENUE_PHOTOS_DIR, req.params.id);
+      const filePath = path.join(venueDir, `${uuid}.webp`);
 
-      if (!ok) {
-        console.error("Object storage upload error:", error);
-        res.status(500).json({ error: "Failed to upload image" });
+      try {
+        fs.mkdirSync(venueDir, { recursive: true });
+        await fs.promises.writeFile(filePath, processed);
+      } catch (writeErr) {
+        console.error("Filesystem write error:", writeErr);
+        res.status(500).json({ error: "Failed to save image" });
         return;
       }
 
-      const { url: signedUrl } = await client.downloadAsUrl(objectKey);
-
       const [photo] = await db
         .insert(venuePhotosTable)
-        .values({ venueId: req.params.id, url: objectKey, sortOrder: currentPhotos.length })
+        .values({ venueId: req.params.id, url: photoKey, sortOrder: currentPhotos.length })
         .returning();
 
-      res.status(201).json({ photo: { ...photo, url: signedUrl } });
+      const photoUrl = resolvePhotoUrl(photoKey);
+      res.status(201).json({ photo: { ...photo, url: photoUrl } });
     } catch (err) {
       console.error("POST /owner/venues/:id/photos/upload error:", err);
       res.status(500).json({ error: "Internal server error" });
@@ -647,13 +646,14 @@ router.delete<{ venueId: string; photoId: string }>(
           ),
         );
 
-      // Clean up object storage if this is a stored photo (not an external URL)
+      // Clean up filesystem file if this is a locally stored photo
       if (photoRecord?.url.startsWith(PHOTO_KEY_PREFIX)) {
         try {
-          const client = makeStorageClient();
-          await client.delete(photoRecord.url);
+          const filePath = path.join(UPLOADS_DIR, photoRecord.url);
+          await fs.promises.unlink(filePath);
         } catch (e) {
-          console.error("Failed to delete photo from storage:", e);
+          // Non-fatal — file may already be gone
+          console.warn("Failed to delete photo file from filesystem:", e);
         }
       }
 
