@@ -25,7 +25,9 @@ const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter(_req, file, cb) {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    // Accept common image MIME types plus application/octet-stream (sent by some
+    // Android builds of expo-image-picker). Sharp will reject truly invalid files.
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/octet-stream"];
     if (!allowed.includes(file.mimetype)) {
       cb(new Error("Only JPEG, PNG, and WebP images are allowed"));
       return;
@@ -33,6 +35,24 @@ const photoUpload = multer({
     cb(null, true);
   },
 });
+
+/** Applies multer.single("photo") and converts multer errors into JSON 400s.
+ *  Returns true if the request is ready to handle, false if a response was already sent. */
+function applyPhotoUpload(req: any, res: any): Promise<boolean> {
+  return new Promise((resolve) => {
+    photoUpload.single("photo")(req, res, (err: unknown) => {
+      if (err instanceof multer.MulterError) {
+        res.status(400).json({ error: err.message });
+        resolve(false);
+      } else if (err) {
+        res.status(400).json({ error: (err as Error).message ?? "Upload failed" });
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+}
 
 // ─── Object storage helpers ───────────────────────────────────────────────────
 
@@ -505,8 +525,11 @@ router.post<{ id: string }>(
   "/owner/venues/:id/photos/upload",
   requireAuth,
   requireRole("VENUE_OWNER"),
-  photoUpload.single("photo"),
   async (req, res) => {
+    // Apply multer and convert any parse/size/type errors to JSON 400s
+    const ready = await applyPhotoUpload(req, res);
+    if (!ready) return; // response already sent by applyPhotoUpload
+
     try {
       const [existing] = await db
         .select()
@@ -536,10 +559,18 @@ router.post<{ id: string }>(
       }
 
       // Strip EXIF, auto-orient, re-encode as WebP
-      const processed = await sharp(req.file.buffer)
-        .rotate()
-        .toFormat("webp", { quality: 85 })
-        .toBuffer();
+      // sharp auto-detects format from buffer magic bytes, so application/octet-stream is fine
+      let processed: Buffer;
+      try {
+        processed = await sharp(req.file.buffer)
+          .rotate()
+          .toFormat("webp", { quality: 85 })
+          .toBuffer();
+      } catch (sharpErr) {
+        console.error("Sharp processing error:", sharpErr);
+        res.status(400).json({ error: "Invalid image file" });
+        return;
+      }
 
       const objectKey = `${PHOTO_KEY_PREFIX}${req.params.id}/${randomUUID()}.webp`;
       const client = new StorageClient();

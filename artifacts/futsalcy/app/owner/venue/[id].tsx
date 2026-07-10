@@ -133,7 +133,7 @@ export default function OwnerVenueDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   // ─── Photo state ──────────────────────────────────────────────────────────
-  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   // ─── New pitch modal state ────────────────────────────────────────────────
@@ -312,30 +312,65 @@ export default function OwnerVenueDetailScreen() {
       return;
     }
 
+    const remaining = 7 - (venue?.photos?.length ?? 0);
+    if (remaining <= 0) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "images",
       allowsEditing: false,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
       quality: 0.9,
     });
 
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset = result.assets[0];
-    const uri = asset.uri;
-    const mimeType = asset.mimeType ?? "image/jpeg";
-    const ext = uri.split(".").pop() ?? "jpg";
+    if (result.canceled || result.assets.length === 0) return;
 
     setPhotoError(null);
-    setPhotoUploading(true);
-    try {
-      await uploadVenuePhoto(id!, { uri, type: mimeType, name: `photo.${ext}` });
-      invalidate();
-    } catch (err: unknown) {
-      const e = err as { data?: { error?: string }; message?: string } | null;
-      const msg = e?.data?.error ?? e?.message ?? "Failed to upload photo.";
-      setPhotoError(msg);
-    } finally {
-      setPhotoUploading(false);
+
+    const assets = result.assets;
+    let failed = 0;
+    let lastError = "";
+
+    for (let i = 0; i < assets.length; i++) {
+      const asset = assets[i];
+      const label =
+        assets.length > 1 ? `Uploading ${i + 1} of ${assets.length}…` : "Uploading…";
+      setPhotoUploading(label);
+
+      try {
+        let fileArg: File | { uri: string; type: string; name: string };
+
+        if (Platform.OS === "web") {
+          // On web the { uri, type, name } object trick doesn't work —
+          // we must fetch the blob URI and create a real File.
+          const resp = await fetch(asset.uri);
+          const blob = await resp.blob();
+          const mimeType = asset.mimeType ?? blob.type ?? "image/jpeg";
+          const ext = mimeType.split("/")[1] ?? "jpg";
+          fileArg = new File([blob], `photo.${ext}`, { type: mimeType });
+        } else {
+          const uri = asset.uri;
+          const mimeType = asset.mimeType ?? "image/jpeg";
+          const ext = uri.split(".").pop()?.split("?")[0] ?? "jpg";
+          fileArg = { uri, type: mimeType, name: `photo.${ext}` };
+        }
+
+        await uploadVenuePhoto(id!, fileArg);
+        invalidate();
+      } catch (err: unknown) {
+        failed++;
+        const e = err as { data?: { error?: string }; message?: string } | null;
+        lastError = e?.data?.error ?? e?.message ?? "Failed to upload photo.";
+      }
+    }
+
+    setPhotoUploading(null);
+    if (failed > 0) {
+      setPhotoError(
+        assets.length > 1
+          ? `${failed} of ${assets.length} photos failed: ${lastError}`
+          : lastError,
+      );
     }
   };
 
@@ -938,12 +973,12 @@ export default function OwnerVenueDetailScreen() {
               </View>
             ))}
 
-          {photoUploading && (
+          {photoUploading ? (
             <View style={s.uploadProgressRow}>
               <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={s.uploadProgressText}>Uploading photo…</Text>
+              <Text style={s.uploadProgressText}>{photoUploading}</Text>
             </View>
-          )}
+          ) : null}
 
           {photoError ? (
             <Text style={s.photoErrorText}>{photoError}</Text>
@@ -952,7 +987,9 @@ export default function OwnerVenueDetailScreen() {
           {venue.photos.length < 7 && !photoUploading ? (
             <TouchableOpacity style={s.addBtn} onPress={handlePickAndUploadPhoto}>
               <FeatherIcons name="camera" size={16} color={colors.primary} />
-              <Text style={s.addBtnText}>Add Photo</Text>
+              <Text style={s.addBtnText}>
+                Add Photo{venue.photos.length > 0 ? ` (${7 - venue.photos.length} remaining)` : "s"}
+              </Text>
             </TouchableOpacity>
           ) : venue.photos.length >= 7 ? (
             <Text style={s.photoLimitText}>Maximum of 7 photos reached</Text>

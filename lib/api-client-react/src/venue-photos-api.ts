@@ -14,15 +14,26 @@ export interface UploadVenuePhotoResponse {
 
 /**
  * Upload a photo file for a venue using multipart form data.
- * The file object should have the shape that React Native / expo-image-picker returns:
- * { uri: string; type: string; name: string }
+ *
+ * Accepts either:
+ *  - A `File` or `Blob` instance (web — use a real Blob fetched from the picked URI)
+ *  - A React Native file descriptor `{ uri, type, name }` (native — RN's fetch XHR extension)
  */
 export async function uploadVenuePhoto(
   venueId: string,
-  file: { uri: string; type: string; name: string },
+  file: File | Blob | { uri: string; type: string; name: string },
 ): Promise<UploadVenuePhotoResponse> {
   const formData = new FormData();
-  formData.append("photo", { uri: file.uri, type: file.type, name: file.name } as unknown as Blob);
+
+  if ("uri" in file) {
+    // React Native path: append the RN file descriptor object.
+    // RN's fetch implementation recognises this shape and streams the file bytes.
+    formData.append("photo", file as unknown as Blob);
+  } else {
+    // Web/Node path: real Blob or File — append directly with a filename.
+    const name = file instanceof File ? file.name : "photo.webp";
+    formData.append("photo", file, name);
+  }
 
   return customFetch<UploadVenuePhotoResponse>(`/api/owner/venues/${venueId}/photos/upload`, {
     method: "POST",
