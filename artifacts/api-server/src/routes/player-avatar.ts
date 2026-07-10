@@ -1,6 +1,8 @@
+import fs from "fs";
+import path from "path";
 import { Router } from "express";
 import multer from "multer";
-import { Client } from "@replit/object-storage";
+import sharp from "sharp";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
@@ -8,11 +10,15 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router = Router();
 
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const AVATARS_DIR = path.join(UPLOADS_DIR, "avatars");
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB server-side guard
   fileFilter(_req, file, cb) {
-    if (file.mimetype !== "image/jpeg" && file.mimetype !== "image/png") {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "application/octet-stream"];
+    if (!allowed.includes(file.mimetype)) {
       cb(new Error("Only JPG and PNG files are allowed"));
       return;
     }
@@ -20,13 +26,38 @@ const upload = multer({
   },
 });
 
+function applyUpload(req: any, res: any): Promise<boolean> {
+  return new Promise((resolve) => {
+    upload.single("avatar")(req, res, (err: unknown) => {
+      if (err instanceof multer.MulterError) {
+        res.status(400).json({ error: err.message });
+        resolve(false);
+      } else if (err) {
+        res.status(400).json({ error: (err as Error).message ?? "Upload failed" });
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+}
+
+function resolveAvatarUrl(key: string): string {
+  if (key.startsWith("http://") || key.startsWith("https://")) return key;
+  const domain = process.env.REPLIT_DEV_DOMAIN;
+  if (!domain) return key;
+  return `https://${domain}/api/uploads/${key}`;
+}
+
 // POST /player/avatar — upload a profile photo and persist the URL
 router.post(
   "/player/avatar",
   requireAuth,
   requireRole("PLAYER"),
-  upload.single("avatar"),
   async (req, res) => {
+    const ready = await applyUpload(req, res);
+    if (!ready) return;
+
     try {
       if (!req.file) {
         res.status(400).json({ error: "No image file provided" });
@@ -34,23 +65,33 @@ router.post(
       }
 
       const userId = req.user!.userId;
-      const ext = req.file.originalname.split(".").pop() ?? "jpg";
-      const objectKey = `avatars/${userId}.${ext}`;
 
-      const client = new Client({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID } as any);
-      const { ok, error } = await client.uploadFromBytes(objectKey, req.file.buffer, {
-        contentType: req.file.mimetype,
-      });
-
-      if (!ok) {
-        console.error("Object storage upload error:", error);
-        res.status(500).json({ error: "Failed to upload image" });
+      let processed: Buffer;
+      try {
+        processed = await sharp(req.file.buffer)
+          .rotate()
+          .resize(400, 400, { fit: "cover" })
+          .toFormat("webp", { quality: 85 })
+          .toBuffer();
+      } catch (sharpErr) {
+        console.error("Sharp processing error:", sharpErr);
+        res.status(400).json({ error: "Invalid image file" });
         return;
       }
 
-      // Build a public URL — Object Storage serves via the standard download API
-      const { url: downloadUrl } = await client.downloadAsUrl(objectKey);
-      const avatarUrl = downloadUrl;
+      const avatarKey = `avatars/${userId}.webp`;
+      const filePath = path.join(AVATARS_DIR, `${userId}.webp`);
+
+      try {
+        fs.mkdirSync(AVATARS_DIR, { recursive: true });
+        await fs.promises.writeFile(filePath, processed);
+      } catch (writeErr) {
+        console.error("Filesystem write error:", writeErr);
+        res.status(500).json({ error: "Failed to save image" });
+        return;
+      }
+
+      const avatarUrl = resolveAvatarUrl(avatarKey) + `?v=${Date.now()}`;
 
       const [updated] = await db
         .update(usersTable)

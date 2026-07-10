@@ -4,7 +4,8 @@ export { uploadVenuePhoto, reorderVenuePhotos } from "./venue-photos-api";
 export type { VenuePhoto, UploadVenuePhotoResponse } from "./venue-photos-api";
 export { setBaseUrl, setAuthTokenGetter } from "./custom-fetch";
 export type { AuthTokenGetter } from "./custom-fetch";
-export { updateProfile, changePassword, uploadAvatar } from "./profile-api";
+export { updateProfile, changePassword } from "./profile-api";
+export { uploadAvatar } from "./uploadAvatar";
 export type {
   UpdateProfileRequest,
   UpdateProfileResponse,

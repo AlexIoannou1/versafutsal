@@ -13,10 +13,13 @@ import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import FeatherIcons from "@/components/FeatherIcons";
+import AvatarInitials from "@/components/AvatarInitials";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import EditProfileSheet from "@/components/EditProfileSheet";
 import { uploadAvatar } from "@workspace/api-client-react";
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export default function PlayerProfileScreen() {
   const colors = useColors();
@@ -53,7 +56,8 @@ export default function PlayerProfileScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
+      allowsEditing: true,
+      aspect: [1, 1],
       quality: 0.8,
     });
 
@@ -67,12 +71,22 @@ export default function PlayerProfileScreen() {
       return;
     }
 
+    if (asset.fileSize != null && asset.fileSize > MAX_FILE_SIZE) {
+      Alert.alert(
+        "File too large",
+        "Please choose an image smaller than 5 MB.",
+      );
+      return;
+    }
+
     setUploading(true);
     try {
       const { avatarUrl } = await uploadAvatar(asset.uri, mimeType);
       await updateUser({ avatarUrl });
-    } catch {
-      Alert.alert("Upload failed", "Could not upload the image. Please try again.");
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Could not upload the image. Please try again.";
+      Alert.alert("Upload failed", message);
     } finally {
       setUploading(false);
     }
@@ -118,6 +132,12 @@ export default function PlayerProfileScreen() {
       backgroundColor: "rgba(0,0,0,0.4)",
       alignItems: "center",
       justifyContent: "center",
+    },
+    uploadingLabel: {
+      color: "#fff",
+      fontSize: 11,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      marginTop: 4,
     },
     name: {
       fontSize: 22,
@@ -222,13 +242,18 @@ export default function PlayerProfileScreen() {
           {user?.avatarUrl ? (
             <Image source={{ uri: user.avatarUrl }} style={s.avatarImage} contentFit="cover" />
           ) : (
-            <View style={s.avatar}>
-              <FeatherIcons name="user" size={36} color={colors.primary} />
-            </View>
+            <AvatarInitials
+              name={user?.name ?? ""}
+              size={88}
+              fontSize={32}
+              backgroundColor={colors.primary + "20"}
+              color={colors.primary}
+            />
           )}
           {uploading && (
             <View style={[s.uploadOverlay, { borderRadius: 44 }]}>
               <ActivityIndicator color="#fff" />
+              <Text style={s.uploadingLabel}>Uploading…</Text>
             </View>
           )}
           <View style={s.avatarBadge}>
