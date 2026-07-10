@@ -12,6 +12,7 @@ import {
 import { eq, inArray, and, gte, lte, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
+import { sendNotification } from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -116,6 +117,23 @@ router.put<{ id: string }>(
         .set({ status: "APPROVED", rejectionReason: null, updatedAt: new Date() })
         .where(eq(venuesTable.id, id))
         .returning();
+
+      // Only send notification when status actually transitions into APPROVED.
+      // Re-approving an already-approved venue must not fire a duplicate notification.
+      if (existing.status !== "APPROVED") {
+        try {
+          await sendNotification({
+            userId: existing.ownerId,
+            type: "VENUE_APPROVED",
+            title: "Venue Approved!",
+            body: `Your venue "${existing.name}" has been approved and is now live on FutsalCY.`,
+            entityType: "VENUE",
+            entityId: id,
+          });
+        } catch (notifErr) {
+          console.warn("[notifications] venue approval notification failed (non-fatal):", notifErr);
+        }
+      }
 
       res.json({ venue: updated });
     } catch (err) {

@@ -9,6 +9,7 @@ import favouritesRouter from "./favourites";
 import playerAccountRouter from "./player-account";
 import playerAvatarRouter from "./player-avatar";
 import ownerAccountRouter from "./owner-account";
+import ownerNotificationsRouter from "./owner-notifications";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(favouritesRouter);
 router.use(playerAccountRouter);
 router.use(playerAvatarRouter);
 router.use(ownerAccountRouter);
+router.use(ownerNotificationsRouter);
 
 export default router;
