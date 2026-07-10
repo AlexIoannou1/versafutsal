@@ -16,6 +16,14 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 
+export const blockTypeEnum = pgEnum("block_type", [
+  "OFF_DAY",
+  "BANK_HOLIDAY",
+  "TRAINING",
+  "MAINTENANCE",
+  "PRIVATE",
+]);
+
 export const venueStatusEnum = pgEnum("venue_status", [
   "PENDING",
   "APPROVED",
@@ -115,6 +123,23 @@ export const maintenanceBlocksTable = pgTable("maintenance_blocks", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ─── Availability Blocks ───────────────────────────────────────────────────
+
+export const availabilityBlocksTable = pgTable("availability_blocks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  venueId: uuid("venue_id").references(() => venuesTable.id, { onDelete: "cascade" }),
+  pitchId: uuid("pitch_id").references(() => pitchesTable.id, { onDelete: "cascade" }),
+  blockType: blockTypeEnum("block_type").notNull().default("OFF_DAY"),
+  label: text("label"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  recursWeekly: boolean("recurs_weekly").notNull().default(false),
+  dayOfWeek: integer("day_of_week"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // ─── Player Favourites ─────────────────────────────────────────────────────
 
 export const playerFavouritesTable = pgTable(
@@ -151,6 +176,18 @@ export const pitchesRelations = relations(pitchesTable, ({ one, many }) => ({
   }),
   pricingRules: many(pricingRulesTable),
   maintenanceBlocks: many(maintenanceBlocksTable),
+  availabilityBlocks: many(availabilityBlocksTable),
+}));
+
+export const availabilityBlocksRelations = relations(availabilityBlocksTable, ({ one }) => ({
+  venue: one(venuesTable, {
+    fields: [availabilityBlocksTable.venueId],
+    references: [venuesTable.id],
+  }),
+  pitch: one(pitchesTable, {
+    fields: [availabilityBlocksTable.pitchId],
+    references: [pitchesTable.id],
+  }),
 }));
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -166,3 +203,5 @@ export type Venue = typeof venuesTable.$inferSelect;
 export type Pitch = typeof pitchesTable.$inferSelect;
 export type OpeningHours = typeof openingHoursTable.$inferSelect;
 export type PricingRule = typeof pricingRulesTable.$inferSelect;
+export type AvailabilityBlock = typeof availabilityBlocksTable.$inferSelect;
+export type BlockType = "OFF_DAY" | "BANK_HOLIDAY" | "TRAINING" | "MAINTENANCE" | "PRIVATE";

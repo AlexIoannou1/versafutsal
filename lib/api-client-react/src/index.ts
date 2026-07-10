@@ -51,3 +51,16 @@ export {
   deleteOwnerAccount,
 } from "./owner-connect-api";
 export type { OwnerConnectConfig, OwnerConnectStatus } from "./owner-connect-api";
+export {
+  useListBlocks,
+  useCreateBlock,
+  useDeleteBlock,
+  useListBlocksForVenues,
+} from "./blocks-api";
+export type {
+  AvailabilityBlock,
+  BlockType,
+  CreateBlockRequest,
+  CreateBlockResponse,
+  ListBlocksResponse,
+} from "./blocks-api";

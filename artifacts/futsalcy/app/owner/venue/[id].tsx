@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
   View,
   Text,
@@ -29,12 +30,32 @@ import {
   deletePitch,
   setOpeningHours,
   setPricingRules,
-  useCreateMaintenanceBlock,
-  useDeleteMaintenanceBlock,
+  useListBlocks,
+  useCreateBlock,
+  useDeleteBlock,
+  type AvailabilityBlock,
+  type BlockType,
 } from "@workspace/api-client-react";
 
 const DAYS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function parseLocalDate(str: string): Date {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+function fmtLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function parseLocalTime(str: string): Date {
+  const [h, m] = (str || "08:00").split(":").map(Number);
+  const dt = new Date();
+  dt.setHours(h ?? 0, m ?? 0, 0, 0);
+  return dt;
+}
+function fmtLocalTime(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 const TYPE_LABELS: Record<string, string> = { INDOOR: "Indoor", OUTDOOR: "Outdoor", HYBRID: "Hybrid" };
 const DAY_TYPE_LABELS: Record<string, string> = { ALL: "All days", WEEKDAY: "Weekdays", WEEKEND: "Weekends" };
 
@@ -129,62 +150,91 @@ export default function OwnerVenueDetailScreen() {
   const [allDayPrice, setAllDayPrice] = useState("");
   const [pricingSaving, setPricingSaving] = useState(false);
 
-  // ─── Maintenance blocks modal state ──────────────────────────────────────
-  const [blockModalPitch, setBlockModalPitch] = useState<Pitch | null>(null);
-  const [blockStartDate, setBlockStartDate] = useState("");
-  const [blockStartTime, setBlockStartTime] = useState("00:00");
-  const [blockEndDate, setBlockEndDate] = useState("");
-  const [blockEndTime, setBlockEndTime] = useState("23:59");
-  const [blockReason, setBlockReason] = useState("");
+  // ─── Availability blocks state ────────────────────────────────────────────
+  const { data: blocksData, refetch: refetchBlocks } = useListBlocks(id!);
+  const availabilityBlocks: AvailabilityBlock[] = (blocksData?.blocks ?? []) as AvailabilityBlock[];
 
-  const { mutate: doCreateBlock, isPending: blockCreating } = useCreateMaintenanceBlock();
-  const { mutate: doDeleteBlock } = useDeleteMaintenanceBlock();
+  const [avBlockModalVisible, setAvBlockModalVisible] = useState(false);
+  const [avBlockPitchId, setAvBlockPitchId] = useState<string | "">("");
+  const [avBlockType, setAvBlockType] = useState<BlockType>("OFF_DAY");
+  const [avBlockLabel, setAvBlockLabel] = useState("");
+  const [avBlockStartDate, setAvBlockStartDate] = useState("");
+  const [avBlockEndDate, setAvBlockEndDate] = useState("");
+  const [avBlockFullDay, setAvBlockFullDay] = useState(true);
+  const [avBlockStartTime, setAvBlockStartTime] = useState("08:00");
+  const [avBlockEndTime, setAvBlockEndTime] = useState("22:00");
+  const [avBlockRecursWeekly, setAvBlockRecursWeekly] = useState(false);
+  const [avBlockDayOfWeek, setAvBlockDayOfWeek] = useState(1);
 
-  function openBlockModal(pitch: Pitch) {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    setBlockStartDate(today);
-    setBlockStartTime("00:00");
-    setBlockEndDate(today);
-    setBlockEndTime("23:59");
-    setBlockReason("");
-    setBlockModalPitch(pitch);
+  const [avBlockToDelete, setAvBlockToDelete] = useState<string | null>(null);
+  const [showScopeDropdown, setShowScopeDropdown] = useState(false);
+  const [showBlockTypeDropdown, setShowBlockTypeDropdown] = useState(false);
+  const [avActivePicker, setAvActivePicker] = useState<"startDate" | "endDate" | "startTime" | "endTime" | null>(null);
+
+  const { mutate: doCreateAvBlock, isPending: avBlockCreating } = useCreateBlock(id!);
+  const { mutate: doDeleteAvBlock } = useDeleteBlock(id!);
+
+  function openAvBlockModal() {
+    const today = new Date().toISOString().slice(0, 10);
+    setAvBlockPitchId("");
+    setAvBlockType("OFF_DAY");
+    setAvBlockLabel("");
+    setAvBlockStartDate(today);
+    setAvBlockEndDate(today);
+    setAvBlockFullDay(true);
+    setAvBlockStartTime("08:00");
+    setAvBlockEndTime("22:00");
+    setAvBlockRecursWeekly(false);
+    setAvBlockDayOfWeek(1);
+    setAvBlockModalVisible(true);
   }
 
-  function handleCreateBlock() {
-    if (!blockModalPitch || !id) return;
-    const startAt = `${blockStartDate}T${blockStartTime}:00.000Z`;
-    const endAt = `${blockEndDate}T${blockEndTime}:00.000Z`;
-    if (new Date(startAt) >= new Date(endAt)) {
-      Alert.alert("Invalid Range", "Start must be before end.");
+  function handleCreateAvBlock() {
+    if (!avBlockStartDate || !avBlockEndDate) {
+      Alert.alert("Error", "Start date and end date are required.");
       return;
     }
-    doCreateBlock(
-      { venueId: id, pitchId: blockModalPitch.id, data: { startAt, endAt, reason: blockReason || undefined } },
+    if (avBlockRecursWeekly && avBlockStartDate > avBlockEndDate) {
+      Alert.alert("Error", "Start date must be on or before end date.");
+      return;
+    }
+    doCreateAvBlock(
       {
-        onSuccess: () => {
-          setBlockModalPitch(null);
-          invalidate();
+        pitchId: avBlockPitchId || undefined,
+        blockType: avBlockType,
+        label: avBlockLabel.trim() || undefined,
+        startDate: avBlockStartDate,
+        endDate: avBlockEndDate,
+        startTime: avBlockFullDay ? undefined : avBlockStartTime,
+        endTime: avBlockFullDay ? undefined : avBlockEndTime,
+        recursWeekly: avBlockRecursWeekly,
+        dayOfWeek: avBlockRecursWeekly ? avBlockDayOfWeek : undefined,
+      },
+      {
+        onSuccess: (result) => {
+          setAvBlockModalVisible(false);
+          void refetchBlocks();
+          if (result.warning) {
+            Alert.alert("Block Created", result.warning);
+          }
         },
-        onError: () => Alert.alert("Error", "Could not create maintenance block."),
+        onError: () => Alert.alert("Error", "Could not create block."),
       },
     );
   }
 
-  function handleDeleteBlock(blockId: string, pitchId: string) {
-    if (!id) return;
-    Alert.alert("Delete Block", "Remove this maintenance block?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () =>
-          doDeleteBlock(
-            { venueId: id, pitchId, blockId },
-            { onSuccess: invalidate, onError: () => Alert.alert("Error", "Could not delete block.") },
-          ),
-      },
-    ]);
+  function handleDeleteAvBlock(blockId: string) {
+    setAvBlockToDelete(blockId);
+  }
+
+  function handleConfirmDeleteAvBlock() {
+    if (!avBlockToDelete) return;
+    const blockId = avBlockToDelete;
+    setAvBlockToDelete(null);
+    doDeleteAvBlock(blockId, {
+      onSuccess: () => void refetchBlocks(),
+      onError: () => Alert.alert("Error", "Could not delete block."),
+    });
   }
 
   // ─── Opening hours state ──────────────────────────────────────────────────
@@ -836,10 +886,6 @@ export default function OwnerVenueDetailScreen() {
                   <FeatherIcons name="dollar-sign" size={12} color={colors.foreground} />
                   <Text style={s.pitchActionText}>Pricing</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.pitchActionBtn, { borderColor: colors.primary + "40" }]} onPress={() => openBlockModal(pitch)}>
-                  <FeatherIcons name="slash" size={12} color={colors.primary} />
-                  <Text style={[s.pitchActionText, { color: colors.primary }]}>Block</Text>
-                </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.pitchActionBtn, { borderColor: colors.destructive + "40" }]}
                   onPress={() => handleDeletePitch(pitch.id, pitch.name)}
@@ -854,6 +900,118 @@ export default function OwnerVenueDetailScreen() {
             <FeatherIcons name="plus" size={16} color={colors.primary} />
             <Text style={s.addBtnText}>Add Pitch</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Blocked Periods Section */}
+        <View style={s.section}>
+          <View style={s.sectionHeader}>
+            <Text style={s.sectionTitle}>Blocked Periods ({availabilityBlocks.length})</Text>
+            <TouchableOpacity style={s.editBtn} onPress={openAvBlockModal}>
+              <FeatherIcons name="slash" size={14} color={colors.primary} />
+              <Text style={s.editBtnText}>Block Time</Text>
+            </TouchableOpacity>
+          </View>
+          {availabilityBlocks.length === 0 ? (
+            <Text style={[s.noPricingText, { marginBottom: 4 }]}>No blocked periods set.</Text>
+          ) : (
+            availabilityBlocks.map((blk) => {
+              const blockTypeColors: Record<string, string> = {
+                OFF_DAY: "#6366F1",
+                BANK_HOLIDAY: "#8B5CF6",
+                TRAINING: "#F59E0B",
+                MAINTENANCE: "#EF4444",
+                PRIVATE: "#10B981",
+              };
+              const blockTypeLabels: Record<string, string> = {
+                OFF_DAY: "Off Day",
+                BANK_HOLIDAY: "Bank Holiday",
+                TRAINING: "Training",
+                MAINTENANCE: "Maintenance",
+                PRIVATE: "Private",
+              };
+              const bc = blockTypeColors[blk.blockType] ?? colors.primary;
+              const scopePitch = venue?.pitches.find((p) => p.id === blk.pitchId);
+              return (
+                <View
+                  key={blk.id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: bc + "12",
+                    borderRadius: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: bc,
+                    padding: 10,
+                    marginBottom: 8,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                      <View style={{ backgroundColor: bc + "25", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                        <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: bc }}>
+                          {blockTypeLabels[blk.blockType] ?? blk.blockType}
+                        </Text>
+                      </View>
+                      {blk.recursWeekly && (
+                        <View style={{ backgroundColor: colors.muted, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground }}>
+                            Weekly · {DAYS_FULL[blk.dayOfWeek ?? 0]}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground }}>
+                      {blk.recursWeekly
+                        ? `Repeats every ${DAYS_FULL[blk.dayOfWeek ?? 0]}`
+                        : blk.startDate === blk.endDate
+                        ? blk.startDate
+                        : `${blk.startDate} – ${blk.endDate}`}
+                    </Text>
+                    {blk.startTime && blk.endTime && (
+                      <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground }}>
+                        {blk.startTime} – {blk.endTime} UTC
+                      </Text>
+                    )}
+                    {!blk.startTime && (
+                      <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground }}>
+                        Full day
+                      </Text>
+                    )}
+                    {blk.label && (
+                      <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+                        {blk.label}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+                      Scope: {scopePitch ? scopePitch.name : "All pitches"}
+                    </Text>
+                  </View>
+                  <View>
+                    {avBlockToDelete === blk.id ? (
+                      <View style={{ flexDirection: "row", gap: 4, alignItems: "center" }}>
+                        <TouchableOpacity
+                          onPress={() => setAvBlockToDelete(null)}
+                          style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }}
+                        >
+                          <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleConfirmDeleteAvBlock}
+                          style={{ paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, backgroundColor: colors.destructive }}
+                        >
+                          <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", color: "#fff" }}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity onPress={() => handleDeleteAvBlock(blk.id)} style={{ padding: 8 }}>
+                        <FeatherIcons name="trash-2" size={14} color={colors.destructive} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         {/* Opening Hours Section */}
@@ -962,62 +1120,241 @@ export default function OwnerVenueDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Maintenance Block Modal */}
-      <Modal visible={!!blockModalPitch} transparent animationType="slide" onRequestClose={() => setBlockModalPitch(null)}>
+      {/* Availability Block Modal */}
+      <Modal visible={avBlockModalVisible} transparent animationType="slide" onRequestClose={() => setAvBlockModalVisible(false)}>
         <KeyboardAvoidingView style={s.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : undefined}>
           <ScrollView contentContainerStyle={s.modalSheet} keyboardShouldPersistTaps="handled">
-            <Text style={s.modalTitle}>Maintenance — {blockModalPitch?.name}</Text>
-            {blockModalPitch?.maintenanceBlocks && blockModalPitch.maintenanceBlocks.length > 0 && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={[s.mLabel, { marginBottom: 8 }]}>Existing Blocks</Text>
-                {blockModalPitch.maintenanceBlocks.map((blk) => (
-                  <View key={blk.id} style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.muted, borderRadius: 8, padding: 10, marginBottom: 6 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.foreground }}>
-                        {new Date(blk.startAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
-                        {" – "}
-                        {new Date(blk.endAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
-                      </Text>
-                      {blk.reason && <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 }}>{blk.reason}</Text>}
+            <Text style={s.modalTitle}>Block Time</Text>
+
+            {/* Scope dropdown */}
+            {(() => {
+              const scopeOptions = [
+                { id: "", label: "Whole Venue" },
+                ...(venue?.pitches.map((p) => ({ id: p.id, label: p.name })) ?? []),
+              ];
+              const selectedScope = scopeOptions.find((o) => o.id === avBlockPitchId) ?? scopeOptions[0];
+              return (
+                <View style={[s.mField, { zIndex: 20 }]}>
+                  <Text style={s.mLabel}>Scope</Text>
+                  <TouchableOpacity
+                    style={[s.mInput, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}
+                    onPress={() => { setShowScopeDropdown(!showScopeDropdown); setShowBlockTypeDropdown(false); }}
+                  >
+                    <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular", fontSize: 14 }}>{selectedScope.label}</Text>
+                    <FeatherIcons name={showScopeDropdown ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                  {showScopeDropdown && (
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginTop: 4, overflow: "hidden", backgroundColor: colors.card }}>
+                      {scopeOptions.map((opt, idx) => (
+                        <TouchableOpacity
+                          key={opt.id}
+                          style={{
+                            paddingHorizontal: 14, paddingVertical: 11,
+                            backgroundColor: avBlockPitchId === opt.id ? colors.primary + "12" : colors.card,
+                            borderBottomWidth: idx < scopeOptions.length - 1 ? 1 : 0,
+                            borderBottomColor: colors.border,
+                            flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                          }}
+                          onPress={() => { setAvBlockPitchId(opt.id); setShowScopeDropdown(false); }}
+                        >
+                          <Text style={{ fontFamily: avBlockPitchId === opt.id ? "PlusJakartaSans_600SemiBold" : "PlusJakartaSans_400Regular", color: avBlockPitchId === opt.id ? colors.primary : colors.foreground, fontSize: 14 }}>
+                            {opt.label}
+                          </Text>
+                          {avBlockPitchId === opt.id && <FeatherIcons name="check" size={14} color={colors.primary} />}
+                        </TouchableOpacity>
+                      ))}
                     </View>
-                    <TouchableOpacity onPress={() => handleDeleteBlock(blk.id, blockModalPitch.id)} style={{ padding: 6 }}>
-                      <FeatherIcons name="trash-2" size={14} color={colors.destructive} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-            <Text style={[s.mLabel, { marginBottom: 8 }]}>Create New Block</Text>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
+                  )}
+                </View>
+              );
+            })()}
+
+            {/* Block Type dropdown */}
+            {(() => {
+              const btOptions: { value: BlockType; label: string }[] = [
+                { value: "OFF_DAY", label: "Off Day" },
+                { value: "BANK_HOLIDAY", label: "Bank Holiday" },
+                { value: "TRAINING", label: "Training" },
+                { value: "MAINTENANCE", label: "Maintenance" },
+                { value: "PRIVATE", label: "Private" },
+              ];
+              const selectedBt = btOptions.find((o) => o.value === avBlockType) ?? btOptions[0];
+              return (
+                <View style={[s.mField, { zIndex: 10 }]}>
+                  <Text style={s.mLabel}>Block Type</Text>
+                  <TouchableOpacity
+                    style={[s.mInput, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}
+                    onPress={() => { setShowBlockTypeDropdown(!showBlockTypeDropdown); setShowScopeDropdown(false); }}
+                  >
+                    <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular", fontSize: 14 }}>{selectedBt.label}</Text>
+                    <FeatherIcons name={showBlockTypeDropdown ? "chevron-up" : "chevron-down"} size={14} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                  {showBlockTypeDropdown && (
+                    <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 10, marginTop: 4, overflow: "hidden", backgroundColor: colors.card }}>
+                      {btOptions.map((opt, idx) => (
+                        <TouchableOpacity
+                          key={opt.value}
+                          style={{
+                            paddingHorizontal: 14, paddingVertical: 11,
+                            backgroundColor: avBlockType === opt.value ? colors.primary + "12" : colors.card,
+                            borderBottomWidth: idx < btOptions.length - 1 ? 1 : 0,
+                            borderBottomColor: colors.border,
+                            flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+                          }}
+                          onPress={() => { setAvBlockType(opt.value); setShowBlockTypeDropdown(false); }}
+                        >
+                          <Text style={{ fontFamily: avBlockType === opt.value ? "PlusJakartaSans_600SemiBold" : "PlusJakartaSans_400Regular", color: avBlockType === opt.value ? colors.primary : colors.foreground, fontSize: 14 }}>
+                            {opt.label}
+                          </Text>
+                          {avBlockType === opt.value && <FeatherIcons name="check" size={14} color={colors.primary} />}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
+
+            {/* Dates */}
+            <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[s.mLabel, { marginBottom: 4 }]}>Start Date</Text>
-                <TextInput style={s.mInput} value={blockStartDate} onChangeText={setBlockStartDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} />
+                {Platform.OS === "android" ? (
+                  <TouchableOpacity style={s.mInput} onPress={() => setAvActivePicker("startDate")}>
+                    <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular" }}>{avBlockStartDate}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <DateTimePicker
+                    value={parseLocalDate(avBlockStartDate)}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "compact" : "default"}
+                    onChange={(_: DateTimePickerEvent, d?: Date) => { if (d) setAvBlockStartDate(fmtLocalDate(d)); }}
+                  />
+                )}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.mLabel, { marginBottom: 4 }]}>Start Time (UTC)</Text>
-                <TextInput style={s.mInput} value={blockStartTime} onChangeText={setBlockStartTime} placeholder="00:00" placeholderTextColor={colors.mutedForeground} />
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", gap: 8, marginBottom: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[s.mLabel, { marginBottom: 4 }]}>End Date</Text>
-                <TextInput style={s.mInput} value={blockEndDate} onChangeText={setBlockEndDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.mLabel, { marginBottom: 4 }]}>End Time (UTC)</Text>
-                <TextInput style={s.mInput} value={blockEndTime} onChangeText={setBlockEndTime} placeholder="23:59" placeholderTextColor={colors.mutedForeground} />
+                {Platform.OS === "android" ? (
+                  <TouchableOpacity style={s.mInput} onPress={() => setAvActivePicker("endDate")}>
+                    <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular" }}>{avBlockEndDate}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <DateTimePicker
+                    value={parseLocalDate(avBlockEndDate)}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "compact" : "default"}
+                    onChange={(_: DateTimePickerEvent, d?: Date) => { if (d) setAvBlockEndDate(fmtLocalDate(d)); }}
+                  />
+                )}
               </View>
             </View>
-            <View style={[s.mField, { marginBottom: 16 }]}>
-              <Text style={s.mLabel}>Reason (optional)</Text>
-              <TextInput style={s.mInput} value={blockReason} onChangeText={setBlockReason} placeholder="e.g. Resurfacing, Inspection" placeholderTextColor={colors.mutedForeground} />
+
+            {/* Full Day Toggle */}
+            <View style={[s.mField, { marginBottom: 14 }]}>
+              <Text style={s.mLabel}>Duration</Text>
+              <View style={s.toggleRow}>
+                <TouchableOpacity
+                  style={[s.toggleBtn, { backgroundColor: avBlockFullDay ? colors.primary : colors.muted, borderColor: avBlockFullDay ? colors.primary : colors.border }]}
+                  onPress={() => setAvBlockFullDay(true)}
+                >
+                  <Text style={[s.toggleBtnText, { color: avBlockFullDay ? colors.primaryForeground : colors.foreground }]}>Full Day</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.toggleBtn, { backgroundColor: !avBlockFullDay ? colors.primary : colors.muted, borderColor: !avBlockFullDay ? colors.primary : colors.border }]}
+                  onPress={() => setAvBlockFullDay(false)}
+                >
+                  <Text style={[s.toggleBtnText, { color: !avBlockFullDay ? colors.primaryForeground : colors.foreground }]}>Time Range</Text>
+                </TouchableOpacity>
+              </View>
             </View>
+
+            {/* Time pickers when not full day */}
+            {!avBlockFullDay && (
+              <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.mLabel, { marginBottom: 4 }]}>Start Time</Text>
+                  {Platform.OS === "android" ? (
+                    <TouchableOpacity style={s.mInput} onPress={() => setAvActivePicker("startTime")}>
+                      <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular" }}>{avBlockStartTime}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <DateTimePicker
+                      value={parseLocalTime(avBlockStartTime)}
+                      mode="time"
+                      is24Hour
+                      display={Platform.OS === "ios" ? "compact" : "default"}
+                      onChange={(_: DateTimePickerEvent, d?: Date) => { if (d) setAvBlockStartTime(fmtLocalTime(d)); }}
+                    />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.mLabel, { marginBottom: 4 }]}>End Time</Text>
+                  {Platform.OS === "android" ? (
+                    <TouchableOpacity style={s.mInput} onPress={() => setAvActivePicker("endTime")}>
+                      <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_400Regular" }}>{avBlockEndTime}</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <DateTimePicker
+                      value={parseLocalTime(avBlockEndTime)}
+                      mode="time"
+                      is24Hour
+                      display={Platform.OS === "ios" ? "compact" : "default"}
+                      onChange={(_: DateTimePickerEvent, d?: Date) => { if (d) setAvBlockEndTime(fmtLocalTime(d)); }}
+                    />
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Label */}
+            <View style={s.mField}>
+              <Text style={s.mLabel}>Label (optional)</Text>
+              <TextInput style={s.mInput} value={avBlockLabel} onChangeText={setAvBlockLabel} placeholder="e.g. National Holiday, Team Training" placeholderTextColor={colors.mutedForeground} />
+            </View>
+
+            {/* Weekly Repeat Toggle */}
+            <View style={[s.mField, { marginBottom: 6 }]}>
+              <Text style={s.mLabel}>Repeat</Text>
+              <View style={s.toggleRow}>
+                <TouchableOpacity
+                  style={[s.toggleBtn, { backgroundColor: !avBlockRecursWeekly ? colors.primary : colors.muted, borderColor: !avBlockRecursWeekly ? colors.primary : colors.border }]}
+                  onPress={() => setAvBlockRecursWeekly(false)}
+                >
+                  <Text style={[s.toggleBtnText, { color: !avBlockRecursWeekly ? colors.primaryForeground : colors.foreground }]}>No repeat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.toggleBtn, { backgroundColor: avBlockRecursWeekly ? colors.primary : colors.muted, borderColor: avBlockRecursWeekly ? colors.primary : colors.border }]}
+                  onPress={() => setAvBlockRecursWeekly(true)}
+                >
+                  <Text style={[s.toggleBtnText, { color: avBlockRecursWeekly ? colors.primaryForeground : colors.foreground }]}>Every week</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Day of week selector for weekly repeat */}
+            {avBlockRecursWeekly && (
+              <View style={[s.mField, { marginBottom: 16 }]}>
+                <Text style={s.mLabel}>Day of Week</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                  {DAYS_SHORT.map((d, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={[s.typeChip, { backgroundColor: avBlockDayOfWeek === i ? colors.primary : colors.muted, borderColor: avBlockDayOfWeek === i ? colors.primary : colors.border }]}
+                      onPress={() => setAvBlockDayOfWeek(i)}
+                    >
+                      <Text style={[s.typeChipText, { color: avBlockDayOfWeek === i ? colors.primaryForeground : colors.foreground }]}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
             <View style={s.mActions}>
-              <TouchableOpacity style={s.mCancelBtn} onPress={() => setBlockModalPitch(null)}>
-                <Text style={s.mCancelText}>Close</Text>
+              <TouchableOpacity style={s.mCancelBtn} onPress={() => setAvBlockModalVisible(false)}>
+                <Text style={s.mCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.mSaveBtn, blockCreating && { opacity: 0.5 }]} onPress={handleCreateBlock} disabled={blockCreating}>
-                <Text style={s.mSaveText}>{blockCreating ? "Saving…" : "Create Block"}</Text>
+              <TouchableOpacity style={[s.mSaveBtn, avBlockCreating && { opacity: 0.5 }]} onPress={handleCreateAvBlock} disabled={avBlockCreating}>
+                <Text style={s.mSaveText}>{avBlockCreating ? "Saving…" : "Create Block"}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -1074,6 +1411,74 @@ export default function OwnerVenueDetailScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+      {/* Android: availability block date/time picker dialog */}
+      {Platform.OS === "android" && avActivePicker !== null && (
+        <DateTimePicker
+          value={
+            avActivePicker === "startDate" ? parseLocalDate(avBlockStartDate) :
+            avActivePicker === "endDate" ? parseLocalDate(avBlockEndDate) :
+            avActivePicker === "startTime" ? parseLocalTime(avBlockStartTime) :
+            parseLocalTime(avBlockEndTime)
+          }
+          mode={avActivePicker === "startDate" || avActivePicker === "endDate" ? "date" : "time"}
+          is24Hour
+          display="default"
+          onChange={(_: DateTimePickerEvent, d?: Date) => {
+            setAvActivePicker(null);
+            if (!d) return;
+            if (avActivePicker === "startDate") setAvBlockStartDate(fmtLocalDate(d));
+            else if (avActivePicker === "endDate") setAvBlockEndDate(fmtLocalDate(d));
+            else if (avActivePicker === "startTime") setAvBlockStartTime(fmtLocalTime(d));
+            else setAvBlockEndTime(fmtLocalTime(d));
+          }}
+        />
+      )}
+
+      {/* iOS: availability block date/time picker bottom sheet */}
+      {Platform.OS === "ios" && avActivePicker !== null && (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setAvActivePicker(null)}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" }}
+            activeOpacity={1}
+            onPress={() => setAvActivePicker(null)}
+          >
+            <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 32, paddingHorizontal: 16 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground }}>
+                  {avActivePicker === "startDate" ? "Start Date" : avActivePicker === "endDate" ? "End Date" : avActivePicker === "startTime" ? "Start Time" : "End Time"}
+                </Text>
+                <TouchableOpacity onPress={() => setAvActivePicker(null)}>
+                  <Text style={{ fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary }}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={
+                  avActivePicker === "startDate" ? parseLocalDate(avBlockStartDate) :
+                  avActivePicker === "endDate" ? parseLocalDate(avBlockEndDate) :
+                  avActivePicker === "startTime" ? parseLocalTime(avBlockStartTime) :
+                  parseLocalTime(avBlockEndTime)
+                }
+                mode={avActivePicker === "startDate" || avActivePicker === "endDate" ? "date" : "time"}
+                is24Hour
+                display="spinner"
+                onChange={(_: DateTimePickerEvent, d?: Date) => {
+                  if (!d) return;
+                  if (avActivePicker === "startDate") setAvBlockStartDate(fmtLocalDate(d));
+                  else if (avActivePicker === "endDate") setAvBlockEndDate(fmtLocalDate(d));
+                  else if (avActivePicker === "startTime") setAvBlockStartTime(fmtLocalTime(d));
+                  else setAvBlockEndTime(fmtLocalTime(d));
+                }}
+                style={{ width: "100%" }}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
     </View>
   );
 }

@@ -7,9 +7,10 @@ import {
   pricingRulesTable,
   venuePhotosTable,
   maintenanceBlocksTable,
+  availabilityBlocksTable,
   bookingsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, inArray, sql, gt } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql, gt, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
@@ -838,6 +839,250 @@ router.put<{ id: string; pitchId: string }>(
       res.json({ pricingRules: updated });
     } catch (err) {
       console.error("PUT /owner/venues/:id/pitches/:pitchId/pricing error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─── Owner: Availability Blocks ───────────────────────────────────────────────
+
+// GET /owner/venues/:venueId/blocks — list all availability blocks for a venue
+router.get<{ venueId: string }>(
+  "/owner/venues/:venueId/blocks",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const venue = await assertVenueOwner(req.params.venueId, req.user!.userId, res);
+      if (!venue) return;
+
+      const blocks = await db
+        .select()
+        .from(availabilityBlocksTable)
+        .where(eq(availabilityBlocksTable.venueId, req.params.venueId))
+        .orderBy(availabilityBlocksTable.startDate);
+
+      res.json({ blocks });
+    } catch (err) {
+      console.error("GET /owner/venues/:venueId/blocks error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// POST /owner/venues/:venueId/blocks — create an availability block
+router.post<{ venueId: string }>(
+  "/owner/venues/:venueId/blocks",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const venue = await assertVenueOwner(req.params.venueId, req.user!.userId, res);
+      if (!venue) return;
+
+      const {
+        pitchId,
+        blockType,
+        label,
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        recursWeekly,
+        dayOfWeek,
+      } = req.body as {
+        pitchId?: string;
+        blockType?: string;
+        label?: string;
+        startDate: string;
+        endDate: string;
+        startTime?: string;
+        endTime?: string;
+        recursWeekly?: boolean;
+        dayOfWeek?: number;
+      };
+
+      if (!startDate || !endDate) {
+        res.status(400).json({ error: "startDate and endDate are required" });
+        return;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        res.status(400).json({ error: "startDate and endDate must be YYYY-MM-DD" });
+        return;
+      }
+      if (startDate > endDate) {
+        res.status(400).json({ error: "startDate must be on or before endDate" });
+        return;
+      }
+
+      const validBlockTypes = ["OFF_DAY", "BANK_HOLIDAY", "TRAINING", "MAINTENANCE", "PRIVATE"];
+      const resolvedBlockType = (blockType && validBlockTypes.includes(blockType)
+        ? blockType
+        : "OFF_DAY") as "OFF_DAY" | "BANK_HOLIDAY" | "TRAINING" | "MAINTENANCE" | "PRIVATE";
+
+      // If pitchId provided, verify it belongs to this venue
+      if (pitchId) {
+        const [pitch] = await db
+          .select()
+          .from(pitchesTable)
+          .where(and(eq(pitchesTable.id, pitchId), eq(pitchesTable.venueId, req.params.venueId)))
+          .limit(1);
+        if (!pitch) {
+          res.status(404).json({ error: "Pitch not found in this venue" });
+          return;
+        }
+      }
+
+      if (recursWeekly && (dayOfWeek === undefined || dayOfWeek === null || dayOfWeek < 0 || dayOfWeek > 6)) {
+        res.status(400).json({ error: "dayOfWeek (0-6) is required when recursWeekly is true" });
+        return;
+      }
+
+      // startTime and endTime must be provided as a pair in HH:MM format with start < end
+      const timeRe = /^\d{2}:\d{2}$/;
+      if ((startTime || endTime) && !(startTime && endTime)) {
+        res.status(400).json({ error: "Both startTime and endTime must be provided together" });
+        return;
+      }
+      if (startTime && endTime) {
+        if (!timeRe.test(startTime) || !timeRe.test(endTime)) {
+          res.status(400).json({ error: "startTime and endTime must be in HH:MM format" });
+          return;
+        }
+        if (startTime >= endTime) {
+          res.status(400).json({ error: "startTime must be before endTime" });
+          return;
+        }
+      }
+
+      // Check for confirmed booking conflicts on affected pitches
+      const affectedPitchIds: string[] = [];
+      if (pitchId) {
+        affectedPitchIds.push(pitchId);
+      } else {
+        const pitches = await db
+          .select({ id: pitchesTable.id })
+          .from(pitchesTable)
+          .where(eq(pitchesTable.venueId, req.params.venueId));
+        affectedPitchIds.push(...pitches.map((p) => p.id));
+      }
+
+      let conflictingBookings: { id: string; startAt: string; endAt: string; status: string; pitchId: string }[] = [];
+      if (affectedPitchIds.length > 0) {
+        const dayStart = new Date(`${startDate}T00:00:00.000Z`);
+        const dayEnd = new Date(`${endDate}T23:59:59.999Z`);
+
+        const rawConflicts = await db
+          .select({
+            id: bookingsTable.id,
+            startAt: bookingsTable.startAt,
+            endAt: bookingsTable.endAt,
+            status: bookingsTable.status,
+            pitchId: bookingsTable.pitchId,
+          })
+          .from(bookingsTable)
+          .where(
+            and(
+              inArray(bookingsTable.pitchId, affectedPitchIds),
+              inArray(bookingsTable.status, ["PENDING", "CONFIRMED"]),
+              gte(bookingsTable.startAt, dayStart),
+              lte(bookingsTable.startAt, dayEnd),
+            ),
+          );
+
+        conflictingBookings = rawConflicts
+          .filter((b) => {
+            if (recursWeekly && dayOfWeek !== undefined) {
+              return b.startAt.getUTCDay() === dayOfWeek;
+            }
+            const bookingDate = b.startAt.toISOString().slice(0, 10);
+            if (bookingDate < startDate || bookingDate > endDate) return false;
+            if (startTime && endTime) {
+              const bStartTime = b.startAt.toISOString().slice(11, 16);
+              const bEndTime = b.endAt.toISOString().slice(11, 16);
+              return bStartTime < endTime && bEndTime > startTime;
+            }
+            return true;
+          })
+          .map((b) => ({
+            id: b.id,
+            startAt: b.startAt.toISOString(),
+            endAt: b.endAt.toISOString(),
+            status: b.status,
+            pitchId: b.pitchId,
+          }));
+      }
+
+      const [block] = await db
+        .insert(availabilityBlocksTable)
+        .values({
+          venueId: req.params.venueId,
+          pitchId: pitchId ?? null,
+          blockType: resolvedBlockType,
+          label: label ?? null,
+          startDate,
+          endDate,
+          startTime: startTime ?? null,
+          endTime: endTime ?? null,
+          recursWeekly: recursWeekly ?? false,
+          dayOfWeek: recursWeekly && dayOfWeek !== undefined ? dayOfWeek : null,
+        })
+        .returning();
+
+      res.status(201).json({
+        block,
+        ...(conflictingBookings.length > 0
+          ? {
+              warning: `This block overlaps ${conflictingBookings.length} pending/confirmed booking(s). Those bookings have not been cancelled.`,
+              conflictingBookings,
+            }
+          : {}),
+      });
+    } catch (err) {
+      console.error("POST /owner/venues/:venueId/blocks error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// DELETE /owner/venues/:venueId/blocks/:blockId — remove a block
+router.delete<{ venueId: string; blockId: string }>(
+  "/owner/venues/:venueId/blocks/:blockId",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const venue = await assertVenueOwner(req.params.venueId, req.user!.userId, res);
+      if (!venue) return;
+
+      const [existing] = await db
+        .select()
+        .from(availabilityBlocksTable)
+        .where(
+          and(
+            eq(availabilityBlocksTable.id, req.params.blockId),
+            eq(availabilityBlocksTable.venueId, req.params.venueId),
+          ),
+        )
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Block not found" });
+        return;
+      }
+
+      await db
+        .delete(availabilityBlocksTable)
+        .where(
+          and(
+            eq(availabilityBlocksTable.id, req.params.blockId),
+            eq(availabilityBlocksTable.venueId, req.params.venueId),
+          ),
+        );
+
+      res.status(204).send();
+    } catch (err) {
+      console.error("DELETE /owner/venues/:venueId/blocks/:blockId error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
   },

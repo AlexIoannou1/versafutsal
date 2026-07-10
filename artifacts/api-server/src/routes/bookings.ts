@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   bookingsTable,
   maintenanceBlocksTable,
+  availabilityBlocksTable,
   venuesTable,
   pitchesTable,
   openingHoursTable,
@@ -12,13 +13,72 @@ import {
   refundsTable,
   auditLogTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, lt, gt, inArray, desc, ne } from "drizzle-orm";
+import { eq, and, gte, lte, lt, gt, inArray, desc, ne, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 
 const router: IRouter = Router();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Check whether a given UTC date string (YYYY-MM-DD) is blocked by any
+ * availability_blocks rows covering that date (and optionally that pitch).
+ * Returns matching block rows.
+ */
+async function getAvailabilityBlocksForDate(
+  venueId: string,
+  pitchId: string,
+  date: string,
+): Promise<(typeof availabilityBlocksTable.$inferSelect)[]> {
+  const dateObj = new Date(`${date}T00:00:00.000Z`);
+  const dayOfWeek = dateObj.getUTCDay();
+
+  const blocks = await db
+    .select()
+    .from(availabilityBlocksTable)
+    .where(
+      and(
+        eq(availabilityBlocksTable.venueId, venueId),
+        or(
+          isNull(availabilityBlocksTable.pitchId),
+          eq(availabilityBlocksTable.pitchId, pitchId),
+        ),
+      ),
+    );
+
+  return blocks.filter((b) => {
+    if (b.recursWeekly) {
+      // Must match day-of-week AND fall within the configured date range
+      return b.dayOfWeek === dayOfWeek && b.startDate <= date && b.endDate >= date;
+    }
+    return b.startDate <= date && b.endDate >= date;
+  });
+}
+
+/**
+ * Given a list of blocks for a specific date, determine whether a slot
+ * (startAt/endAt as ISO strings, UTC) is blocked.
+ */
+function isSlotBlockedByAvailabilityBlock(
+  slot: { startAt: string; endAt: string },
+  blocks: (typeof availabilityBlocksTable.$inferSelect)[],
+): boolean {
+  for (const b of blocks) {
+    if (!b.startTime || !b.endTime) {
+      return true;
+    }
+    const datePrefix = slot.startAt.slice(0, 10);
+    const blockStart = new Date(`${datePrefix}T${b.startTime}:00.000Z`).getTime();
+    const blockEnd = new Date(`${datePrefix}T${b.endTime}:00.000Z`).getTime();
+    const slotStart = new Date(slot.startAt).getTime();
+    const slotEnd = new Date(slot.endAt).getTime();
+    if (blockStart < slotEnd && blockEnd > slotStart) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function generateSlots(
   date: string,
@@ -176,21 +236,25 @@ router.get<{ venueId: string; pitchId: string }>(
           ),
         );
 
+      const availabilityBlocks = await getAvailabilityBlocksForDate(venueId, pitchId, date);
+
       const slots = rawSlots.map((slot) => {
         const isBooked = bookedStartTimes.has(slot.startAt);
-        const isBlocked = maintenanceBlocks.some((b) => {
+        const isLegacyBlocked = maintenanceBlocks.some((b) => {
           const bStart = b.startAt.getTime();
           const bEnd = b.endAt.getTime();
           const sStart = new Date(slot.startAt).getTime();
           const sEnd = new Date(slot.endAt).getTime();
           return bStart < sEnd && bEnd > sStart;
         });
+        const isAvailabilityBlocked = isSlotBlockedByAvailabilityBlock(slot, availabilityBlocks);
+        const isBlocked = isLegacyBlocked || isAvailabilityBlocked;
         const available = !isBooked && !isBlocked;
         return {
           startAt: slot.startAt,
           endAt: slot.endAt,
           available,
-          ...(available ? {} : { reason: isBooked ? "booked" : "maintenance" }),
+          ...(available ? {} : { reason: isBooked ? "booked" : "blocked" }),
         };
       });
 
@@ -284,12 +348,24 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
     const endDate = new Date(startDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
 
     // ── Atomic transaction: conflict check + policy snapshot + insert ─────────
-    // Running these steps inside a transaction prevents a maintenance block
-    // added between the check and the insert from being silently ignored.
+    // All availability checks run inside the transaction so a block created
+    // between the pre-check and the insert cannot slip through (TOCTOU fix).
     let booking: typeof bookingsTable.$inferSelect;
     let player: { id: string; name: string; email: string } | undefined;
     try {
       const result = await db.transaction(async (tx) => {
+        // Check availability blocks (inside transaction to prevent race conditions)
+        const avBlocks = await getAvailabilityBlocksForDate(pitchRow.venueId, pitchId, dateStr);
+        if (
+          avBlocks.length > 0 &&
+          isSlotBlockedByAvailabilityBlock(
+            { startAt: startDate.toISOString(), endAt: endDate.toISOString() },
+            avBlocks,
+          )
+        ) {
+          throw Object.assign(new Error("availability_blocked"), { _type: "availability_blocked" });
+        }
+
         // Check maintenance blocks (exclusive boundaries to avoid blocking adjacent slots)
         const conflictingBlock = await tx
           .select({ id: maintenanceBlocksTable.id })
@@ -362,6 +438,11 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
         .where(eq(usersTable.id, req.user!.userId))
         .limit(1);
     } catch (err: unknown) {
+      // Availability block flagged inside transaction
+      if ((err as { _type?: string })?._type === "availability_blocked") {
+        res.status(409).json({ error: "This slot is not available. Please choose another time." });
+        return;
+      }
       // Maintenance conflict flagged inside transaction
       if ((err as { _type?: string })?._type === "maintenance_blocked") {
         res.status(409).json({ error: "This slot is blocked for maintenance. Please choose another time." });

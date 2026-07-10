@@ -99,6 +99,13 @@
       "when": 1752105600000,
       "tag": "0014_pitch_type_default_outdoor",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1752192000000,
+      "tag": "0015_availability_blocks",
+      "breakpoints": true
     }
   ]
 }

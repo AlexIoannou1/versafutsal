@@ -12,7 +12,8 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
-import { useListOwnerBookings } from "@workspace/api-client-react";
+import { useListOwnerBookings, useListOwnerVenues, useListBlocksForVenues } from "@workspace/api-client-react";
+import type { AvailabilityBlock } from "@workspace/api-client-react";
 
 type ViewMode = "day" | "month";
 
@@ -193,6 +194,11 @@ export default function OwnerCalendarScreen() {
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
   const bookings: Booking[] = (data?.bookings ?? []) as Booking[];
 
+  const { data: venuesData } = useListOwnerVenues();
+  const venues = (venuesData as { venues?: { id: string }[] } | undefined)?.venues ?? [];
+  const venueIds = venues.map((v) => v.id);
+  const { allBlocks } = useListBlocksForVenues(venueIds);
+
   // ─── Month grid helpers ───────────────────────────────────────────────────
   const monthGrid = useMemo(
     () => buildMonthGrid(currentDate.getFullYear(), currentDate.getMonth()),
@@ -219,6 +225,19 @@ export default function OwnerCalendarScreen() {
   function getBookingsForDay(day: Date): Booking[] {
     const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
     return bookingsByDay.get(key) ?? [];
+  }
+
+  // ─── Blocks for a given day ──────────────────────────────────────────────
+  function getBlocksForDay(day: Date): AvailabilityBlock[] {
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+    const dow = day.getDay();
+    return (allBlocks as AvailabilityBlock[]).filter((b) => {
+      if (b.recursWeekly) {
+        // Must match day-of-week AND fall within the configured date range
+        return b.dayOfWeek === dow && b.startDate <= key && b.endDate >= key;
+      }
+      return b.startDate <= key && b.endDate >= key;
+    });
   }
 
   // ─── Navigation ──────────────────────────────────────────────────────────
@@ -342,10 +361,66 @@ export default function OwnerCalendarScreen() {
     );
   }
 
+  const BLOCK_TYPE_COLORS: Record<string, string> = {
+    OFF_DAY: "#6366F1",
+    BANK_HOLIDAY: "#8B5CF6",
+    TRAINING: "#F59E0B",
+    MAINTENANCE: "#EF4444",
+    PRIVATE: "#10B981",
+  };
+  const BLOCK_TYPE_LABELS: Record<string, string> = {
+    OFF_DAY: "Off Day",
+    BANK_HOLIDAY: "Bank Holiday",
+    TRAINING: "Training",
+    MAINTENANCE: "Maintenance",
+    PRIVATE: "Private",
+  };
+
+  function BlockCard({ block }: { block: AvailabilityBlock }) {
+    const bc = BLOCK_TYPE_COLORS[block.blockType] ?? "#6366F1";
+    return (
+      <View style={{
+        flexDirection: "row",
+        backgroundColor: bc + "15",
+        borderRadius: 10,
+        marginBottom: 8,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: bc + "40",
+      }}>
+        <View style={{ width: 4, backgroundColor: bc }} />
+        <View style={{ flex: 1, padding: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 }}>
+            <View style={{ backgroundColor: bc + "25", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>
+              <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: bc }}>
+                {BLOCK_TYPE_LABELS[block.blockType] ?? block.blockType}
+              </Text>
+            </View>
+            {block.recursWeekly && (
+              <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_400Regular", color: bc }}>Recurring</Text>
+            )}
+          </View>
+          <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground }}>
+            {block.startTime && block.endTime ? `${block.startTime} – ${block.endTime} UTC` : "Full day"}
+          </Text>
+          {block.label && (
+            <Text style={{ fontSize: 12, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 2 }}>
+              {block.label}
+            </Text>
+          )}
+          <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+            {block.pitchId ? "Pitch-specific" : "Venue-wide"}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   // ─── Day View ─────────────────────────────────────────────────────────────
   const DayView = () => {
     const dayBookings = getBookingsForDay(currentDate)
       .slice().sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const dayBlocks = getBlocksForDay(currentDate);
 
     return (
       <ScrollView
@@ -356,7 +431,14 @@ export default function OwnerCalendarScreen() {
         }
       >
         <Text style={s.dayDate}>{formatDateLong(currentDate)}</Text>
-        {dayBookings.length === 0 ? (
+        {dayBlocks.length > 0 && (
+          <View style={{ marginBottom: 12 }}>
+            {dayBlocks.map((blk) => <BlockCard key={blk.id} block={blk} />)}
+          </View>
+        )}
+        {dayBookings.length === 0 && dayBlocks.length === 0 ? (
+          <Text style={s.noBookings}>No bookings or blocks this day.</Text>
+        ) : dayBookings.length === 0 ? (
           <Text style={s.noBookings}>No bookings this day.</Text>
         ) : (
           dayBookings.map((b) => (
@@ -409,6 +491,16 @@ export default function OwnerCalendarScreen() {
                         {day.getDate()}
                       </Text>
                     )}
+                    {getBlocksForDay(day).slice(0, 1).map((blk) => {
+                      const bc = BLOCK_TYPE_COLORS[blk.blockType] ?? "#6366F1";
+                      return (
+                        <View key={blk.id} style={[s.monthDot, { backgroundColor: bc + "CC" }]}>
+                          <Text style={s.monthDotText} numberOfLines={1}>
+                            {BLOCK_TYPE_LABELS[blk.blockType] ?? blk.blockType}
+                          </Text>
+                        </View>
+                      );
+                    })}
                     {dayBookings.slice(0, 2).map((b) => {
                       const sc = STATUS_COLORS[b.status] ?? colors.primary;
                       return (
