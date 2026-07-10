@@ -264,7 +264,9 @@ export default function PlayerVenueDetailScreen() {
     );
   }
 
-  const photos = (venue.photos as Array<{ id: string; url: string }>) ?? [];
+  const photos = ((venue.photos as Array<{ id: string; url: string; sortOrder: number }>) ?? [])
+    .slice()
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   const pitches = (venue.pitches as Array<{
     id: string;
     name: string;

@@ -1,0 +1,45 @@
+#8 - Venue Image Uploads
+What & Why
+Replace the current URL-entry workflow with real binary image uploads so venue owners can upload photos directly from their device. Images are stored securely in object storage, validated server-side, and displayed to players in a carousel. This is the complete replacement for the existing URL-based photo system.
+
+Done looks like
+Owner can tap "Add Photo" and pick an image from their device camera roll (or camera)
+Upload progress is shown per-image while the file transfers
+Validation errors appear inline for rejected files (wrong type, too large, already at limit)
+Owner can reorder photos by drag-and-drop
+Owner can remove any photo with a confirm prompt
+Maximum of 7 photos is enforced — the add button is disabled/hidden once the limit is reached
+Player venue detail screen shows photos in a swipeable horizontal carousel with dot indicators
+Player venue list cards still show the cover photo (first in sort order)
+Invalid files (non-image MIME type, over size limit) are rejected at both client and server
+Images are sanitised server-side (strip EXIF, re-encode) before being stored
+Stored URLs are signed/CDN-backed — raw storage bucket is not publicly accessible
+Out of scope
+Image captions (post-MVP)
+Cropping or editing images in-app
+Video uploads
+Migrating existing URL-based photo entries (they remain as-is; owners can delete and re-upload)
+Steps
+Object storage setup — Provision an App Storage bucket (using the Replit object-storage skill). Define a helper in the API server for generating signed upload URLs and serving signed read URLs. Store only the object key in venue_photos.url, not a raw public URL.
+
+API: upload, validate, sanitise — Add a POST /owner/venues/:id/photos/upload multipart endpoint. Enforce: accepted MIME types (image/jpeg, image/png, image/webp), max file size (5 MB), max 7 photos per venue. Strip EXIF metadata and re-encode via sharp before writing to storage. Return the new photo record (id, signed URL, sortOrder). Keep the existing delete and reorder endpoints; remove the old URL-submission endpoint.
+
+API: signed read URLs — Update all venue GET responses that include photo data to return short-lived signed URLs (or a CDN prefix) instead of raw storage keys, so the mobile app can always render them.
+
+Owner upload UI — Replace the URL text-input in owner/venue/[id].tsx with a photo grid. Each slot shows a thumbnail or an "Add" tile. Tapping "Add" opens the device image picker (expo-image-picker). Show a per-image progress bar during upload. Display inline error messages for validation failures. Disable "Add" when 7 images exist.
+
+Owner reorder UI — Make the photo grid draggable (react-native-reanimated + react-native-draggable-flatlist or equivalent already in the project). On drag-end, call the existing reorder endpoint to persist the new sort order.
+
+Player carousel — Replace the current horizontal ScrollView in player/venue/[id].tsx with a proper paging carousel component showing dot indicators and the photo count. Handle the no-photos placeholder state.
+
+Player venue cards — Confirm cover photo (first by sort order) continues to appear correctly on discovery/list cards now that URLs are signed.
+
+Relevant files
+lib/db/src/schema/venues.ts
+artifacts/api-server/src/routes/venues.ts
+artifacts/futsalcy/app/owner/venue/[id].tsx
+artifacts/futsalcy/app/player/venue/[id].tsx
+Dependencies
+
+Edit venue and pitch details
+Open task

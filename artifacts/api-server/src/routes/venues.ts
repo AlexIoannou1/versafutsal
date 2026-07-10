@@ -1,4 +1,8 @@
 import { Router, type IRouter, type Response } from "express";
+import multer from "multer";
+import sharp from "sharp";
+import { randomUUID } from "node:crypto";
+import { Client as StorageClient } from "@replit/object-storage";
 import { db } from "@workspace/db";
 import {
   venuesTable,
@@ -14,6 +18,44 @@ import { eq, and, gte, lte, inArray, sql, gt, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 
 const router: IRouter = Router();
+
+// ─── Photo upload middleware ──────────────────────────────────────────────────
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter(_req, file, cb) {
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowed.includes(file.mimetype)) {
+      cb(new Error("Only JPEG, PNG, and WebP images are allowed"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+// ─── Object storage helpers ───────────────────────────────────────────────────
+
+const PHOTO_KEY_PREFIX = "venue-photos/";
+
+/**
+ * If the url is an object-storage key (starts with "venue-photos/"), resolve it
+ * to a signed download URL. External URLs are returned unchanged.
+ */
+async function signPhotoUrl(url: string): Promise<string> {
+  if (!url.startsWith(PHOTO_KEY_PREFIX)) return url;
+  try {
+    const client = new StorageClient();
+    const { url: signedUrl } = await client.downloadAsUrl(url);
+    return signedUrl ?? url;
+  } catch {
+    return url;
+  }
+}
+
+async function signPhotoList<T extends { url: string }>(photos: T[]): Promise<T[]> {
+  return Promise.all(photos.map(async (p) => ({ ...p, url: await signPhotoUrl(p.url) })));
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -56,7 +98,8 @@ async function getVenueWithDetails(venueId: string) {
       })),
   }));
 
-  return { ...venue, photos, pitches: pitchesWithPricing, openingHours: hours };
+  const signedPhotos = await signPhotoList(photos);
+  return { ...venue, photos: signedPhotos, pitches: pitchesWithPricing, openingHours: hours };
 }
 
 function assertOwnsVenue(venueOwnerId: string, userId: string, res: Response): boolean {
@@ -137,7 +180,7 @@ router.get("/venues", async (req, res) => {
 
     const priceRangeMap = new Map(priceRangeRows.map((r) => [r.venueId, r]));
     const photoMap = new Map<string, string>();
-    for (const photo of photos) {
+    for (const photo of photos.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!photoMap.has(photo.venueId)) photoMap.set(photo.venueId, photo.url);
     }
     const pitchTypesMap = new Map<string, string[]>();
@@ -168,7 +211,15 @@ router.get("/venues", async (req, res) => {
       venues = venues.filter((v) => v.minPrice !== null && v.minPrice <= max);
     }
 
-    res.json({ venues });
+    // Sign cover photo URLs for object-storage photos
+    const signedVenues = await Promise.all(
+      venues.map(async (v) => ({
+        ...v,
+        coverPhoto: v.coverPhoto ? await signPhotoUrl(v.coverPhoto) : null,
+      })),
+    );
+
+    res.json({ venues: signedVenues });
   } catch (err) {
     console.error("GET /venues error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -216,7 +267,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
     ]);
 
     const photoMap = new Map<string, string>();
-    for (const p of photos) {
+    for (const p of photos.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!photoMap.has(p.venueId)) photoMap.set(p.venueId, p.url);
     }
     const pitchCountMap = new Map<string, number>();
@@ -224,13 +275,17 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
       pitchCountMap.set(p.venueId, (pitchCountMap.get(p.venueId) ?? 0) + 1);
     }
 
-    res.json({
-      venues: venues.map((v) => ({
-        ...v,
-        coverPhoto: photoMap.get(v.id) ?? null,
-        pitchCount: pitchCountMap.get(v.id) ?? 0,
-      })),
-    });
+    const signedOwnerVenues = await Promise.all(
+      venues.map(async (v) => {
+        const rawCover = photoMap.get(v.id) ?? null;
+        return {
+          ...v,
+          coverPhoto: rawCover ? await signPhotoUrl(rawCover) : null,
+          pitchCount: pitchCountMap.get(v.id) ?? 0,
+        };
+      }),
+    );
+    res.json({ venues: signedOwnerVenues });
   } catch (err) {
     console.error("GET /owner/venues error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -445,11 +500,12 @@ router.post<{ id: string }>(
   },
 );
 
-// POST /owner/venues/:id/photos — add photo URL
+// POST /owner/venues/:id/photos/upload — upload a photo file
 router.post<{ id: string }>(
-  "/owner/venues/:id/photos",
+  "/owner/venues/:id/photos/upload",
   requireAuth,
   requireRole("VENUE_OWNER"),
+  photoUpload.single("photo"),
   async (req, res) => {
     try {
       const [existing] = await db
@@ -464,20 +520,49 @@ router.post<{ id: string }>(
       }
       if (!assertOwnsVenue(existing.ownerId, req.user!.userId, res)) return;
 
-      const { url, sortOrder } = req.body as { url: string; sortOrder?: number };
-      if (!url) {
-        res.status(400).json({ error: "url is required" });
+      if (!req.file) {
+        res.status(400).json({ error: "No image file provided" });
         return;
       }
 
+      const currentPhotos = await db
+        .select({ id: venuePhotosTable.id })
+        .from(venuePhotosTable)
+        .where(eq(venuePhotosTable.venueId, req.params.id));
+
+      if (currentPhotos.length >= 7) {
+        res.status(400).json({ error: "Maximum of 7 photos per venue" });
+        return;
+      }
+
+      // Strip EXIF, auto-orient, re-encode as WebP
+      const processed = await sharp(req.file.buffer)
+        .rotate()
+        .toFormat("webp", { quality: 85 })
+        .toBuffer();
+
+      const objectKey = `${PHOTO_KEY_PREFIX}${req.params.id}/${randomUUID()}.webp`;
+      const client = new StorageClient();
+      const { ok, error } = await client.uploadFromBytes(objectKey, processed, {
+        contentType: "image/webp",
+      });
+
+      if (!ok) {
+        console.error("Object storage upload error:", error);
+        res.status(500).json({ error: "Failed to upload image" });
+        return;
+      }
+
+      const { url: signedUrl } = await client.downloadAsUrl(objectKey);
+
       const [photo] = await db
         .insert(venuePhotosTable)
-        .values({ venueId: req.params.id, url, sortOrder: sortOrder ?? 0 })
+        .values({ venueId: req.params.id, url: objectKey, sortOrder: currentPhotos.length })
         .returning();
 
-      res.status(201).json({ photo });
+      res.status(201).json({ photo: { ...photo, url: signedUrl } });
     } catch (err) {
-      console.error("POST /owner/venues/:id/photos error:", err);
+      console.error("POST /owner/venues/:id/photos/upload error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -502,6 +587,17 @@ router.delete<{ venueId: string; photoId: string }>(
       }
       if (!assertOwnsVenue(existing.ownerId, req.user!.userId, res)) return;
 
+      const [photoRecord] = await db
+        .select()
+        .from(venuePhotosTable)
+        .where(
+          and(
+            eq(venuePhotosTable.id, req.params.photoId),
+            eq(venuePhotosTable.venueId, req.params.venueId),
+          ),
+        )
+        .limit(1);
+
       await db
         .delete(venuePhotosTable)
         .where(
@@ -511,9 +607,66 @@ router.delete<{ venueId: string; photoId: string }>(
           ),
         );
 
+      // Clean up object storage if this is a stored photo (not an external URL)
+      if (photoRecord?.url.startsWith(PHOTO_KEY_PREFIX)) {
+        try {
+          const client = new StorageClient();
+          await client.delete(photoRecord.url);
+        } catch (e) {
+          console.error("Failed to delete photo from storage:", e);
+        }
+      }
+
       res.status(204).send();
     } catch (err) {
       console.error("DELETE /owner/venues/:id/photos/:photoId error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// PUT /owner/venues/:id/photos/reorder — set sort order for all photos
+router.put<{ id: string }>(
+  "/owner/venues/:id/photos/reorder",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const [existing] = await db
+        .select()
+        .from(venuesTable)
+        .where(eq(venuesTable.id, req.params.id))
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Venue not found" });
+        return;
+      }
+      if (!assertOwnsVenue(existing.ownerId, req.user!.userId, res)) return;
+
+      const { orderedIds } = req.body as { orderedIds: string[] };
+      if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== "string")) {
+        res.status(400).json({ error: "orderedIds must be an array of photo id strings" });
+        return;
+      }
+
+      await Promise.all(
+        orderedIds.map((photoId, idx) =>
+          db
+            .update(venuePhotosTable)
+            .set({ sortOrder: idx })
+            .where(
+              and(
+                eq(venuePhotosTable.id, photoId),
+                eq(venuePhotosTable.venueId, req.params.id),
+              ),
+            ),
+        ),
+      );
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("PUT /owner/venues/:id/photos/reorder error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
   },

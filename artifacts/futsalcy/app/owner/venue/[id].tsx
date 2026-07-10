@@ -12,7 +12,9 @@ import {
   Modal,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
@@ -24,8 +26,9 @@ import {
   getGetOwnerVenueQueryKey,
   getListOwnerVenuesQueryKey,
   submitVenueForApproval,
-  addVenuePhoto,
   deleteVenuePhoto,
+  uploadVenuePhoto,
+  reorderVenuePhotos,
   createPitch,
   deletePitch,
   setOpeningHours,
@@ -130,8 +133,8 @@ export default function OwnerVenueDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   // ─── Photo state ──────────────────────────────────────────────────────────
-  const [photoUrl, setPhotoUrl] = useState("");
-  const [photoAdding, setPhotoAdding] = useState(false);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   // ─── New pitch modal state ────────────────────────────────────────────────
   const [pitchModalVisible, setPitchModalVisible] = useState(false);
@@ -299,17 +302,40 @@ export default function OwnerVenueDetailScreen() {
   };
 
   // ─── Photos ───────────────────────────────────────────────────────────────
-  const handleAddPhoto = async () => {
-    if (!photoUrl.trim()) return;
-    setPhotoAdding(true);
+  const handlePickAndUploadPhoto = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Permission needed",
+        "Please allow access to your photo library to upload venue photos.",
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      allowsEditing: false,
+      quality: 0.9,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const uri = asset.uri;
+    const mimeType = asset.mimeType ?? "image/jpeg";
+    const ext = uri.split(".").pop() ?? "jpg";
+
+    setPhotoError(null);
+    setPhotoUploading(true);
     try {
-      await addVenuePhoto(id!, { url: photoUrl.trim() });
-      setPhotoUrl("");
+      await uploadVenuePhoto(id!, { uri, type: mimeType, name: `photo.${ext}` });
       invalidate();
-    } catch {
-      Alert.alert("Error", "Failed to add photo.");
+    } catch (err: unknown) {
+      const e = err as { data?: { error?: string }; message?: string } | null;
+      const msg = e?.data?.error ?? e?.message ?? "Failed to upload photo.";
+      setPhotoError(msg);
     } finally {
-      setPhotoAdding(false);
+      setPhotoUploading(false);
     }
   };
 
@@ -329,6 +355,24 @@ export default function OwnerVenueDetailScreen() {
         },
       },
     ]);
+  };
+
+  const handleMovePhoto = async (photoId: string, direction: -1 | 1) => {
+    if (!venue) return;
+    const sorted = [...venue.photos].sort((a, b) => a.sortOrder - b.sortOrder);
+    const idx = sorted.findIndex((p) => p.id === photoId);
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+
+    const newOrder = sorted.map((p) => p.id);
+    [newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx]!, newOrder[idx]!];
+
+    try {
+      await reorderVenuePhotos(id!, newOrder);
+      invalidate();
+    } catch {
+      Alert.alert("Error", "Failed to reorder photos.");
+    }
   };
 
   // ─── Pitches ──────────────────────────────────────────────────────────────
@@ -503,43 +547,79 @@ export default function OwnerVenueDetailScreen() {
     infoRow: { flexDirection: "row", gap: 6, marginBottom: 6 },
     infoLabel: { fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: colors.mutedForeground, width: 72 },
     infoValue: { fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.foreground, flex: 1 },
-    photoRow: {
+    photoListRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
-      marginBottom: 8,
+      marginBottom: 10,
       backgroundColor: colors.muted,
-      borderRadius: 8,
-      padding: 10,
+      borderRadius: 10,
+      padding: 8,
     },
-    photoUrl: {
-      fontSize: 12,
-      fontFamily: "PlusJakartaSans_400Regular",
-      color: colors.foreground,
-      flex: 1,
-    },
-    addPhotoRow: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 4 },
-    addPhotoInput: {
-      flex: 1,
-      backgroundColor: colors.muted,
+    photoThumb: {
+      width: 64,
+      height: 64,
       borderRadius: 8,
+      backgroundColor: colors.border,
+    },
+    photoReorderCol: {
+      flexDirection: "column",
+      gap: 2,
+    },
+    reorderBtn: {
+      padding: 4,
+      borderRadius: 6,
+      backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
-      paddingHorizontal: 12,
-      height: 40,
+    },
+    coverBadge: {
+      flex: 1,
+      backgroundColor: colors.primary + "20",
+      borderRadius: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      alignSelf: "center",
+    },
+    coverBadgeText: {
+      fontSize: 11,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.primary,
+    },
+    photoDeleteBtn: {
+      padding: 8,
+      borderRadius: 8,
+      backgroundColor: colors.destructive + "10",
+    },
+    uploadProgressRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      padding: 12,
+      backgroundColor: colors.muted,
+      borderRadius: 10,
+      marginBottom: 10,
+    },
+    uploadProgressText: {
       fontSize: 13,
       fontFamily: "PlusJakartaSans_400Regular",
-      color: colors.foreground,
+      color: colors.mutedForeground,
     },
-    addPhotoBtn: {
-      backgroundColor: colors.primary,
-      borderRadius: 8,
-      paddingHorizontal: 14,
-      height: 40,
-      alignItems: "center",
-      justifyContent: "center",
+    photoErrorText: {
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.destructive,
+      marginBottom: 8,
+      paddingHorizontal: 4,
     },
-    addPhotoBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primaryForeground },
+    photoLimitText: {
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.mutedForeground,
+      textAlign: "center",
+      paddingVertical: 8,
+      fontStyle: "italic",
+    },
     pitchCard: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -812,40 +892,71 @@ export default function OwnerVenueDetailScreen() {
 
         {/* Photos Section */}
         <View style={s.section}>
-          <Text style={[s.sectionTitle, { marginBottom: 12 }]}>Photos ({venue.photos.length})</Text>
-          {venue.photos.map((photo) => (
-            <View key={photo.id} style={s.photoRow}>
-              <FeatherIcons name="image" size={16} color={colors.mutedForeground} />
-              <Text style={s.photoUrl} numberOfLines={1}>
-                {photo.url}
-              </Text>
-              <TouchableOpacity onPress={() => handleDeletePhoto(photo.id)}>
-                <FeatherIcons name="trash-2" size={16} color={colors.destructive} />
-              </TouchableOpacity>
+          <Text style={[s.sectionTitle, { marginBottom: 12 }]}>
+            Photos ({venue.photos.length}/7)
+          </Text>
+
+          {[...venue.photos]
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map((photo, idx, arr) => (
+              <View key={photo.id} style={s.photoListRow}>
+                <Image
+                  source={{ uri: photo.url }}
+                  style={s.photoThumb}
+                  resizeMode="cover"
+                />
+                <View style={s.photoReorderCol}>
+                  <TouchableOpacity
+                    disabled={idx === 0}
+                    onPress={() => handleMovePhoto(photo.id, -1)}
+                    style={[s.reorderBtn, idx === 0 && { opacity: 0.25 }]}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  >
+                    <FeatherIcons name="chevron-up" size={16} color={colors.foreground} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={idx === arr.length - 1}
+                    onPress={() => handleMovePhoto(photo.id, 1)}
+                    style={[s.reorderBtn, idx === arr.length - 1 && { opacity: 0.25 }]}
+                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  >
+                    <FeatherIcons name="chevron-down" size={16} color={colors.foreground} />
+                  </TouchableOpacity>
+                </View>
+                {idx === 0 && (
+                  <View style={s.coverBadge}>
+                    <Text style={s.coverBadgeText}>Cover</Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  onPress={() => handleDeletePhoto(photo.id)}
+                  style={s.photoDeleteBtn}
+                  hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                >
+                  <FeatherIcons name="trash-2" size={16} color={colors.destructive} />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+          {photoUploading && (
+            <View style={s.uploadProgressRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={s.uploadProgressText}>Uploading photo…</Text>
             </View>
-          ))}
-          <View style={s.addPhotoRow}>
-            <TextInput
-              style={s.addPhotoInput}
-              value={photoUrl}
-              onChangeText={setPhotoUrl}
-              placeholder="Paste photo URL…"
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-            <TouchableOpacity
-              style={[s.addPhotoBtn, photoAdding && { opacity: 0.5 }]}
-              onPress={handleAddPhoto}
-              disabled={photoAdding || !photoUrl.trim()}
-            >
-              {photoAdding ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : (
-                <Text style={s.addPhotoBtnText}>Add</Text>
-              )}
+          )}
+
+          {photoError ? (
+            <Text style={s.photoErrorText}>{photoError}</Text>
+          ) : null}
+
+          {venue.photos.length < 7 && !photoUploading ? (
+            <TouchableOpacity style={s.addBtn} onPress={handlePickAndUploadPhoto}>
+              <FeatherIcons name="camera" size={16} color={colors.primary} />
+              <Text style={s.addBtnText}>Add Photo</Text>
             </TouchableOpacity>
-          </View>
+          ) : venue.photos.length >= 7 ? (
+            <Text style={s.photoLimitText}>Maximum of 7 photos reached</Text>
+          ) : null}
         </View>
 
         {/* Pitches Section */}
