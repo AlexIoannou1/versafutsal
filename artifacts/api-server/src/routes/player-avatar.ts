@@ -37,7 +37,7 @@ router.post(
       const ext = req.file.originalname.split(".").pop() ?? "jpg";
       const objectKey = `avatars/${userId}.${ext}`;
 
-      const client = new Client();
+      const client = new Client({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID } as any);
       const { ok, error } = await client.uploadFromBytes(objectKey, req.file.buffer, {
         contentType: req.file.mimetype,
       });

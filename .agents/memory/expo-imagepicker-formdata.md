@@ -25,6 +25,15 @@ if (Platform.OS === "web") {
 ## Android MIME type
 Some Android builds of expo-image-picker send `application/octet-stream` instead of `image/jpeg`. The multer `fileFilter` must accept it; sharp detects the real format from buffer magic bytes anyway.
 
+## @replit/object-storage — must pass bucketId explicitly
+`@replit/object-storage` v1 auto-discovers its bucket ID by calling `REPLIT_SIDECAR_ENDPOINT + "/object-storage/default-bucket"`. In this project the sidecar is unreachable, causing "A bucket name is needed to use Cloud Storage." at runtime.
+
+Fix: always pass the bucket ID explicitly using the `DEFAULT_OBJECT_STORAGE_BUCKET_ID` env var:
+```typescript
+new Client({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID } as any)
+```
+Use a shared factory (`makeStorageClient()`) rather than `new Client()` everywhere.
+
 ## Multer error handling
 Always wrap `multer.single(...)` in a manual callback to convert multer errors into JSON 400 responses, not HTML 500s:
 

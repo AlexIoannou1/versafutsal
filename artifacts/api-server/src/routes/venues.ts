@@ -59,13 +59,22 @@ function applyPhotoUpload(req: any, res: any): Promise<boolean> {
 const PHOTO_KEY_PREFIX = "venue-photos/";
 
 /**
+ * Create a StorageClient with the bucket ID passed explicitly.
+ * @replit/object-storage v1 fetches the bucket ID from a Replit sidecar endpoint
+ * which may not be available in development — passing it directly bypasses that.
+ */
+function makeStorageClient() {
+  return new StorageClient({ bucketId: process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID } as any);
+}
+
+/**
  * If the url is an object-storage key (starts with "venue-photos/"), resolve it
  * to a signed download URL. External URLs are returned unchanged.
  */
 async function signPhotoUrl(url: string): Promise<string> {
   if (!url.startsWith(PHOTO_KEY_PREFIX)) return url;
   try {
-    const client = new StorageClient();
+    const client = makeStorageClient();
     const { url: signedUrl } = await client.downloadAsUrl(url);
     return signedUrl ?? url;
   } catch {
@@ -573,7 +582,7 @@ router.post<{ id: string }>(
       }
 
       const objectKey = `${PHOTO_KEY_PREFIX}${req.params.id}/${randomUUID()}.webp`;
-      const client = new StorageClient();
+      const client = makeStorageClient();
       const { ok, error } = await client.uploadFromBytes(objectKey, processed, {
         contentType: "image/webp",
       });
@@ -641,7 +650,7 @@ router.delete<{ venueId: string; photoId: string }>(
       // Clean up object storage if this is a stored photo (not an external URL)
       if (photoRecord?.url.startsWith(PHOTO_KEY_PREFIX)) {
         try {
-          const client = new StorageClient();
+          const client = makeStorageClient();
           await client.delete(photoRecord.url);
         } catch (e) {
           console.error("Failed to delete photo from storage:", e);
