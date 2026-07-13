@@ -22,6 +22,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar.badge.checkmark", selected: "calendar.badge.checkmark" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="users">
+        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
+        <Label>Users</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -87,6 +91,13 @@ function ClassicTabLayout() {
         options={{
           title: "Bookings",
           tabBarIcon: ({ color }) => <FeatherIcons name="list" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: "Users",
+          tabBarIcon: ({ color }) => <FeatherIcons name="users" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

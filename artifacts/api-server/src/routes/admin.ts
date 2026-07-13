@@ -12,7 +12,7 @@ import {
   refundsTable,
   auditLogTable,
 } from "@workspace/db/schema";
-import { eq, inArray, and, gte, lte, desc } from "drizzle-orm";
+import { eq, inArray, and, gte, lte, desc, ilike, or, isNull, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 import { sendNotification } from "../lib/notifications";
@@ -565,5 +565,87 @@ router.post<{ id: string }>(
     }
   },
 );
+
+// ─── Admin Users ──────────────────────────────────────────────────────────────
+
+// GET /admin/users?search=&role=&page=&limit= — List all non-admin users (admin only)
+router.get("/admin/users", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { search, role, page: pageStr, limit: limitStr } = req.query as {
+      search?: string;
+      role?: string;
+      page?: string;
+      limit?: string;
+    };
+
+    const page = Math.max(1, parseInt(pageStr ?? "1", 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(limitStr ?? "50", 10) || 50));
+    const offset = (page - 1) * limit;
+
+    const conditions: ReturnType<typeof eq>[] = [];
+
+    // Exclude ADMIN accounts
+    conditions.push(ne(usersTable.role, "ADMIN"));
+
+    // Role filter
+    if (role === "PLAYER" || role === "VENUE_OWNER") {
+      conditions.push(eq(usersTable.role, role));
+    }
+
+    // Build base query with all conditions
+    const baseWhere = conditions.length > 0 ? and(...(conditions as Parameters<typeof and>)) : undefined;
+
+    // Search filter applied after role/admin filters
+    const searchTerm = search?.trim();
+    const whereClause = searchTerm
+      ? and(
+          baseWhere,
+          or(
+            ilike(usersTable.name, `%${searchTerm}%`),
+            ilike(usersTable.email, `%${searchTerm}%`),
+            ilike(usersTable.phoneNumber, `%${searchTerm}%`),
+          ),
+        )
+      : baseWhere;
+
+    const rows = await db
+      .select({
+        id: usersTable.id,
+        name: usersTable.name,
+        email: usersTable.email,
+        phoneNumber: usersTable.phoneNumber,
+        role: usersTable.role,
+        avatarUrl: usersTable.avatarUrl,
+        createdAt: usersTable.createdAt,
+        deletedAt: usersTable.deletedAt,
+        stripeConnectAccountId: usersTable.stripeConnectAccountId,
+      })
+      .from(usersTable)
+      .where(whereClause)
+      .orderBy(desc(usersTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    // Total count for pagination
+    const countRows = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(whereClause);
+
+    res.json({
+      users: rows.map((u) => ({
+        ...u,
+        createdAt: u.createdAt.toISOString(),
+        deletedAt: u.deletedAt ? u.deletedAt.toISOString() : null,
+      })),
+      total: countRows.length,
+      page,
+      limit,
+    });
+  } catch (err) {
+    console.error("GET /admin/users error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 export default router;

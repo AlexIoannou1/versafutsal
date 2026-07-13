@@ -693,3 +693,29 @@ export type UpdateAdminSettings200 = {
 export type SetVenueFeeOverride200 = {
   settings: AdminSettingsRecord;
 };
+
+export type AdminUserRecord = {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber: string | null;
+  role: "PLAYER" | "VENUE_OWNER";
+  avatarUrl: string | null;
+  createdAt: string;
+  deletedAt: string | null;
+  stripeConnectAccountId: string | null;
+};
+
+export type AdminListUsersParams = {
+  search?: string;
+  role?: "PLAYER" | "VENUE_OWNER";
+  page?: number;
+  limit?: number;
+};
+
+export type AdminListUsers200 = {
+  users: AdminUserRecord[];
+  total: number;
+  page: number;
+  limit: number;
+};
