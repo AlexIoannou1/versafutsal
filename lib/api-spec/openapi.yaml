@@ -801,6 +801,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /owner/bookings/{id}/audit:
+    get:
+      operationId: getOwnerBookingAudit
+      tags: [bookings]
+      summary: Get audit log for a specific booking (owner view)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Audit entries for this booking
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+                required: [entries]
+        "403":
+          description: Not your venue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /owner/venues/{venueId}/pitches/{pitchId}/blocks:
     post:
       operationId: createMaintenanceBlock
@@ -1045,6 +1085,114 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /admin/venues/{id}/disable:
+    put:
+      operationId: adminDisableVenue
+      tags: [admin]
+      summary: Disable an approved venue (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Venue disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [venue]
+                properties:
+                  venue:
+                    $ref: "#/components/schemas/VenueRecord"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all non-admin users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users, total, page, limit]
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUserRecord"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  limit:
+                    type: integer
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /admin/bookings:
     get:
       operationId: adminListBookings
@@ -1135,6 +1283,52 @@ paths:
                 $ref: "#/components/schemas/ApiError"
         "404":
           description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /admin/bookings/{id}/audit:
+    get:
+      operationId: adminGetBookingAudit
+      tags: [admin]
+      summary: Get full audit trail for a booking (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Audit trail entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Booking not found
           content:
             application/json:
               schema:
@@ -1403,6 +1597,43 @@ components:
         error:
           type: string
       required: [error]
+
+    AuditEntry:
+      type: object
+      required: [id, action, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        actorUserId:
+          type: string
+          nullable: true
+        actorRole:
+          type: string
+          nullable: true
+        actorName:
+          type: string
+          nullable: true
+        previousValue:
+          type: object
+          nullable: true
+          additionalProperties: true
+        newValue:
+          type: object
+          nullable: true
+          additionalProperties: true
+        notes:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
 
     UserRole:
       type: string
@@ -1728,6 +1959,37 @@ components:
               items:
                 $ref: "#/components/schemas/OpeningHoursRecord"
           required: [photos, pitches, openingHours]
+
+    AdminUserRecord:
+      type: object
+      required: [id, name, email, role, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+          nullable: true
+        role:
+          $ref: "#/components/schemas/UserRole"
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        stripeConnectAccountId:
+          type: string
+          nullable: true
 
     AdminVenueSummary:
       allOf:

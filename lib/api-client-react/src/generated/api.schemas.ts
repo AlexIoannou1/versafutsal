@@ -13,6 +13,25 @@ export interface ApiError {
   error: string;
 }
 
+export type AuditEntryPreviousValue = { [key: string]: unknown } | null;
+
+export type AuditEntryNewValue = { [key: string]: unknown } | null;
+
+export type AuditEntryMetadata = { [key: string]: unknown } | null;
+
+export interface AuditEntry {
+  id: string;
+  action: string;
+  actorUserId?: string | null;
+  actorRole?: string | null;
+  actorName?: string | null;
+  previousValue?: AuditEntryPreviousValue;
+  newValue?: AuditEntryNewValue;
+  notes?: string | null;
+  metadata?: AuditEntryMetadata;
+  createdAt: string;
+}
+
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export const UserRole = {
@@ -27,7 +46,6 @@ export const VenueStatus = {
   PENDING: "PENDING",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
-  DISABLED: "DISABLED",
 } as const;
 
 export type PitchType = (typeof PitchType)[keyof typeof PitchType];
@@ -111,7 +129,6 @@ export interface VenueRecord {
   cancellationWindowHours: number;
   contactPhone?: string | null;
   rejectionReason?: string | null;
-  disabledReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -205,7 +222,6 @@ export interface VenueSummary {
 export type OwnerVenueSummary = VenueSummary & {
   pitchCount: number;
   rejectionReason?: string | null;
-  disabledReason?: string | null;
 };
 
 export type VenueDetail = VenueRecord & {
@@ -213,6 +229,18 @@ export type VenueDetail = VenueRecord & {
   pitches: PitchWithPricing[];
   openingHours: OpeningHoursRecord[];
 };
+
+export interface AdminUserRecord {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string | null;
+  role: UserRole;
+  avatarUrl?: string | null;
+  createdAt: string;
+  deletedAt?: string | null;
+  stripeConnectAccountId?: string | null;
+}
 
 export type AdminVenueSummaryOwner = {
   id?: string;
@@ -343,7 +371,6 @@ export interface BookingPlayerSummary {
   id: string;
   name: string;
   email: string;
-  phoneNumber?: string | null;
 }
 
 export type BookingWithDetails = BookingRecord & {
@@ -614,6 +641,10 @@ export type GetOwnerBooking200 = {
   booking: GetOwnerBooking200Booking;
 };
 
+export type GetOwnerBookingAudit200 = {
+  entries: AuditEntry[];
+};
+
 export type CreateMaintenanceBlock201 = {
   block: MaintenanceBlock;
 };
@@ -629,7 +660,6 @@ export const AdminListVenuesStatus = {
   PENDING: "PENDING",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
-  DISABLED: "DISABLED",
 } as const;
 
 export type AdminListVenues200 = {
@@ -648,12 +678,26 @@ export type RejectVenue200 = {
   venue: VenueRecord;
 };
 
-export type DisableVenueRequest = {
+export type AdminDisableVenueBody = {
   reason: string;
 };
 
-export type DisableVenue200 = {
+export type AdminDisableVenue200 = {
   venue: VenueRecord;
+};
+
+export type AdminListUsersParams = {
+  search?: string;
+  role?: string;
+  page?: number;
+  limit?: number;
+};
+
+export type AdminListUsers200 = {
+  users: AdminUserRecord[];
+  total: number;
+  page: number;
+  limit: number;
 };
 
 export type AdminListBookingsParams = {
@@ -668,6 +712,10 @@ export type AdminListBookings200 = {
 
 export type AdminGetBooking200 = {
   booking: BookingWithDetails;
+};
+
+export type AdminGetBookingAudit200 = {
+  entries: AuditEntry[];
 };
 
 export type GetCheckoutFeeParams = {
@@ -692,30 +740,4 @@ export type UpdateAdminSettings200 = {
 
 export type SetVenueFeeOverride200 = {
   settings: AdminSettingsRecord;
-};
-
-export type AdminUserRecord = {
-  id: string;
-  name: string;
-  email: string;
-  phoneNumber: string | null;
-  role: "PLAYER" | "VENUE_OWNER";
-  avatarUrl: string | null;
-  createdAt: string;
-  deletedAt: string | null;
-  stripeConnectAccountId: string | null;
-};
-
-export type AdminListUsersParams = {
-  search?: string;
-  role?: "PLAYER" | "VENUE_OWNER";
-  page?: number;
-  limit?: number;
-};
-
-export type AdminListUsers200 = {
-  users: AdminUserRecord[];
-  total: number;
-  page: number;
-  limit: number;
 };

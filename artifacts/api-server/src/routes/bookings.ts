@@ -16,6 +16,7 @@ import {
 import { eq, and, gte, lte, lt, gt, inArray, desc, ne, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
+import { logBookingAuditFireAndForget, logBookingAudit } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -466,6 +467,16 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
       throw err;
     }
 
+    // Fire-and-forget audit entry for booking creation
+    logBookingAuditFireAndForget(db, {
+      bookingId: booking.id,
+      actorUserId: req.user!.userId,
+      actorRole: "PLAYER",
+      action: "BOOKING_CREATED",
+      newValue: { status: "PENDING", pitchId, startAt: booking.startAt.toISOString() },
+      metadata: { actorEmail: req.user!.email },
+    });
+
     res.status(201).json({
       booking: {
         ...booking,
@@ -788,19 +799,19 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), a
     }
 
     // Write audit log entry — fire-and-forget so a log failure never blocks the response
-    db.insert(auditLogTable).values({
+    logBookingAuditFireAndForget(db, {
+      bookingId: booking.id,
       actorUserId: req.user!.userId,
-      entityType: "BOOKING",
-      entityId: booking.id,
+      actorRole: "VENUE_OWNER",
       action: "MANUAL_BOOKING_CREATED",
+      newValue: { status: "CONFIRMED", pitchId, startAt: booking.startAt.toISOString() },
+      notes: `Walk-in/phone booking for ${guestName.trim()}`,
       metadata: {
         guestName: guestName.trim(),
         guestPhone: guestPhone.trim(),
-        pitchId,
-        startAt: booking.startAt.toISOString(),
         actorEmail: req.user!.email,
       },
-    }).catch((e) => console.error("audit log insert failed (MANUAL_BOOKING_CREATED):", e));
+    });
 
     res.status(201).json({
       booking: {
@@ -1119,23 +1130,35 @@ router.get<{ id: string }>(
       }
 
       const entries = await db
-        .select()
+        .select({
+          log: auditLogTable,
+          actorName: usersTable.name,
+        })
         .from(auditLogTable)
+        .leftJoin(usersTable, eq(auditLogTable.actorUserId, usersTable.id))
         .where(
           and(
-            eq(auditLogTable.entityType, "BOOKING"),
+            or(
+              eq(auditLogTable.entityType, "BOOKING"),
+              eq(auditLogTable.entityType, "PAYMENT"),
+            ),
             eq(auditLogTable.entityId, bookingId),
           ),
         )
         .orderBy(desc(auditLogTable.createdAt));
 
       res.json({
-        entries: entries.map((e) => ({
+        entries: entries.map(({ log: e, actorName }) => ({
           id: e.id,
           action: e.action,
           metadata: e.metadata,
           createdAt: e.createdAt.toISOString(),
           actorUserId: e.actorUserId,
+          actorRole: e.actorRole,
+          actorName: actorName ?? null,
+          previousValue: e.previousValue ?? null,
+          newValue: e.newValue ?? null,
+          notes: e.notes ?? null,
         })),
       });
     } catch (err) {
@@ -1482,29 +1505,33 @@ router.put<{ id: string }>(
         .limit(1);
 
       // Write audit log entry for the edit — fire-and-forget
-      const auditChanges: Record<string, { from: unknown; to: unknown }> = {};
+      const prevFields: Record<string, unknown> = {};
+      const newFields: Record<string, unknown> = {};
       if (existing.pitchId !== updated.pitchId) {
-        auditChanges.pitchId = { from: existing.pitchId, to: updated.pitchId };
+        prevFields.pitchId = existing.pitchId;
+        newFields.pitchId = updated.pitchId;
       }
       if (existing.startAt.toISOString() !== updated.startAt.toISOString()) {
-        auditChanges.startAt = { from: existing.startAt.toISOString(), to: updated.startAt.toISOString() };
+        prevFields.startAt = existing.startAt.toISOString();
+        newFields.startAt = updated.startAt.toISOString();
       }
       if (existing.guestName !== updated.guestName) {
-        auditChanges.guestName = { from: existing.guestName, to: updated.guestName };
+        prevFields.guestName = existing.guestName;
+        newFields.guestName = updated.guestName;
       }
       if (existing.guestPhone !== updated.guestPhone) {
-        auditChanges.guestPhone = { from: existing.guestPhone, to: updated.guestPhone };
+        prevFields.guestPhone = existing.guestPhone;
+        newFields.guestPhone = updated.guestPhone;
       }
-      db.insert(auditLogTable).values({
+      logBookingAuditFireAndForget(db, {
+        bookingId: updated.id,
         actorUserId: req.user!.userId,
-        entityType: "BOOKING",
-        entityId: updated.id,
+        actorRole: "VENUE_OWNER",
         action: "BOOKING_EDITED",
-        metadata: {
-          changes: auditChanges,
-          actorEmail: req.user!.email,
-        },
-      }).catch((e) => console.error("audit log insert failed (BOOKING_EDITED):", e));
+        previousValue: Object.keys(prevFields).length > 0 ? prevFields : null,
+        newValue: Object.keys(newFields).length > 0 ? newFields : null,
+        metadata: { actorEmail: req.user!.email },
+      });
 
       res.json({ booking: enrichBooking(fullRow!) });
     } catch (err) {
@@ -1675,36 +1702,68 @@ router.post<{ id: string }>(
             processedAt: new Date(),
           });
 
-          // Audit: BOOKING_REFUNDED + REFUND_ISSUED
-          await tx.insert(auditLogTable).values([
-            {
-              actorUserId: actorId,
-              entityType: "BOOKING",
-              entityId: bookingId,
-              action: "BOOKING_REFUNDED",
-              metadata: { reason: reason ?? null, cancelledBy: actorRole },
-            },
-            {
-              actorUserId: actorId,
-              entityType: "PAYMENT",
-              entityId: payment.id,
-              action: "REFUND_ISSUED",
-              metadata: {
-                refundId,
-                amount: payment.amount,
-                providerPaymentId: payment.providerPaymentId,
-              },
-            },
-          ]);
+          // Audit: BOOKING_CANCELLED + BOOKING_STATUS_CHANGED + PAYMENT_STATUS_CHANGED + REFUND_ISSUED
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: actorId,
+            actorRole,
+            action: "BOOKING_CANCELLED",
+            previousValue: { status: booking.status },
+            newValue: { status: "REFUNDED" },
+            notes: reason ?? null,
+            metadata: { cancelledBy: actorRole, refunded: true },
+          });
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: actorId,
+            actorRole,
+            action: "BOOKING_STATUS_CHANGED",
+            previousValue: { status: booking.status },
+            newValue: { status: "REFUNDED" },
+            notes: reason ?? null,
+            metadata: { cancelledBy: actorRole, via: "cancellation-with-refund" },
+          });
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: actorId,
+            actorRole,
+            action: "PAYMENT_STATUS_CHANGED",
+            previousValue: { paymentStatus: "SUCCEEDED" },
+            newValue: { paymentStatus: "REFUNDED" },
+            notes: reason ?? null,
+            metadata: { cancelledBy: actorRole },
+          });
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: actorId,
+            actorRole,
+            action: "REFUND_ISSUED",
+            previousValue: { paymentStatus: "SUCCEEDED" },
+            newValue: { paymentStatus: "REFUNDED", refundId, amount: payment.amount },
+            notes: reason ?? null,
+            metadata: { providerPaymentId: payment.providerPaymentId },
+          });
         } else {
           // Cancelled without refund (either no payment, or outside window)
-          await tx.insert(auditLogTable).values({
+          await logBookingAudit(tx, {
+            bookingId,
             actorUserId: actorId,
-            entityType: "BOOKING",
-            entityId: bookingId,
+            actorRole,
             action: "BOOKING_CANCELLED",
+            previousValue: { status: booking.status },
+            newValue: { status: "CANCELLED" },
+            notes: reason ?? null,
+            metadata: { cancelledBy: actorRole, refunded: false },
+          });
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: actorId,
+            actorRole,
+            action: "BOOKING_STATUS_CHANGED",
+            previousValue: { status: booking.status },
+            newValue: { status: "CANCELLED" },
+            notes: reason ?? null,
             metadata: {
-              reason: reason ?? null,
               cancelledBy: actorRole,
               noRefund: !payment || !refundEligible,
               outsideWindow: !withinWindow,

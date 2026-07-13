@@ -1,5 +1,10 @@
 export * from "./generated/api";
 export * from "./generated/api.schemas";
+// Backward-compat re-exports for renamed generated symbols
+export {
+  adminDisableVenue as disableVenue,
+  useAdminDisableVenue as useDisableVenue,
+} from "./generated/api";
 export { uploadVenuePhoto, reorderVenuePhotos } from "./venue-photos-api";
 export type { VenuePhoto, UploadVenuePhotoResponse } from "./venue-photos-api";
 export { setBaseUrl, setAuthTokenGetter } from "./custom-fetch";
@@ -15,6 +20,7 @@ export {
   useCreateManualBooking,
   useUpdateOwnerBooking,
   useGetOwnerBookingAudit,
+  useGetAdminBookingAudit,
   useGetOwnerStats,
 } from "./manual-booking-api";
 export type {
@@ -23,6 +29,7 @@ export type {
   UpdateOwnerBookingRequest,
   AuditLogEntry,
   GetOwnerBookingAuditResponse,
+  GetAdminBookingAuditResponse,
   OwnerStatsParams,
   OwnerStatsResponse,
 } from "./manual-booking-api";
@@ -53,7 +60,10 @@ export {
   disconnectOwnerConnectAccount,
   deleteOwnerAccount,
 } from "./owner-connect-api";
-export type { OwnerConnectConfig, OwnerConnectStatus } from "./owner-connect-api";
+export type {
+  OwnerConnectConfig,
+  OwnerConnectStatus,
+} from "./owner-connect-api";
 export {
   useListBlocks,
   useCreateBlock,

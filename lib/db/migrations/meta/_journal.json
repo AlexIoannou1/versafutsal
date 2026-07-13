@@ -113,6 +113,13 @@
       "when": 1752278400000,
       "tag": "0016_venue_disabled",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1752364800000,
+      "tag": "0017_booking_audit_extended",
+      "breakpoints": true
     }
   ]
 }

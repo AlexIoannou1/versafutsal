@@ -37,17 +37,21 @@ export const auditActionEnum = pgEnum("audit_action", [
   "BOOKING_ALREADY_CONFIRMED",
   "BOOKING_CANCELLED",
   "BOOKING_REFUNDED",
+  "BOOKING_STATUS_CHANGED",
   "PAYMENT_CREATED",
   "PAYMENT_SUCCEEDED",
   "PAYMENT_FAILED",
+  "PAYMENT_STATUS_CHANGED",
   "REFUND_ISSUED",
   "ADMIN_REFUND_ISSUED",
+  "ADMIN_MODIFIED_BOOKING",
   "VENUE_APPROVED",
   "VENUE_REJECTED",
   "FEE_WAIVED",
   "USER_CREATED",
   "MANUAL_BOOKING_CREATED",
   "BOOKING_EDITED",
+  "NOTIFICATION_SENT",
 ]);
 
 export const auditLogTable = pgTable("audit_log", {
@@ -55,9 +59,13 @@ export const auditLogTable = pgTable("audit_log", {
   actorUserId: uuid("actor_user_id").references(() => usersTable.id, {
     onDelete: "set null",
   }),
-  entityType: text("entity_type").notNull(), // "BOOKING" | "PAYMENT" | "VENUE" | etc.
+  actorRole: text("actor_role"),
+  entityType: text("entity_type").notNull(),
   entityId: uuid("entity_id").notNull(),
   action: auditActionEnum("action").notNull(),
+  previousValue: jsonb("previous_value").$type<Record<string, unknown>>(),
+  newValue: jsonb("new_value").$type<Record<string, unknown>>(),
+  notes: text("notes"),
   metadata: jsonb("metadata").notNull().default({}),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

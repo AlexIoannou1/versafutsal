@@ -14,6 +14,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 import { sendBookingConfirmedNotifications } from "../lib/notifications";
+import { logBookingAudit, logBookingAuditFireAndForget } from "../lib/audit";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -280,10 +281,26 @@ router.post<{ bookingId: string }>(
 
           await tx.insert(auditLogTable).values({
             actorUserId: req.user!.userId,
+            actorRole: "PLAYER",
             entityType: "PAYMENT",
             entityId: bookingId,
             action: "PAYMENT_FAILED",
+            previousValue: { status: "PENDING" },
+            newValue: { status: "FAILED" },
+            notes: confirmation.errorMessage ?? null,
             metadata: { error: confirmation.errorMessage ?? "Unknown error" },
+          });
+
+          // Also write PAYMENT_STATUS_CHANGED on the booking entity so it shows in booking trail
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: req.user!.userId,
+            actorRole: "PLAYER",
+            action: "PAYMENT_STATUS_CHANGED",
+            previousValue: { paymentStatus: "PENDING" },
+            newValue: { paymentStatus: "FAILED" },
+            notes: confirmation.errorMessage ?? "Payment failed",
+            metadata: { via: "checkout" },
           });
         });
 
@@ -320,28 +337,58 @@ router.post<{ bookingId: string }>(
           .set({ status: "SUCCEEDED", updatedAt: new Date() })
           .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId));
 
-        await tx.insert(auditLogTable).values([
-          {
-            actorUserId: req.user!.userId,
-            entityType: "PAYMENT",
-            entityId: bookingId,
-            action: "PAYMENT_CREATED",
-            metadata: {
-              providerPaymentId: intent.providerPaymentId,
-              amount: intent.amount,
-              feeAmount: intent.feeAmount,
-              feePercent: intent.feePercent,
-              feeWaived: intent.feeWaived,
-            },
+        await tx.insert(auditLogTable).values({
+          actorUserId: req.user!.userId,
+          actorRole: "PLAYER",
+          entityType: "PAYMENT",
+          entityId: bookingId,
+          action: "PAYMENT_CREATED",
+          previousValue: { status: "PENDING" },
+          newValue: { status: "SUCCEEDED" },
+          notes: null,
+          metadata: {
+            providerPaymentId: intent.providerPaymentId,
+            amount: intent.amount,
+            feeAmount: intent.feeAmount,
+            feePercent: intent.feePercent,
+            feeWaived: intent.feeWaived,
           },
-          {
+        });
+
+        // PAYMENT_STATUS_CHANGED + BOOKING_CONFIRMED on the booking entity
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "PLAYER",
+          action: "PAYMENT_STATUS_CHANGED",
+          previousValue: { paymentStatus: "PENDING" },
+          newValue: { paymentStatus: "SUCCEEDED" },
+          notes: null,
+          metadata: { via: "checkout", amount: intent.amount },
+        });
+
+        if (!alreadyConfirmedConcurrently) {
+          await logBookingAudit(tx, {
+            bookingId,
             actorUserId: req.user!.userId,
-            entityType: "BOOKING",
-            entityId: bookingId,
-            action: alreadyConfirmedConcurrently ? "BOOKING_ALREADY_CONFIRMED" : "BOOKING_CONFIRMED",
-            metadata: { via: "checkout", concurrent: alreadyConfirmedConcurrently },
-          },
-        ]);
+            actorRole: "PLAYER",
+            action: "BOOKING_STATUS_CHANGED",
+            previousValue: { status: "PENDING" },
+            newValue: { status: "CONFIRMED" },
+            notes: null,
+            metadata: { via: "checkout" },
+          });
+        }
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "PLAYER",
+          action: alreadyConfirmedConcurrently ? "BOOKING_ALREADY_CONFIRMED" : "BOOKING_CONFIRMED",
+          previousValue: alreadyConfirmedConcurrently ? null : { status: "PENDING" },
+          newValue: alreadyConfirmedConcurrently ? null : { status: "CONFIRMED" },
+          notes: alreadyConfirmedConcurrently ? "Concurrent checkout — booking already confirmed" : null,
+          metadata: { via: "checkout", concurrent: alreadyConfirmedConcurrently },
+        });
       });
 
       // Send notifications — skip if concurrent checkout already confirmed + notified
@@ -361,6 +408,14 @@ router.post<{ bookingId: string }>(
             venueName: pitchRow.venueName,
             pitchName: pitchRow.name,
             startAt: booking.startAt,
+          });
+          logBookingAuditFireAndForget(db, {
+            bookingId,
+            actorUserId: req.user!.userId,
+            actorRole: "PLAYER",
+            action: "NOTIFICATION_SENT",
+            notes: "Booking confirmed notifications dispatched to player and owner",
+            metadata: { types: ["BOOKING_CONFIRMED", "NEW_BOOKING_OWNER"] },
           });
         } catch (notifErr) {
           console.warn("Notification dispatch failed (non-fatal):", notifErr);

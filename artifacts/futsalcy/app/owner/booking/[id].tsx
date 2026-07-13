@@ -51,27 +51,51 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function getAuditActionMeta(action: string, metadata: Record<string, unknown>) {
+const ROLE_LABELS: Record<string, string> = {
+  PLAYER: "Player",
+  VENUE_OWNER: "Owner",
+  ADMIN: "Admin",
+};
+
+function getAuditActionMeta(action: string, previousValue: Record<string, unknown> | null, newValue: Record<string, unknown> | null) {
   switch (action) {
     case "MANUAL_BOOKING_CREATED":
-      return { icon: "plus-circle" as const, color: "#00C851", label: "Manual booking created" };
+      return { icon: "plus-circle" as const, color: "#00C851", label: "Walk-in booking created" };
+    case "BOOKING_CREATED":
+      return { icon: "check-circle" as const, color: "#6366F1", label: "Booking created" };
     case "BOOKING_EDITED": {
-      const changes = metadata.changes as Record<string, unknown> | undefined;
       const parts: string[] = [];
-      if (changes?.startAt) parts.push("time");
-      if (changes?.pitchId) parts.push("pitch");
-      if (changes?.guestName || changes?.guestPhone) parts.push("guest details");
+      const prev = previousValue ?? {};
+      if (prev.startAt) parts.push("time");
+      if (prev.pitchId) parts.push("pitch");
+      if (prev.guestName || prev.guestPhone) parts.push("guest details");
       const detail = parts.length > 0 ? ` — ${parts.join(", ")} changed` : "";
       return { icon: "edit-2" as const, color: "#F59E0B", label: `Booking edited${detail}` };
     }
     case "BOOKING_CANCELLED":
       return { icon: "x-circle" as const, color: "#EF4444", label: "Booking cancelled" };
-    case "BOOKING_CREATED":
-      return { icon: "check-circle" as const, color: "#6366F1", label: "Booking created" };
     case "BOOKING_CONFIRMED":
       return { icon: "check-circle" as const, color: "#00C851", label: "Booking confirmed" };
     case "BOOKING_REFUNDED":
       return { icon: "rotate-ccw" as const, color: "#6366F1", label: "Booking refunded" };
+    case "REFUND_ISSUED":
+      return { icon: "rotate-ccw" as const, color: "#6366F1", label: "Refund issued" };
+    case "BOOKING_STATUS_CHANGED": {
+      const from = String(previousValue?.status ?? "");
+      const to = String(newValue?.status ?? "");
+      return { icon: "refresh-cw" as const, color: "#F59E0B", label: `Status changed${from && to ? `: ${from} → ${to}` : ""}` };
+    }
+    case "PAYMENT_STATUS_CHANGED": {
+      const from = String(previousValue?.paymentStatus ?? previousValue?.status ?? "");
+      const to = String(newValue?.paymentStatus ?? newValue?.status ?? "");
+      return { icon: "credit-card" as const, color: "#6366F1", label: `Payment status changed${from && to ? `: ${from} → ${to}` : ""}` };
+    }
+    case "ADMIN_MODIFIED_BOOKING":
+      return { icon: "shield" as const, color: "#9333EA", label: "Admin modified booking" };
+    case "ADMIN_REFUND_ISSUED":
+      return { icon: "shield" as const, color: "#9333EA", label: "Admin refund issued" };
+    case "NOTIFICATION_SENT":
+      return { icon: "bell" as const, color: "#6B7280", label: "Notification sent" };
     default:
       return {
         icon: "clock" as const,
@@ -79,6 +103,40 @@ function getAuditActionMeta(action: string, metadata: Record<string, unknown>) {
         label: action.toLowerCase().replace(/_/g, " "),
       };
   }
+}
+
+function renderValueDiff(
+  previousValue: Record<string, unknown> | null,
+  newValue: Record<string, unknown> | null,
+  muted: string,
+  foreground: string,
+): React.ReactNode {
+  if (!previousValue && !newValue) return null;
+  const keys = new Set([
+    ...Object.keys(previousValue ?? {}),
+    ...Object.keys(newValue ?? {}),
+  ]);
+  if (keys.size === 0) return null;
+  const rows: React.ReactNode[] = [];
+  for (const key of keys) {
+    const from = previousValue?.[key];
+    const to = newValue?.[key];
+    if (from === to) continue;
+    const label = key.replace(/([A-Z])/g, " $1").toLowerCase();
+    rows.push(
+      <Text key={key} style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: muted, marginTop: 2 }}>
+        <Text style={{ color: foreground, fontFamily: "PlusJakartaSans_500Medium" }}>{label}: </Text>
+        {from !== undefined ? (
+          <Text style={{ color: "#EF4444" }}>{String(from)}</Text>
+        ) : null}
+        {from !== undefined && to !== undefined ? " → " : ""}
+        {to !== undefined ? (
+          <Text style={{ color: "#00C851" }}>{String(to)}</Text>
+        ) : null}
+      </Text>
+    );
+  }
+  return rows.length > 0 ? <>{rows}</> : null;
 }
 
 type AuditEntryRowProps = {
@@ -90,12 +148,17 @@ type AuditEntryRowProps = {
 };
 
 function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: AuditEntryRowProps) {
-  const { icon, color, label } = getAuditActionMeta(entry.action, entry.metadata);
+  const { icon, color, label } = getAuditActionMeta(entry.action, entry.previousValue, entry.newValue);
+  const roleLabel = entry.actorRole ? (ROLE_LABELS[entry.actorRole] ?? entry.actorRole) : null;
+  const actorDisplay = entry.actorName
+    ? `${entry.actorName}${roleLabel ? ` · ${roleLabel}` : ""}`
+    : roleLabel ?? null;
+  const diffNode = renderValueDiff(entry.previousValue, entry.newValue, muted, foreground);
   return (
     <View
       style={{
         flexDirection: "row",
-        alignItems: "center",
+        alignItems: "flex-start",
         gap: 12,
         paddingHorizontal: 16,
         paddingVertical: 11,
@@ -111,6 +174,7 @@ function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: Audit
           backgroundColor: color + "20",
           alignItems: "center",
           justifyContent: "center",
+          marginTop: 1,
         }}
       >
         <FeatherIcons name={icon} size={13} color={color} />
@@ -119,6 +183,17 @@ function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: Audit
         <Text style={{ fontSize: 13, fontFamily: "PlusJakartaSans_500Medium", color: foreground }}>
           {label}
         </Text>
+        {actorDisplay && (
+          <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: muted, marginTop: 1 }}>
+            {actorDisplay}
+          </Text>
+        )}
+        {diffNode}
+        {entry.notes && (
+          <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: muted, marginTop: 2, fontStyle: "italic" }}>
+            "{entry.notes}"
+          </Text>
+        )}
         <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_400Regular", color: muted, marginTop: 2 }}>
           {timeAgo(entry.createdAt)}
         </Text>

@@ -19,7 +19,10 @@ import type {
 import type {
   AddVenuePhoto201,
   AddVenuePhotoRequest,
+  AdminDisableVenue200,
+  AdminDisableVenueBody,
   AdminGetBooking200,
+  AdminGetBookingAudit200,
   AdminGetVenue200,
   AdminListBookings200,
   AdminListBookingsParams,
@@ -27,7 +30,6 @@ import type {
   AdminListUsersParams,
   AdminListVenues200,
   AdminListVenuesParams,
-  AdminVenueDetail,
   ApiError,
   ApproveVenue200,
   AuthResponse,
@@ -48,6 +50,7 @@ import type {
   GetBookingPayment200,
   GetCheckoutFeeParams,
   GetOwnerBooking200,
+  GetOwnerBookingAudit200,
   GetOwnerVenue200,
   GetPitchAvailability200,
   GetPitchAvailabilityParams,
@@ -66,8 +69,6 @@ import type {
   RegisterPushToken200,
   RegisterPushTokenRequest,
   RegisterRequest,
-  DisableVenue200,
-  DisableVenueRequest,
   RejectVenue200,
   RejectVenueRequest,
   SetOpeningHours200,
@@ -2281,6 +2282,94 @@ export function useGetOwnerBooking<
 }
 
 /**
+ * @summary Get audit log for a specific booking (owner view)
+ */
+export const getGetOwnerBookingAuditUrl = (id: string) => {
+  return `/api/owner/bookings/${id}/audit`;
+};
+
+export const getOwnerBookingAudit = async (
+  id: string,
+  options?: RequestInit,
+): Promise<GetOwnerBookingAudit200> => {
+  return customFetch<GetOwnerBookingAudit200>(getGetOwnerBookingAuditUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOwnerBookingAuditQueryKey = (id: string) => {
+  return [`/api/owner/bookings/${id}/audit`] as const;
+};
+
+export const getGetOwnerBookingAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerBookingAudit>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerBookingAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetOwnerBookingAuditQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOwnerBookingAudit>>
+  > = ({ signal }) => getOwnerBookingAudit(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerBookingAudit>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerBookingAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerBookingAudit>>
+>;
+export type GetOwnerBookingAuditQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get audit log for a specific booking (owner view)
+ */
+
+export function useGetOwnerBookingAudit<
+  TData = Awaited<ReturnType<typeof getOwnerBookingAudit>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerBookingAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerBookingAuditQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Block a pitch slot for maintenance
  */
 export const getCreateMaintenanceBlockUrl = (
@@ -2928,43 +3017,43 @@ export const useRejectVenue = <
 };
 
 /**
- * @summary Disable an approved venue
+ * @summary Disable an approved venue (admin only)
  */
-export const getDisableVenueUrl = (id: string) => {
+export const getAdminDisableVenueUrl = (id: string) => {
   return `/api/admin/venues/${id}/disable`;
 };
 
-export const disableVenue = async (
+export const adminDisableVenue = async (
   id: string,
-  disableVenueRequest: DisableVenueRequest,
+  adminDisableVenueBody: AdminDisableVenueBody,
   options?: RequestInit,
-): Promise<DisableVenue200> => {
-  return customFetch<DisableVenue200>(getDisableVenueUrl(id), {
+): Promise<AdminDisableVenue200> => {
+  return customFetch<AdminDisableVenue200>(getAdminDisableVenueUrl(id), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(disableVenueRequest),
+    body: JSON.stringify(adminDisableVenueBody),
   });
 };
 
-export const getDisableVenueMutationOptions = <
+export const getAdminDisableVenueMutationOptions = <
   TError = ErrorType<ApiError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof disableVenue>>,
+    Awaited<ReturnType<typeof adminDisableVenue>>,
     TError,
-    { id: string; data: BodyType<DisableVenueRequest> },
+    { id: string; data: BodyType<AdminDisableVenueBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof disableVenue>>,
+  Awaited<ReturnType<typeof adminDisableVenue>>,
   TError,
-  { id: string; data: BodyType<DisableVenueRequest> },
+  { id: string; data: BodyType<AdminDisableVenueBody> },
   TContext
 > => {
-  const mutationKey = ["disableVenue"];
+  const mutationKey = ["adminDisableVenue"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -2974,44 +3063,139 @@ export const getDisableVenueMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof disableVenue>>,
-    { id: string; data: BodyType<DisableVenueRequest> }
+    Awaited<ReturnType<typeof adminDisableVenue>>,
+    { id: string; data: BodyType<AdminDisableVenueBody> }
   > = (props) => {
     const { id, data } = props ?? {};
-    return disableVenue(id, data, requestOptions);
+
+    return adminDisableVenue(id, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type DisableVenueMutationResult = NonNullable<
-  Awaited<ReturnType<typeof disableVenue>>
+export type AdminDisableVenueMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminDisableVenue>>
 >;
-export type DisableVenueMutationBody = BodyType<DisableVenueRequest>;
-export type DisableVenueMutationError = ErrorType<ApiError>;
+export type AdminDisableVenueMutationBody = BodyType<AdminDisableVenueBody>;
+export type AdminDisableVenueMutationError = ErrorType<ApiError>;
 
 /**
- * @summary Disable an approved venue
+ * @summary Disable an approved venue (admin only)
  */
-export const useDisableVenue = <
+export const useAdminDisableVenue = <
   TError = ErrorType<ApiError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof disableVenue>>,
+    Awaited<ReturnType<typeof adminDisableVenue>>,
     TError,
-    { id: string; data: BodyType<DisableVenueRequest> },
+    { id: string; data: BodyType<AdminDisableVenueBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof disableVenue>>,
+  Awaited<ReturnType<typeof adminDisableVenue>>,
   TError,
-  { id: string; data: BodyType<DisableVenueRequest> },
+  { id: string; data: BodyType<AdminDisableVenueBody> },
   TContext
 > => {
-  return useMutation(getDisableVenueMutationOptions(options));
+  return useMutation(getAdminDisableVenueMutationOptions(options));
 };
+
+/**
+ * @summary List all non-admin users (admin only)
+ */
+export const getAdminListUsersUrl = (params?: AdminListUsersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/users?${stringifiedParams}`
+    : `/api/admin/users`;
+};
+
+export const adminListUsers = async (
+  params?: AdminListUsersParams,
+  options?: RequestInit,
+): Promise<AdminListUsers200> => {
+  return customFetch<AdminListUsers200>(getAdminListUsersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminListUsersQueryKey = (params?: AdminListUsersParams) => {
+  return [`/api/admin/users`, ...(params ? [params] : [])] as const;
+};
+
+export const getAdminListUsersQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminListUsers>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: AdminListUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminListUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAdminListUsersQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminListUsers>>> = ({
+    signal,
+  }) => adminListUsers(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminListUsers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminListUsersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminListUsers>>
+>;
+export type AdminListUsersQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary List all non-admin users (admin only)
+ */
+
+export function useAdminListUsers<
+  TData = Awaited<ReturnType<typeof adminListUsers>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: AdminListUsersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminListUsers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminListUsersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary List all bookings across all venues (admin only)
@@ -3189,6 +3373,94 @@ export function useAdminGetBooking<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getAdminGetBookingQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get full audit trail for a booking (admin only)
+ */
+export const getAdminGetBookingAuditUrl = (id: string) => {
+  return `/api/admin/bookings/${id}/audit`;
+};
+
+export const adminGetBookingAudit = async (
+  id: string,
+  options?: RequestInit,
+): Promise<AdminGetBookingAudit200> => {
+  return customFetch<AdminGetBookingAudit200>(getAdminGetBookingAuditUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminGetBookingAuditQueryKey = (id: string) => {
+  return [`/api/admin/bookings/${id}/audit`] as const;
+};
+
+export const getAdminGetBookingAuditQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminGetBookingAudit>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminGetBookingAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getAdminGetBookingAuditQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof adminGetBookingAudit>>
+  > = ({ signal }) => adminGetBookingAudit(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminGetBookingAudit>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminGetBookingAuditQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminGetBookingAudit>>
+>;
+export type AdminGetBookingAuditQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get full audit trail for a booking (admin only)
+ */
+
+export function useAdminGetBookingAudit<
+  TData = Awaited<ReturnType<typeof adminGetBookingAudit>>,
+  TError = ErrorType<ApiError>,
+>(
+  id: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminGetBookingAudit>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminGetBookingAuditQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -3868,91 +4140,6 @@ export type SetVenueFeeOverrideMutationResult = NonNullable<
 >;
 export type SetVenueFeeOverrideMutationBody = BodyType<VenueFeeOverrideRequest>;
 export type SetVenueFeeOverrideMutationError = ErrorType<unknown>;
-
-// ─── Admin Users ──────────────────────────────────────────────────────────────
-
-export const getAdminListUsersUrl = (params?: AdminListUsersParams) => {
-  const normalizedParams = new URLSearchParams();
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : value.toString());
-    }
-  });
-  const stringifiedParams = normalizedParams.toString();
-  return stringifiedParams.length > 0
-    ? `/api/admin/users?${stringifiedParams}`
-    : `/api/admin/users`;
-};
-
-export const adminListUsers = async (
-  params?: AdminListUsersParams,
-  options?: RequestInit,
-): Promise<AdminListUsers200> => {
-  return customFetch<AdminListUsers200>(getAdminListUsersUrl(params), {
-    ...options,
-    method: "GET",
-  });
-};
-
-export const getAdminListUsersQueryKey = (params?: AdminListUsersParams) => {
-  return [`/api/admin/users`, ...(params ? [params] : [])] as const;
-};
-
-export const getAdminListUsersQueryOptions = <
-  TData = Awaited<ReturnType<typeof adminListUsers>>,
-  TError = ErrorType<ApiError>,
->(
-  params?: AdminListUsersParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof adminListUsers>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-  const queryKey = queryOptions?.queryKey ?? getAdminListUsersQueryKey(params);
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminListUsers>>> = ({
-    signal,
-  }) => adminListUsers(params, { signal, ...requestOptions });
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof adminListUsers>>,
-    TError,
-    TData
-  > & { queryKey: QueryKey };
-};
-
-export type AdminListUsersQueryResult = NonNullable<
-  Awaited<ReturnType<typeof adminListUsers>>
->;
-export type AdminListUsersQueryError = ErrorType<ApiError>;
-
-/**
- * @summary List all non-admin users (admin only)
- */
-export function useAdminListUsers<
-  TData = Awaited<ReturnType<typeof adminListUsers>>,
-  TError = ErrorType<ApiError>,
->(
-  params?: AdminListUsersParams,
-  options?: {
-    query?: UseQueryOptions<
-      Awaited<ReturnType<typeof adminListUsers>>,
-      TError,
-      TData
-    >;
-    request?: SecondParameter<typeof customFetch>;
-  },
-): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getAdminListUsersQueryOptions(params, options);
-  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
-    queryKey: QueryKey;
-  };
-  query.queryKey = queryOptions.queryKey;
-  return query;
-}
 
 /**
  * @summary Set or clear per-venue fee override

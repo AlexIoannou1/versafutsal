@@ -831,6 +831,30 @@ export const GetOwnerBookingResponse = zod.object({
 });
 
 /**
+ * @summary Get audit log for a specific booking (owner view)
+ */
+export const GetOwnerBookingAuditParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetOwnerBookingAuditResponse = zod.object({
+  entries: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      action: zod.string(),
+      actorUserId: zod.string().nullish(),
+      actorRole: zod.string().nullish(),
+      actorName: zod.string().nullish(),
+      previousValue: zod.record(zod.string(), zod.unknown()).nullish(),
+      newValue: zod.record(zod.string(), zod.unknown()).nullish(),
+      notes: zod.string().nullish(),
+      metadata: zod.record(zod.string(), zod.unknown()).nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
  * @summary Block a pitch slot for maintenance
  */
 export const CreateMaintenanceBlockParams = zod.object({
@@ -948,6 +972,9 @@ export const AdminGetVenueParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const adminGetVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin = 0;
+export const adminGetVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax = 6;
+
 export const AdminGetVenueResponse = zod.object({
   venue: zod
     .object({
@@ -969,11 +996,71 @@ export const AdminGetVenueResponse = zod.object({
       zod.object({
         owner: zod
           .object({
-            id: zod.string().uuid().optional(),
-            name: zod.string().optional(),
-            email: zod.string().email().optional(),
+            id: zod.string().uuid(),
+            name: zod.string(),
+            email: zod.string().email(),
+            phoneNumber: zod.string().nullish(),
+            stripeConnectAccountId: zod.string().nullish(),
           })
           .nullish(),
+        photos: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            url: zod.string(),
+            sortOrder: zod.number(),
+            createdAt: zod.coerce.date(),
+          }),
+        ),
+        pitches: zod.array(
+          zod
+            .object({
+              id: zod.string().uuid(),
+              venueId: zod.string().uuid(),
+              name: zod.string(),
+              size: zod.string(),
+              type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]),
+              slotDurationMinutes: zod.number(),
+              createdAt: zod.coerce.date(),
+            })
+            .and(
+              zod.object({
+                pricingRules: zod.array(
+                  zod.object({
+                    id: zod.string().uuid(),
+                    pitchId: zod.string().uuid(),
+                    dayType: zod.enum(["WEEKDAY", "WEEKEND", "ALL"]),
+                    pricePerHour: zod.string(),
+                    depositType: zod.string(),
+                    depositAmount: zod.string().nullish(),
+                  }),
+                ),
+                maintenanceBlocks: zod.array(
+                  zod.object({
+                    id: zod.string().uuid(),
+                    pitchId: zod.string().uuid(),
+                    startAt: zod.coerce.date(),
+                    endAt: zod.coerce.date(),
+                    reason: zod.string().nullish(),
+                    createdAt: zod.coerce.date(),
+                  }),
+                ),
+              }),
+            ),
+        ),
+        openingHours: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            dayOfWeek: zod
+              .number()
+              .min(adminGetVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin)
+              .max(adminGetVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax),
+            openTime: zod.string(),
+            closeTime: zod.string(),
+            isClosed: zod.boolean(),
+          }),
+        ),
       }),
     ),
 });
@@ -1030,6 +1117,64 @@ export const RejectVenueResponse = zod.object({
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
+});
+
+/**
+ * @summary Disable an approved venue (admin only)
+ */
+export const AdminDisableVenueParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AdminDisableVenueBody = zod.object({
+  reason: zod.string(),
+});
+
+export const AdminDisableVenueResponse = zod.object({
+  venue: zod.object({
+    id: zod.string().uuid(),
+    ownerId: zod.string().uuid(),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    name: zod.string(),
+    district: zod.string(),
+    address: zod.string(),
+    description: zod.string().nullish(),
+    amenities: zod.array(zod.string()),
+    cancellationWindowHours: zod.number(),
+    contactPhone: zod.string().nullish(),
+    rejectionReason: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
+ * @summary List all non-admin users (admin only)
+ */
+export const AdminListUsersQueryParams = zod.object({
+  search: zod.coerce.string().optional(),
+  role: zod.coerce.string().optional(),
+  page: zod.coerce.number().optional(),
+  limit: zod.coerce.number().optional(),
+});
+
+export const AdminListUsersResponse = zod.object({
+  users: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      name: zod.string(),
+      email: zod.string().email(),
+      phoneNumber: zod.string().nullish(),
+      role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
+      avatarUrl: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+      deletedAt: zod.coerce.date().nullish(),
+      stripeConnectAccountId: zod.string().nullish(),
+    }),
+  ),
+  total: zod.number(),
+  page: zod.number(),
+  limit: zod.number(),
 });
 
 /**
@@ -1138,6 +1283,30 @@ export const AdminGetBookingResponse = zod.object({
         }),
       }),
     ),
+});
+
+/**
+ * @summary Get full audit trail for a booking (admin only)
+ */
+export const AdminGetBookingAuditParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const AdminGetBookingAuditResponse = zod.object({
+  entries: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      action: zod.string(),
+      actorUserId: zod.string().nullish(),
+      actorRole: zod.string().nullish(),
+      actorName: zod.string().nullish(),
+      previousValue: zod.record(zod.string(), zod.unknown()).nullish(),
+      newValue: zod.record(zod.string(), zod.unknown()).nullish(),
+      notes: zod.string().nullish(),
+      metadata: zod.record(zod.string(), zod.unknown()).nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
 });
 
 /**

@@ -16,6 +16,7 @@ import { eq, inArray, and, gte, lte, desc, ilike, or, isNull, ne } from "drizzle
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 import { sendNotification } from "../lib/notifications";
+import { logBookingAudit } from "../lib/audit";
 
 const router: IRouter = Router();
 
@@ -513,31 +514,56 @@ router.post<{ id: string }>(
           processedAt: new Date(),
         });
 
-        await tx.insert(auditLogTable).values([
-          {
-            actorUserId: req.user!.userId,
-            entityType: "BOOKING",
-            entityId: bookingId,
-            action: "BOOKING_REFUNDED",
-            metadata: {
-              reason: reason ?? "Admin force-refund",
-              cancelledBy: "ADMIN",
-              previousStatus: booking.status,
-            },
-          },
-          {
-            actorUserId: req.user!.userId,
-            entityType: "PAYMENT",
-            entityId: payment.id,
-            action: "ADMIN_REFUND_ISSUED",
-            metadata: {
-              refundId,
-              amount: payment.amount,
-              providerPaymentId: payment.providerPaymentId,
-              adminId: req.user!.userId,
-            },
-          },
-        ]);
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "ADMIN",
+          action: "ADMIN_MODIFIED_BOOKING",
+          previousValue: { status: booking.status },
+          newValue: { status: "REFUNDED" },
+          notes: reason ?? "Admin force-refund",
+          metadata: { modification: "force-refund" },
+        });
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "ADMIN",
+          action: "BOOKING_STATUS_CHANGED",
+          previousValue: { status: booking.status },
+          newValue: { status: "REFUNDED" },
+          notes: reason ?? "Admin force-refund",
+          metadata: { cancelledBy: "ADMIN" },
+        });
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "ADMIN",
+          action: "PAYMENT_STATUS_CHANGED",
+          previousValue: { paymentStatus: "SUCCEEDED" },
+          newValue: { paymentStatus: "REFUNDED" },
+          notes: reason ?? "Admin force-refund",
+          metadata: { cancelledBy: "ADMIN" },
+        });
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "ADMIN",
+          action: "REFUND_ISSUED",
+          previousValue: { paymentStatus: "SUCCEEDED" },
+          newValue: { paymentStatus: "REFUNDED", refundId, amount: payment?.amount },
+          notes: reason ?? null,
+          metadata: { providerPaymentId: payment?.providerPaymentId, via: "admin-force-refund" },
+        });
+        await logBookingAudit(tx, {
+          bookingId,
+          actorUserId: req.user!.userId,
+          actorRole: "ADMIN",
+          action: "ADMIN_REFUND_ISSUED",
+          previousValue: { paymentStatus: "SUCCEEDED" },
+          newValue: { paymentStatus: "REFUNDED", refundId, amount: payment?.amount },
+          notes: reason ?? null,
+          metadata: { providerPaymentId: payment?.providerPaymentId },
+        });
       });
 
       res.json({
@@ -561,6 +587,65 @@ router.post<{ id: string }>(
         return;
       }
       console.error("POST /admin/bookings/:id/refund error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// GET /admin/bookings/:id/audit — Full audit trail for a booking (admin only, no ownership check)
+router.get<{ id: string }>(
+  "/admin/bookings/:id/audit",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req, res) => {
+    try {
+      const bookingId = req.params.id;
+
+      const [bookingCheck] = await db
+        .select({ id: bookingsTable.id })
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, bookingId))
+        .limit(1);
+
+      if (!bookingCheck) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      const entries = await db
+        .select({
+          log: auditLogTable,
+          actorName: usersTable.name,
+        })
+        .from(auditLogTable)
+        .leftJoin(usersTable, eq(auditLogTable.actorUserId, usersTable.id))
+        .where(
+          and(
+            or(
+              eq(auditLogTable.entityType, "BOOKING"),
+              eq(auditLogTable.entityType, "PAYMENT"),
+            ),
+            eq(auditLogTable.entityId, bookingId),
+          ),
+        )
+        .orderBy(desc(auditLogTable.createdAt));
+
+      res.json({
+        entries: entries.map(({ log: e, actorName }) => ({
+          id: e.id,
+          action: e.action,
+          metadata: e.metadata,
+          createdAt: e.createdAt.toISOString(),
+          actorUserId: e.actorUserId,
+          actorRole: e.actorRole,
+          actorName: actorName ?? null,
+          previousValue: e.previousValue ?? null,
+          newValue: e.newValue ?? null,
+          notes: e.notes ?? null,
+        })),
+      });
+    } catch (err) {
+      console.error("GET /admin/bookings/:id/audit error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
   },

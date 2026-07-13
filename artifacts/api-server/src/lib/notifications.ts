@@ -13,6 +13,7 @@ type NotifType =
   | "BOOKING_REMINDER"
   | "VENUE_APPROVED"
   | "VENUE_REJECTED"
+  | "VENUE_DISABLED"
   | "PAYMENT_FAILED";
 
 interface SendNotifOpts {
