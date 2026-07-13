@@ -17,6 +17,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "BOOKING_REMINDER",
   "VENUE_APPROVED",
   "VENUE_REJECTED",
+  "VENUE_DISABLED",
   "PAYMENT_FAILED",
 ]);
 

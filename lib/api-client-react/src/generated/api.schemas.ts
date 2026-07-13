@@ -27,6 +27,7 @@ export const VenueStatus = {
   PENDING: "PENDING",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
+  DISABLED: "DISABLED",
 } as const;
 
 export type PitchType = (typeof PitchType)[keyof typeof PitchType];
@@ -110,6 +111,7 @@ export interface VenueRecord {
   cancellationWindowHours: number;
   contactPhone?: string | null;
   rejectionReason?: string | null;
+  disabledReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -203,6 +205,7 @@ export interface VenueSummary {
 export type OwnerVenueSummary = VenueSummary & {
   pitchCount: number;
   rejectionReason?: string | null;
+  disabledReason?: string | null;
 };
 
 export type VenueDetail = VenueRecord & {
@@ -219,6 +222,21 @@ export type AdminVenueSummaryOwner = {
 
 export type AdminVenueSummary = VenueRecord & {
   owner?: AdminVenueSummaryOwner;
+};
+
+export interface AdminVenueOwner {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string | null;
+  stripeConnectAccountId?: string | null;
+}
+
+export type AdminVenueDetail = VenueRecord & {
+  owner?: AdminVenueOwner | null;
+  photos: VenuePhoto[];
+  pitches: PitchWithPricing[];
+  openingHours: OpeningHoursRecord[];
 };
 
 export interface CreateVenueRequest {
@@ -611,6 +629,7 @@ export const AdminListVenuesStatus = {
   PENDING: "PENDING",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
+  DISABLED: "DISABLED",
 } as const;
 
 export type AdminListVenues200 = {
@@ -618,7 +637,7 @@ export type AdminListVenues200 = {
 };
 
 export type AdminGetVenue200 = {
-  venue: AdminVenueSummary;
+  venue: AdminVenueDetail;
 };
 
 export type ApproveVenue200 = {
@@ -626,6 +645,14 @@ export type ApproveVenue200 = {
 };
 
 export type RejectVenue200 = {
+  venue: VenueRecord;
+};
+
+export type DisableVenueRequest = {
+  reason: string;
+};
+
+export type DisableVenue200 = {
   venue: VenueRecord;
 };
 

@@ -23,19 +23,22 @@ import {
   approveVenue,
   rejectVenue,
 } from "@workspace/api-client-react";
+import AdminVenueDetailScreen from "@/components/admin/AdminVenueDetailScreen";
 
-type TabKey = "PENDING" | "APPROVED" | "REJECTED";
+type TabKey = "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "PENDING", label: "Pending" },
   { key: "APPROVED", label: "Approved" },
   { key: "REJECTED", label: "Rejected" },
+  { key: "DISABLED", label: "Disabled" },
 ];
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#FF9500",
   APPROVED: "#00C851",
   REJECTED: "#FF3B30",
+  DISABLED: "#8E8E93",
 };
 
 type VenueItem = {
@@ -43,8 +46,9 @@ type VenueItem = {
   name: string;
   district: string;
   address: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
   rejectionReason?: string | null;
+  disabledReason?: string | null;
   owner?: { name: string; email: string; phoneNumber?: string | null } | null;
   createdAt: string;
 };
@@ -60,6 +64,7 @@ export default function AdminVenuesScreen() {
   const [approveModalVisible, setApproveModalVisible] = useState(false);
   const [approveTarget, setApproveTarget] = useState<{ id: string; name: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [detailVenueId, setDetailVenueId] = useState<string | null>(null);
 
   const { data, isLoading, refetch, isRefetching } = useAdminListVenues({
     status: activeTab,
@@ -308,6 +313,7 @@ export default function AdminVenuesScreen() {
     PENDING: "No pending venues to review.",
     APPROVED: "No approved venues yet.",
     REJECTED: "No rejected venues.",
+    DISABLED: "No disabled venues.",
   };
 
   return (
@@ -374,7 +380,11 @@ export default function AdminVenuesScreen() {
             const isActioning = actionLoading === item.id;
 
             return (
-              <View style={s.card}>
+              <TouchableOpacity
+                style={s.card}
+                activeOpacity={0.85}
+                onPress={() => setDetailVenueId(item.id)}
+              >
                 <View style={s.cardHeader}>
                   <Text style={s.venueName} numberOfLines={1}>
                     {item.name}
@@ -415,6 +425,13 @@ export default function AdminVenuesScreen() {
                   </View>
                 )}
 
+                {item.status === "DISABLED" && item.disabledReason && (
+                  <View style={[s.rejBox, { backgroundColor: "#8E8E9320" }]}>
+                    <Text style={[s.rejLabel, { color: "#8E8E93" }]}>Disabled reason</Text>
+                    <Text style={[s.rejText, { color: "#8E8E93" }]}>{item.disabledReason}</Text>
+                  </View>
+                )}
+
                 {item.status === "PENDING" && (
                   <View style={s.actions}>
                     <TouchableOpacity
@@ -441,7 +458,7 @@ export default function AdminVenuesScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             );
           }}
         />
@@ -514,6 +531,14 @@ export default function AdminVenuesScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {detailVenueId && (
+        <AdminVenueDetailScreen
+          venueId={detailVenueId}
+          visible={!!detailVenueId}
+          onClose={() => setDetailVenueId(null)}
+        />
+      )}
     </View>
   );
 }

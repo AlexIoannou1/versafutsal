@@ -28,6 +28,7 @@ export const venueStatusEnum = pgEnum("venue_status", [
   "PENDING",
   "APPROVED",
   "REJECTED",
+  "DISABLED",
 ]);
 
 export const pitchTypeEnum = pgEnum("pitch_type", [
@@ -56,6 +57,7 @@ export const venuesTable = pgTable("venues", {
     .default(24),
   contactPhone: text("contact_phone"),
   rejectionReason: text("rejection_reason"),
+  disabledReason: text("disabled_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

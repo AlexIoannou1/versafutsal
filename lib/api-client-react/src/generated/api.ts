@@ -25,6 +25,7 @@ import type {
   AdminListBookingsParams,
   AdminListVenues200,
   AdminListVenuesParams,
+  AdminVenueDetail,
   ApiError,
   ApproveVenue200,
   AuthResponse,
@@ -63,6 +64,8 @@ import type {
   RegisterPushToken200,
   RegisterPushTokenRequest,
   RegisterRequest,
+  DisableVenue200,
+  DisableVenueRequest,
   RejectVenue200,
   RejectVenueRequest,
   SetOpeningHours200,
@@ -2920,6 +2923,92 @@ export const useRejectVenue = <
   TContext
 > => {
   return useMutation(getRejectVenueMutationOptions(options));
+};
+
+/**
+ * @summary Disable an approved venue
+ */
+export const getDisableVenueUrl = (id: string) => {
+  return `/api/admin/venues/${id}/disable`;
+};
+
+export const disableVenue = async (
+  id: string,
+  disableVenueRequest: DisableVenueRequest,
+  options?: RequestInit,
+): Promise<DisableVenue200> => {
+  return customFetch<DisableVenue200>(getDisableVenueUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(disableVenueRequest),
+  });
+};
+
+export const getDisableVenueMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disableVenue>>,
+    TError,
+    { id: string; data: BodyType<DisableVenueRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disableVenue>>,
+  TError,
+  { id: string; data: BodyType<DisableVenueRequest> },
+  TContext
+> => {
+  const mutationKey = ["disableVenue"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disableVenue>>,
+    { id: string; data: BodyType<DisableVenueRequest> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+    return disableVenue(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisableVenueMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disableVenue>>
+>;
+export type DisableVenueMutationBody = BodyType<DisableVenueRequest>;
+export type DisableVenueMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Disable an approved venue
+ */
+export const useDisableVenue = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disableVenue>>,
+    TError,
+    { id: string; data: BodyType<DisableVenueRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof disableVenue>>,
+  TError,
+  { id: string; data: BodyType<DisableVenueRequest> },
+  TContext
+> => {
+  return useMutation(getDisableVenueMutationOptions(options));
 };
 
 /**

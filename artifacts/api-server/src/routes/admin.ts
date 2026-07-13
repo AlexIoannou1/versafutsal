@@ -4,6 +4,9 @@ import {
   venuesTable,
   usersTable,
   pitchesTable,
+  venuePhotosTable,
+  openingHoursTable,
+  pricingRulesTable,
   bookingsTable,
   paymentsTable,
   refundsTable,
@@ -16,15 +19,23 @@ import { sendNotification } from "../lib/notifications";
 
 const router: IRouter = Router();
 
+/** Construct the public HTTPS URL for a stored photo key (same logic as venues.ts). */
+function resolvePhotoUrl(key: string): string {
+  if (key.startsWith("http://") || key.startsWith("https://")) return key;
+  const domain = process.env.REPLIT_DEV_DOMAIN;
+  if (!domain) return key;
+  return `https://${domain}/api/uploads/${key}`;
+}
+
 // GET /admin/venues — list all venues (optionally filtered by status)
 router.get("/admin/venues", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const { status } = req.query as { status?: string };
 
-    const validStatuses = ["PENDING", "APPROVED", "REJECTED"];
+    const validStatuses = ["PENDING", "APPROVED", "REJECTED", "DISABLED"];
     const statusFilter =
       status && validStatuses.includes(status)
-        ? (status as "PENDING" | "APPROVED" | "REJECTED")
+        ? (status as "PENDING" | "APPROVED" | "REJECTED" | "DISABLED")
         : null;
 
     const venues = statusFilter
@@ -80,12 +91,70 @@ router.get<{ id: string }>(
       }
 
       const [owner] = await db
-        .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+        .select({
+          id: usersTable.id,
+          name: usersTable.name,
+          email: usersTable.email,
+          phoneNumber: usersTable.phoneNumber,
+          stripeConnectAccountId: usersTable.stripeConnectAccountId,
+        })
         .from(usersTable)
         .where(eq(usersTable.id, venue.ownerId))
         .limit(1);
 
-      res.json({ venue: { ...venue, owner: owner ?? null } });
+      const rawPhotos = await db
+        .select()
+        .from(venuePhotosTable)
+        .where(eq(venuePhotosTable.venueId, id))
+        .orderBy(venuePhotosTable.sortOrder);
+      const photos = rawPhotos.map((p) => ({ ...p, url: resolvePhotoUrl(p.url) }));
+
+      const pitches = await db
+        .select()
+        .from(pitchesTable)
+        .where(eq(pitchesTable.venueId, id));
+
+      const openingHours = await db
+        .select()
+        .from(openingHoursTable)
+        .where(eq(openingHoursTable.venueId, id))
+        .orderBy(openingHoursTable.dayOfWeek);
+
+      const pricingRules =
+        pitches.length > 0
+          ? await db
+              .select()
+              .from(pricingRulesTable)
+              .where(
+                inArray(
+                  pricingRulesTable.pitchId,
+                  pitches.map((p) => p.id),
+                ),
+              )
+          : [];
+
+      const rulesByPitch = new Map<string, typeof pricingRules>();
+      for (const rule of pricingRules) {
+        const existing = rulesByPitch.get(rule.pitchId) ?? [];
+        existing.push(rule);
+        rulesByPitch.set(rule.pitchId, existing);
+      }
+
+      const pitchesWithPricing = pitches.map((p) => ({
+        ...p,
+        pricingRules: rulesByPitch.get(p.id) ?? [],
+        maintenanceBlocks: [],
+      }));
+
+      res.json({
+        venue: {
+          ...venue,
+          owner: owner ?? null,
+          photos,
+          pitches: pitchesWithPricing,
+          openingHours,
+        },
+      });
     } catch (err) {
       console.error("GET /admin/venues/:id error:", err);
       res.status(500).json({ error: "Internal server error" });
@@ -177,6 +246,62 @@ router.put<{ id: string }>(
       res.json({ venue: updated });
     } catch (err) {
       console.error("PUT /admin/venues/:id/reject error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// PUT /admin/venues/:id/disable — disable an approved venue with a required reason
+router.put<{ id: string }>(
+  "/admin/venues/:id/disable",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [existing] = await db
+        .select()
+        .from(venuesTable)
+        .where(eq(venuesTable.id, id))
+        .limit(1);
+
+      if (!existing) {
+        res.status(404).json({ error: "Venue not found" });
+        return;
+      }
+
+      const { reason } = req.body as { reason?: string };
+      if (!reason || !reason.trim()) {
+        res.status(400).json({ error: "A reason is required to disable a venue." });
+        return;
+      }
+
+      const [updated] = await db
+        .update(venuesTable)
+        .set({
+          status: "DISABLED",
+          disabledReason: reason.trim(),
+          updatedAt: new Date(),
+        })
+        .where(eq(venuesTable.id, id))
+        .returning();
+
+      try {
+        await sendNotification({
+          userId: existing.ownerId,
+          type: "VENUE_DISABLED",
+          title: "Venue Disabled",
+          body: `Your venue "${existing.name}" has been disabled by an administrator. Reason: ${reason.trim()}`,
+          entityType: "VENUE",
+          entityId: id,
+        });
+      } catch (notifErr) {
+        console.warn("[notifications] venue disabled notification failed (non-fatal):", notifErr);
+      }
+
+      res.json({ venue: updated });
+    } catch (err) {
+      console.error("PUT /admin/venues/:id/disable error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
   },

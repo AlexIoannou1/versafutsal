@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,27 +29,31 @@ const STATUS_COLORS: Record<string, string> = {
   PENDING: "#FF9500",
   APPROVED: "#00C851",
   REJECTED: "#FF3B30",
+  DISABLED: "#8E8E93",
 };
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "Pending",
   APPROVED: "Approved",
   REJECTED: "Rejected",
+  DISABLED: "Disabled",
 };
 
 type VenueItem = {
   id: string;
   name: string;
   district: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
   pitchCount?: number;
   rejectionReason?: string | null;
+  disabledReason?: string | null;
 };
 
 export default function OwnerVenuesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [disabledPopup, setDisabledPopup] = useState<{ id: string; name: string; reason: string } | null>(null);
 
   const { data, isLoading, refetch, isRefetching } = useListOwnerVenues();
   const venues: VenueItem[] = (data?.venues as VenueItem[] | undefined) ?? [];
@@ -196,6 +201,93 @@ export default function OwnerVenuesScreen() {
       fontFamily: "PlusJakartaSans_500Medium",
       color: colors.foreground,
     },
+    disabledBox: {
+      marginTop: 8,
+      backgroundColor: "#8E8E9320",
+      borderRadius: 8,
+      padding: 10,
+      flexDirection: "row",
+      alignItems: "flex-start",
+    },
+    disabledLabel: {
+      fontSize: 12,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: "#8E8E93",
+      marginBottom: 2,
+    },
+    disabledText: {
+      fontSize: 12,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: "#8E8E93",
+    },
+    popupOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    popupSheet: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      padding: 28,
+      width: "100%",
+      alignItems: "center",
+    },
+    popupIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: "#8E8E9320",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    popupTitle: {
+      fontSize: 20,
+      fontFamily: "PlusJakartaSans_700Bold",
+      color: colors.foreground,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    popupSub: {
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.mutedForeground,
+      textAlign: "center",
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    popupReasonBox: {
+      backgroundColor: colors.muted,
+      borderRadius: 10,
+      padding: 14,
+      width: "100%",
+      marginBottom: 20,
+    },
+    popupReasonLabel: {
+      fontSize: 12,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: "#8E8E93",
+      marginBottom: 4,
+    },
+    popupReasonText: {
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.foreground,
+      lineHeight: 20,
+    },
+    popupOkBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 40,
+    },
+    popupOkText: {
+      fontSize: 15,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.primaryForeground,
+    },
   });
 
   if (isLoading) {
@@ -279,10 +371,28 @@ export default function OwnerVenuesScreen() {
                   </View>
                 )}
 
+                {item.status === "DISABLED" && item.disabledReason && (
+                  <View style={s.disabledBox}>
+                    <View style={{ marginRight: 6, marginTop: 1 }}>
+                      <FeatherIcons name="slash" size={13} color="#8E8E93" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.disabledLabel}>Venue disabled</Text>
+                      <Text style={s.disabledText}>{item.disabledReason}</Text>
+                    </View>
+                  </View>
+                )}
+
                 <View style={s.manageRow}>
                   <TouchableOpacity
                     style={s.manageBtn}
-                    onPress={() => router.push(`/owner/venue/${item.id}`)}
+                    onPress={() => {
+                      if (item.status === "DISABLED" && item.disabledReason) {
+                        setDisabledPopup({ id: item.id, name: item.name, reason: item.disabledReason });
+                      } else {
+                        router.push(`/owner/venue/${item.id}`);
+                      }
+                    }}
                   >
                     <FeatherIcons name="settings" size={14} color={colors.foreground} />
                     <Text style={s.manageBtnText}>Manage</Text>
@@ -293,6 +403,36 @@ export default function OwnerVenuesScreen() {
           }}
         />
       )}
+
+      {/* Disabled venue popup */}
+      <Modal
+        visible={!!disabledPopup}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDisabledPopup(null)}
+      >
+        <View style={s.popupOverlay}>
+          <View style={s.popupSheet}>
+            <View style={s.popupIcon}>
+              <FeatherIcons name="slash" size={28} color="#8E8E93" />
+            </View>
+            <Text style={s.popupTitle}>Venue Disabled</Text>
+            <Text style={s.popupSub}>
+              &quot;{disabledPopup?.name}&quot; has been disabled by an administrator and is no longer visible to players.
+            </Text>
+            <View style={s.popupReasonBox}>
+              <Text style={s.popupReasonLabel}>Reason</Text>
+              <Text style={s.popupReasonText}>{disabledPopup?.reason}</Text>
+            </View>
+            <TouchableOpacity
+              style={s.popupOkBtn}
+              onPress={() => setDisabledPopup(null)}
+            >
+              <Text style={s.popupOkText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

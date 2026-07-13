@@ -966,7 +966,7 @@ paths:
                 type: object
                 properties:
                   venue:
-                    $ref: "#/components/schemas/AdminVenueSummary"
+                    $ref: "#/components/schemas/AdminVenueDetail"
                 required: [venue]
         "404":
           description: Not found
@@ -1747,6 +1747,47 @@ components:
                   format: email
               nullable: true
           required: []
+
+    AdminVenueOwner:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+          nullable: true
+        stripeConnectAccountId:
+          type: string
+          nullable: true
+      required: [id, name, email]
+
+    AdminVenueDetail:
+      allOf:
+        - $ref: "#/components/schemas/VenueRecord"
+        - type: object
+          properties:
+            owner:
+              $ref: "#/components/schemas/AdminVenueOwner"
+              nullable: true
+            photos:
+              type: array
+              items:
+                $ref: "#/components/schemas/VenuePhoto"
+            pitches:
+              type: array
+              items:
+                $ref: "#/components/schemas/PitchWithPricing"
+            openingHours:
+              type: array
+              items:
+                $ref: "#/components/schemas/OpeningHoursRecord"
+          required: [photos, pitches, openingHours]
 
     CreateVenueRequest:
       type: object
