@@ -101,12 +101,31 @@ export default function AdminSettingsScreen() {
     );
   }
 
-  function handleVenueOverride(venueId: string, current: boolean | undefined) {
+  function handleVenueOverride(venueId: string, venueName: string, current: boolean | undefined) {
     const next = current === false ? null : current === true ? false : true;
-    setVenueOverride.mutate(
-      { venueId, data: { feeEnabled: next } },
-      { onSuccess: invalidateSettings, onError: () => Alert.alert("Error", "Failed to update override.") },
-    );
+    const apply = () =>
+      setVenueOverride.mutate(
+        { venueId, data: { feeEnabled: next } },
+        { onSuccess: invalidateSettings, onError: () => Alert.alert("Error", "Failed to update override.") },
+      );
+    if (next === true) {
+      if (Platform.OS === "web") {
+        if (window.confirm(`Enable the platform fee for ${venueName}?`)) {
+          apply();
+        }
+      } else {
+        Alert.alert(
+          "Enable fee?",
+          `Enable the platform fee for ${venueName}?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Confirm", onPress: apply },
+          ],
+        );
+      }
+    } else {
+      apply();
+    }
   }
 
   const s = StyleSheet.create({
@@ -383,7 +402,7 @@ export default function AdminSettingsScreen() {
                     s.venueRow,
                     idx < venues.length - 1 && s.rowBorder,
                   ]}
-                  onPress={() => handleVenueOverride(venue.id, override)}
+                  onPress={() => handleVenueOverride(venue.id, venue.name, override)}
                   activeOpacity={0.7}
                 >
                   <FeatherIcons name="map-pin" size={14} color={colors.mutedForeground} />
