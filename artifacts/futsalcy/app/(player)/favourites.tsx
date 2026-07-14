@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AntDesign } from "@expo/vector-icons";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -205,7 +206,7 @@ export default function FavouritesScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Remove from favourites"
           >
-            <FeatherIcons name="heart" size={20} color={colors.destructive} />
+            <AntDesign name="heart" size={20} color={colors.destructive} />
           </TouchableOpacity>
         </View>
 

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AntDesign } from "@expo/vector-icons";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
@@ -565,11 +566,11 @@ export default function PlayerVenuesScreen() {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityLabel={favouriteIds.has(item.id) ? "Remove from favourites" : "Add to favourites"}
                   >
-                    <FeatherIcons
-                      name="heart"
-                      size={20}
-                      color={favouriteIds.has(item.id) ? colors.destructive : colors.mutedForeground}
-                    />
+                    {favouriteIds.has(item.id) ? (
+                      <AntDesign name="heart" size={20} color={colors.destructive} />
+                    ) : (
+                      <FeatherIcons name="heart" size={20} color={colors.mutedForeground} />
+                    )}
                   </TouchableOpacity>
                 </View>
                 <View style={s.cardMeta}>
