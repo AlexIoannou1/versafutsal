@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ScrollView,
   Platform,
+  TextInput,
 } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
@@ -77,6 +78,7 @@ export default function PlayerBookingsScreen() {
     return result;
   }, [bookings]);
 
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedArea, setSelectedArea] = useState("All Areas");
   const [dateFrom, setDateFrom] = useState<Date | null>(null);
   const [dateTo, setDateTo] = useState<Date | null>(null);
@@ -90,8 +92,10 @@ export default function PlayerBookingsScreen() {
   const effectiveArea = areas.includes(selectedArea) ? selectedArea : "All Areas";
 
   const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return bookings.filter((b) => {
-      const venue = b.venue as { district?: string } | undefined;
+      const venue = b.venue as { name?: string; district?: string } | undefined;
+      const pitch = b.pitch as { name?: string } | undefined;
       const start = new Date(b.startAt);
 
       if (effectiveArea !== "All Areas" && venue?.district !== effectiveArea) return false;
@@ -105,9 +109,20 @@ export default function PlayerBookingsScreen() {
         to.setHours(23, 59, 59, 999);
         if (start > to) return false;
       }
+      if (q) {
+        const haystack = [
+          venue?.name ?? "",
+          pitch?.name ?? "",
+          STATUS_LABELS[b.status] ?? b.status,
+          formatDateShort(b.startAt),
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       return true;
     });
-  }, [bookings, effectiveArea, dateFrom, dateTo]);
+  }, [bookings, effectiveArea, dateFrom, dateTo, searchQuery]);
 
   // ── Split into upcoming (asc) and past (desc most-recent first) ──────────
   const today = useMemo(() => {
@@ -131,9 +146,13 @@ export default function PlayerBookingsScreen() {
   const hasUpcoming = upcomingBookings.length > 0;
   const hasPast = pastBookings.length > 0;
 
-  const hasActiveFilters = effectiveArea !== "All Areas" || dateFrom !== null || dateTo !== null;
+  const hasActiveFilters =
+    searchQuery.trim() !== "" || effectiveArea !== "All Areas" || dateFrom !== null || dateTo !== null;
   const activeFilterCount =
-    (effectiveArea !== "All Areas" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);
+    (searchQuery.trim() ? 1 : 0) +
+    (effectiveArea !== "All Areas" ? 1 : 0) +
+    (dateFrom ? 1 : 0) +
+    (dateTo ? 1 : 0);
 
   function handleFromChange(event: DateTimePickerEvent, date?: Date) {
     if (Platform.OS === "android") setShowFromPicker(false);
@@ -235,6 +254,26 @@ export default function PlayerBookingsScreen() {
       borderRadius: 8,
     },
     iosDoneBtnText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: "#fff" },
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginHorizontal: 16,
+      marginTop: 10,
+      marginBottom: 2,
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 10,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.foreground,
+      paddingVertical: 9,
+    },
     clearBtn: { alignSelf: "flex-end", paddingVertical: 4 },
     clearBtnText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.destructive },
     sectionHeader: {
@@ -321,6 +360,27 @@ export default function PlayerBookingsScreen() {
     <View style={s.container}>
       {/* Filter Bar */}
       <View style={s.filterBar}>
+        {/* Search bar */}
+        <View style={s.searchRow}>
+          <FeatherIcons name="search" size={15} color={colors.mutedForeground} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search venue, pitch, status, date…"
+            placeholderTextColor={colors.mutedForeground}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            clearButtonMode="never"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <FeatherIcons name="x" size={15} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+
         <View style={s.filterRow}>
           <TouchableOpacity
             style={s.filterToggleBtn}
@@ -453,6 +513,7 @@ export default function PlayerBookingsScreen() {
               <TouchableOpacity
                 style={s.clearBtn}
                 onPress={() => {
+                  setSearchQuery("");
                   setSelectedArea("All Areas");
                   setDateFrom(null);
                   setDateTo(null);
