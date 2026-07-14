@@ -77,11 +77,12 @@ export default function BookPitchScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id: venueId, pitchId, pitchName, slotMins } = useLocalSearchParams<{
+  const { id: venueId, pitchId, pitchName, slotMins, date: dateParam } = useLocalSearchParams<{
     id: string;
     pitchId: string;
     pitchName: string;
     slotMins: string;
+    date: string;
   }>();
 
   const decodedPitchName = pitchName ? decodeURIComponent(String(pitchName)) : "Pitch";
@@ -92,9 +93,21 @@ export default function BookPitchScreen() {
     return d;
   }, []);
 
-  const [displayYear, setDisplayYear] = useState(today.getFullYear());
-  const [displayMonth, setDisplayMonth] = useState(today.getMonth());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const initialDate = useMemo(() => {
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(String(dateParam))) {
+      const [y, m, d] = String(dateParam).split("-").map(Number);
+      const parsed = new Date(y!, (m! - 1), d!);
+      parsed.setHours(0, 0, 0, 0);
+      if (!isNaN(parsed.getTime()) && parsed >= today) {
+        return parsed;
+      }
+    }
+    return null;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [displayYear, setDisplayYear] = useState(initialDate?.getFullYear() ?? today.getFullYear());
+  const [displayMonth, setDisplayMonth] = useState(initialDate?.getMonth() ?? today.getMonth());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate);
   const [selectedSlot, setSelectedSlot] = useState<{ startAt: string; endAt: string } | null>(null);
 
   const selectedDateStr = selectedDate ? toDateStr(selectedDate) : "";
