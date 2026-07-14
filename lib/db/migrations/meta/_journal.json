@@ -120,6 +120,13 @@
       "when": 1752364800000,
       "tag": "0017_booking_audit_extended",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1752451200000,
+      "tag": "0018_match_finished_notif_type",
+      "breakpoints": true
     }
   ]
 }

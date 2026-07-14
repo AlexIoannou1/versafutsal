@@ -19,6 +19,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "VENUE_REJECTED",
   "VENUE_DISABLED",
   "PAYMENT_FAILED",
+  "MATCH_FINISHED",
 ]);
 
 export const notificationsTable = pgTable("notifications", {

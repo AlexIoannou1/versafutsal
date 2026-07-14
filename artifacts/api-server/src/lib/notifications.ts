@@ -2,9 +2,12 @@ import { db } from "@workspace/db";
 import {
   notificationsTable,
   usersTable,
+  bookingsTable,
+  pitchesTable,
+  venuesTable,
   type Notification,
 } from "@workspace/db/schema";
-import { and, eq, isNotNull, lt, lte } from "drizzle-orm";
+import { and, eq, isNotNull, lt, lte, notExists } from "drizzle-orm";
 
 type NotifType =
   | "BOOKING_CONFIRMED"
@@ -14,7 +17,8 @@ type NotifType =
   | "VENUE_APPROVED"
   | "VENUE_REJECTED"
   | "VENUE_DISABLED"
-  | "PAYMENT_FAILED";
+  | "PAYMENT_FAILED"
+  | "MATCH_FINISHED";
 
 interface SendNotifOpts {
   userId: string;
@@ -245,6 +249,7 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
 // Polls every minute for:
 //   1. Scheduled notification rows whose scheduledAt has passed — sends push.
 //   2. Stored Expo ticket IDs — checks receipts and clears stale tokens.
+//   3. CONFIRMED bookings whose endAt has passed — sends MATCH_FINISHED to player (once).
 
 export function startReminderDispatcher(intervalMs = 60_000): NodeJS.Timeout {
   return setInterval(async () => {
@@ -312,6 +317,59 @@ export function startReminderDispatcher(intervalMs = 60_000): NodeJS.Timeout {
     } catch (err) {
       console.warn("[push] receipt check error (non-fatal):", err);
     }
+
+    // ── Step 3: send MATCH_FINISHED for past-due CONFIRMED bookings ──
+    try {
+      const now = new Date();
+      // Find CONFIRMED bookings whose session has ended and haven't yet received
+      // a MATCH_FINISHED notification (idempotent — checked via NOT EXISTS).
+      const finishedBookings = await db
+        .select({
+          bookingId: bookingsTable.id,
+          playerId: bookingsTable.playerId,
+          venueName: venuesTable.name,
+          pitchName: pitchesTable.name,
+        })
+        .from(bookingsTable)
+        .innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+        .innerJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+        .where(
+          and(
+            eq(bookingsTable.status, "CONFIRMED"),
+            lt(bookingsTable.endAt, now),
+            notExists(
+              db
+                .select({ id: notificationsTable.id })
+                .from(notificationsTable)
+                .where(
+                  and(
+                    eq(notificationsTable.userId, bookingsTable.playerId),
+                    eq(notificationsTable.type, "MATCH_FINISHED"),
+                    eq(notificationsTable.entityType, "BOOKING"),
+                    eq(notificationsTable.entityId, bookingsTable.id),
+                  ),
+                ),
+            ),
+          ),
+        )
+        .limit(50);
+
+      for (const row of finishedBookings) {
+        await sendNotification({
+          userId: row.playerId,
+          type: "MATCH_FINISHED",
+          title: "Match Finished",
+          body: `Your futsal session at ${row.venueName} — ${row.pitchName} has ended. Well played!`,
+          entityType: "BOOKING",
+          entityId: row.bookingId,
+        });
+        console.info(
+          `[notif] MATCH_FINISHED sent to player ${row.playerId} for booking ${row.bookingId}`,
+        );
+      }
+    } catch (err) {
+      console.warn("[notif] MATCH_FINISHED dispatcher error (non-fatal):", err);
+    }
   }, intervalMs);
 }
 
@@ -355,14 +413,14 @@ export async function sendBookingConfirmedNotifications(opts: {
     entityId: bookingId,
   });
 
-  // Schedule reminder for player ~2 hours before booking
-  const reminderAt = new Date(startAt.getTime() - 2 * 60 * 60 * 1000);
+  // Schedule reminder for player ~1 hour before booking
+  const reminderAt = new Date(startAt.getTime() - 1 * 60 * 60 * 1000);
   if (reminderAt > new Date()) {
     await sendNotification({
       userId: playerId,
       type: "BOOKING_REMINDER",
       title: "Booking Reminder",
-      body: `Your futsal session at ${venueName} starts in 2 hours.`,
+      body: `Your futsal session at ${venueName} starts in 1 hour.`,
       entityType: "BOOKING",
       entityId: bookingId,
       scheduledAt: reminderAt,

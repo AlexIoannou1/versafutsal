@@ -85,3 +85,11 @@ export type {
   OwnerNotification,
   ListOwnerNotificationsResponse,
 } from "./owner-notifications-api";
+export {
+  usePlayerNotifications,
+  useMarkPlayerNotificationsRead,
+} from "./player-notifications-api";
+export type {
+  PlayerNotification,
+  ListPlayerNotificationsResponse,
+} from "./player-notifications-api";

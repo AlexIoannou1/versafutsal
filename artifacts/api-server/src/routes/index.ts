@@ -10,6 +10,7 @@ import playerAccountRouter from "./player-account";
 import playerAvatarRouter from "./player-avatar";
 import ownerAccountRouter from "./owner-account";
 import ownerNotificationsRouter from "./owner-notifications";
+import playerNotificationsRouter from "./player-notifications";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(playerAccountRouter);
 router.use(playerAvatarRouter);
 router.use(ownerAccountRouter);
 router.use(ownerNotificationsRouter);
+router.use(playerNotificationsRouter);
 
 export default router;
