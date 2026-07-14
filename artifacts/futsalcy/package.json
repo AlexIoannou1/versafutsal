@@ -4,7 +4,7 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "printf 'EXPO_PUBLIC_DOMAIN=%s\\nEXPO_PUBLIC_REPL_ID=%s\\n' \"$REPLIT_DEV_DOMAIN\" \"$REPL_ID\" > .env.local && REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_EXPO_DEV_DOMAIN pnpm exec expo start --port $PORT",
+    "dev": "printf 'EXPO_PUBLIC_DOMAIN=%s\\nEXPO_PUBLIC_REPL_ID=%s\\n' \"$REPLIT_DEV_DOMAIN\" \"$REPL_ID\" > .env.local && pnpm exec expo start --tunnel --port $PORT",
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -39,6 +39,7 @@
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
+    "localtunnel": "^2.0.2",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-native": "0.81.5",
