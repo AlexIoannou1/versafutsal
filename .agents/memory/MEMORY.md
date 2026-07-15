@@ -1,4 +1,5 @@
 - [Feather icons Android Expo Go fix](feather-android-fix.md) — boxed-X glyphs on Android; root cause is Expo Go pre-registering 'feather' font, causing expo-font to skip loading the correct TTF.
+- [Expo Android tunnel fix — Replit](expo-android-tunnel.md) — ngrok blocked, loca.lt has bypass page; use SSH+serveo.net shim in @expo/ngrok; inline requires fixes "stuck on bundling".
 - [Stripe React Native — Expo web bundling](stripe-react-native-expo-web.md) — import via `.native.ts`/`.ts` shim pair, not directly; app.json plugin needs merchantIdentifier or startup fails.
 - [Drizzle migration generation is interactive](drizzle-migration-workflow.md) — column rename/retype needs hand-written SQL + journal entry, not `drizzle-kit generate`, in this project.
 - [Expo web API base URL routing](expo-api-base-url-routing.md) — on web, derive API base URL from window.location.hostname (strip .expo.); never rely on EXPO_PUBLIC_DOMAIN which goes stale.
