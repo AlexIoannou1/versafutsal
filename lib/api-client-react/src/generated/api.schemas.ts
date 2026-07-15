@@ -212,6 +212,7 @@ export interface VenueSummary {
   address: string;
   amenities: string[];
   coverPhoto?: string | null;
+  photos: VenuePhoto[];
   minPrice?: number | null;
   maxPrice?: number | null;
   pitchTypes: PitchType[];

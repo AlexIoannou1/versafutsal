@@ -207,8 +207,12 @@ router.get("/venues", async (req, res) => {
 
     const priceRangeMap = new Map(priceRangeRows.map((r) => [r.venueId, r]));
     const photoMap = new Map<string, string>();
+    const photosGroupMap = new Map<string, typeof photos>();
     for (const photo of photos.sort((a, b) => a.sortOrder - b.sortOrder)) {
       if (!photoMap.has(photo.venueId)) photoMap.set(photo.venueId, photo.url);
+      const list = photosGroupMap.get(photo.venueId) ?? [];
+      list.push(photo);
+      photosGroupMap.set(photo.venueId, list);
     }
     const pitchTypesMap = new Map<string, string[]>();
     for (const row of pitchRows) {
@@ -223,6 +227,7 @@ router.get("/venues", async (req, res) => {
       return {
         ...v,
         coverPhoto: photoMap.get(v.id) ?? null,
+        photos: photosGroupMap.get(v.id) ?? [],
         minPrice: priceRange?.minPrice ? parseFloat(priceRange.minPrice) : null,
         maxPrice: priceRange?.maxPrice ? parseFloat(priceRange.maxPrice) : null,
         pitchTypes: pitchTypesMap.get(v.id) ?? [],
@@ -238,11 +243,12 @@ router.get("/venues", async (req, res) => {
       venues = venues.filter((v) => v.minPrice !== null && v.minPrice <= max);
     }
 
-    // Sign cover photo URLs for object-storage photos
+    // Sign cover photo URLs and all photo URLs for object-storage photos
     const signedVenues = await Promise.all(
       venues.map(async (v) => ({
         ...v,
         coverPhoto: v.coverPhoto ? await signPhotoUrl(v.coverPhoto) : null,
+        photos: await signPhotoList(v.photos),
       })),
     );
 

@@ -9,6 +9,8 @@ import {
   TextInput,
   RefreshControl,
   Image,
+  ScrollView,
+  Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,6 +49,114 @@ const PITCH_TYPE_ICONS: Record<string, FeatherName> = {
   OUTDOOR: "sun",
   HYBRID: "layers",
 };
+
+// ─── Venue Card Carousel ──────────────────────────────────────────────────────
+
+interface VenueCardCarouselProps {
+  photos: Array<{ id: string; url: string }>;
+  onPress?: () => void;
+}
+
+function VenueCardCarousel({ photos, onPress }: VenueCardCarouselProps) {
+  const colors = useColors();
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [cardWidth, setCardWidth] = useState(Dimensions.get("window").width - 32);
+  // Track whether the user has started dragging so we don't fire onPress after a swipe
+  const isDragging = useRef(false);
+
+  const cs = StyleSheet.create({
+    wrapper: {
+      width: "100%",
+      height: 140,
+      backgroundColor: colors.muted,
+    },
+    scrollView: { width: "100%", height: 140 },
+    placeholder: {
+      width: "100%",
+      height: 140,
+      backgroundColor: colors.muted,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dotsRow: {
+      position: "absolute",
+      bottom: 8,
+      left: 0,
+      right: 0,
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 5,
+    },
+    dot: {
+      width: 5,
+      height: 5,
+      borderRadius: 3,
+    },
+  });
+
+  if (photos.length === 0) {
+    return (
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={cs.placeholder}>
+        <FeatherIcons name="image" size={32} color={colors.mutedForeground} />
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View
+      style={cs.wrapper}
+      onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
+    >
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScrollBeginDrag={() => { isDragging.current = true; }}
+        onMomentumScrollEnd={(e) => {
+          const idx = Math.round(
+            e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width,
+          );
+          setActiveIndex(Math.max(0, Math.min(idx, photos.length - 1)));
+          isDragging.current = false;
+        }}
+        style={cs.scrollView}
+      >
+        {photos.map((photo) => (
+          <TouchableOpacity
+            key={photo.id}
+            activeOpacity={1}
+            onPress={() => { if (!isDragging.current) onPress?.(); }}
+          >
+            <Image
+              source={{ uri: photo.url }}
+              style={{ width: cardWidth, height: 140 }}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      {photos.length > 1 && (
+        <View style={cs.dotsRow} pointerEvents="none">
+          {photos.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                cs.dot,
+                {
+                  backgroundColor:
+                    i === activeIndex
+                      ? "rgba(255,255,255,0.95)"
+                      : "rgba(255,255,255,0.45)",
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function PlayerVenuesScreen() {
   const colors = useColors();
@@ -255,14 +365,6 @@ export default function PlayerVenuesScreen() {
       borderWidth: 1,
       borderColor: colors.border,
       overflow: "hidden",
-    },
-    cardImage: { width: "100%", height: 140, backgroundColor: colors.muted },
-    imagePlaceholder: {
-      width: "100%",
-      height: 140,
-      backgroundColor: colors.muted,
-      alignItems: "center",
-      justifyContent: "center",
     },
     cardBody: { padding: 14 },
     cardHeader: {
@@ -531,100 +633,95 @@ export default function PlayerVenuesScreen() {
               tintColor={colors.primary}
             />
           }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={s.card}
-              onPress={() => router.push(`/player/venue/${item.id}`)}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel={`View ${item.name}`}
-            >
-              {item.coverPhoto ? (
-                <Image
-                  source={{ uri: item.coverPhoto }}
-                  style={s.cardImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={s.imagePlaceholder}>
-                  <FeatherIcons name="image" size={32} color={colors.mutedForeground} />
-                </View>
-              )}
-              <View style={s.cardBody}>
-                <View style={s.cardHeader}>
-                  <Text style={s.cardName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <TouchableOpacity
-                    style={s.heartBtn}
-                    onPress={() =>
-                      toggleFavourite.mutate({
-                        venueId: item.id,
-                        isFavourited: favouriteIds.has(item.id),
-                      })
-                    }
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel={favouriteIds.has(item.id) ? "Remove from favourites" : "Add to favourites"}
-                  >
-                    {favouriteIds.has(item.id) ? (
-                      <AntDesign name="heart" size={20} color={colors.destructive} />
-                    ) : (
-                      <FeatherIcons name="heart" size={20} color={colors.mutedForeground} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-                <View style={s.cardMeta}>
-                  <FeatherIcons name="map-pin" size={13} color={colors.mutedForeground} />
-                  <Text style={s.cardMetaText}>{item.district}</Text>
-                </View>
+          renderItem={({ item }) => {
+            const navigateToVenue = () => router.push(`/player/venue/${item.id}`);
+            return (
+              <View style={s.card}>
+                {/* Carousel lives outside TouchableOpacity so swipe reaches ScrollView directly */}
+                <VenueCardCarousel photos={item.photos ?? []} onPress={navigateToVenue} />
+                <TouchableOpacity
+                  onPress={navigateToVenue}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${item.name}`}
+                >
+                  <View style={s.cardBody}>
+                    <View style={s.cardHeader}>
+                      <Text style={s.cardName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <TouchableOpacity
+                        style={s.heartBtn}
+                        onPress={() =>
+                          toggleFavourite.mutate({
+                            venueId: item.id,
+                            isFavourited: favouriteIds.has(item.id),
+                          })
+                        }
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityLabel={favouriteIds.has(item.id) ? "Remove from favourites" : "Add to favourites"}
+                      >
+                        {favouriteIds.has(item.id) ? (
+                          <AntDesign name="heart" size={20} color={colors.destructive} />
+                        ) : (
+                          <FeatherIcons name="heart" size={20} color={colors.mutedForeground} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <View style={s.cardMeta}>
+                      <FeatherIcons name="map-pin" size={13} color={colors.mutedForeground} />
+                      <Text style={s.cardMetaText}>{item.district}</Text>
+                    </View>
 
-                {item.pitchTypes.length > 0 && (
-                  <View style={s.pitchTypeRow}>
-                    {item.pitchTypes.map((pt) => (
-                      <View key={pt} style={s.pitchTypeChip}>
-                        <FeatherIcons
-                          name={PITCH_TYPE_ICONS[pt] ?? "circle"}
-                          size={11}
-                          color={colors.primary}
-                        />
-                        <Text style={s.pitchTypeText}>
-                          {pitchTypeLabel[pt] ?? pt}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                {item.amenities.length > 0 && (
-                  <View style={s.amenitiesRow}>
-                    {item.amenities.slice(0, 3).map((a) => (
-                      <View key={a} style={s.amenityChip}>
-                        <Text style={s.amenityText}>{a}</Text>
-                      </View>
-                    ))}
-                    {item.amenities.length > 3 && (
-                      <View style={s.amenityChip}>
-                        <Text style={s.amenityText}>+{item.amenities.length - 3} more</Text>
+                    {item.pitchTypes.length > 0 && (
+                      <View style={s.pitchTypeRow}>
+                        {item.pitchTypes.map((pt) => (
+                          <View key={pt} style={s.pitchTypeChip}>
+                            <FeatherIcons
+                              name={PITCH_TYPE_ICONS[pt] ?? "circle"}
+                              size={11}
+                              color={colors.primary}
+                            />
+                            <Text style={s.pitchTypeText}>
+                              {pitchTypeLabel[pt] ?? pt}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
                     )}
-                  </View>
-                )}
 
-                <View style={s.cardBottom}>
-                  <Text style={s.priceText}>
-                    {item.minPrice != null
-                      ? item.minPrice === item.maxPrice
-                        ? `€${item.minPrice}/hr`
-                        : `€${item.minPrice}–€${item.maxPrice}/hr`
-                      : "Price on request"}
-                  </Text>
-                  <View style={s.viewBtn}>
-                    <Text style={s.viewBtnText}>View →</Text>
+                    {item.amenities.length > 0 && (
+                      <View style={s.amenitiesRow}>
+                        {item.amenities.slice(0, 3).map((a) => (
+                          <View key={a} style={s.amenityChip}>
+                            <Text style={s.amenityText}>{a}</Text>
+                          </View>
+                        ))}
+                        {item.amenities.length > 3 && (
+                          <View style={s.amenityChip}>
+                            <Text style={s.amenityText}>+{item.amenities.length - 3} more</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+
+                    <View style={s.cardBottom}>
+                      <Text style={s.priceText}>
+                        {item.minPrice != null
+                          ? item.minPrice === item.maxPrice
+                            ? `€${item.minPrice}/hr`
+                            : `€${item.minPrice}–€${item.maxPrice}/hr`
+                          : "Price on request"}
+                      </Text>
+                      <View style={s.viewBtn}>
+                        <Text style={s.viewBtnText}>View →</Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          )}
+            );
+          }}
         />
       )}
     </View>
