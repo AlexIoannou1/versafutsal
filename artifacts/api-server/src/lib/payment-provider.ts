@@ -2,6 +2,9 @@ import { db } from "@workspace/db";
 import {
   paymentsTable,
   adminSettingsTable,
+  usersTable,
+  venuesTable,
+  pitchesTable,
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -15,6 +18,8 @@ export interface PaymentIntentResult {
   feePercent: string;
   feeWaived: boolean;
   currency: string;
+  /** Present only for Stripe mode — client must present payment sheet with this secret. */
+  clientSecret?: string;
 }
 
 export interface PaymentProvider {
@@ -71,6 +76,17 @@ function computeDepositAmount(subtotal: string): string {
   // Deposit = 30% of subtotal, minimum €1
   const amount = Math.max(1, parseFloat(subtotal) * 0.3);
   return amount.toFixed(2);
+}
+
+/** Fetch the owner's Stripe Connect account ID for a given venue. Returns null if not found. */
+async function getOwnerStripeAccountId(venueId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ stripeConnectAccountId: usersTable.stripeConnectAccountId })
+    .from(venuesTable)
+    .innerJoin(usersTable, eq(venuesTable.ownerId, usersTable.id))
+    .where(eq(venuesTable.id, venueId))
+    .limit(1);
+  return row?.stripeConnectAccountId ?? null;
 }
 
 // ─── MockPaymentProvider ──────────────────────────────────────────────────────
@@ -146,4 +162,168 @@ export class MockPaymentProvider implements PaymentProvider {
   }
 }
 
-export const paymentProvider: PaymentProvider = new MockPaymentProvider();
+// ─── StripePaymentProvider ────────────────────────────────────────────────────
+// Real Stripe integration. Requires STRIPE_TEST_SK env var.
+
+export class StripePaymentProvider implements PaymentProvider {
+  private stripe: ReturnType<typeof this.buildStripe>;
+
+  constructor(secretKey: string) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Stripe = require("stripe");
+    this.stripe = new Stripe(secretKey, { apiVersion: "2024-11-20.acacia" });
+  }
+
+  private buildStripe(_key: string) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Stripe = require("stripe");
+    return new Stripe(_key, { apiVersion: "2024-11-20.acacia" });
+  }
+
+  async createPaymentIntent(opts: {
+    bookingId: string;
+    venueId: string;
+    subtotalAmount: string;
+    paymentType: "FULL" | "DEPOSIT";
+    idempotencyKey: string;
+    depositAmountOverride?: string;
+  }): Promise<PaymentIntentResult> {
+    const { bookingId, venueId, subtotalAmount, paymentType, idempotencyKey, depositAmountOverride } = opts;
+
+    const { feePercent, feeWaived } = await getEffectiveFeePercent(venueId);
+
+    const baseAmount =
+      paymentType === "DEPOSIT"
+        ? (depositAmountOverride ?? computeDepositAmount(subtotalAmount))
+        : subtotalAmount;
+
+    const appliedFeePercent = feeWaived ? "0.00" : feePercent;
+    const feeAmount = feeWaived ? "0.00" : computeFeeAmount(baseAmount, feePercent);
+
+    const totalAmount = feeWaived
+      ? baseAmount
+      : (parseFloat(baseAmount) + parseFloat(feeAmount)).toFixed(2);
+
+    // Stripe amounts are in smallest currency unit (cents for EUR)
+    const amountCents = Math.round(parseFloat(totalAmount) * 100);
+    const feeCents = Math.round(parseFloat(feeAmount) * 100);
+
+    // Look up the venue owner's Stripe Connect account for destination transfer
+    const ownerStripeAccountId = await getOwnerStripeAccountId(venueId);
+
+    // Build PaymentIntent params
+    const piParams: Record<string, unknown> = {
+      amount: amountCents,
+      currency: "eur",
+      metadata: {
+        bookingId,
+        venueId,
+        paymentType,
+        feePercent: appliedFeePercent,
+      },
+      // Required for mobile payment sheet
+      automatic_payment_methods: { enabled: true },
+    };
+
+    // Apply platform fee + transfer to owner only if they have a connected account
+    if (ownerStripeAccountId && !feeWaived) {
+      piParams.application_fee_amount = feeCents;
+      piParams.transfer_data = { destination: ownerStripeAccountId };
+    } else if (ownerStripeAccountId && feeWaived) {
+      // Fee waived — still transfer full amount to owner
+      piParams.transfer_data = { destination: ownerStripeAccountId };
+    }
+
+    let pi: Awaited<ReturnType<typeof this.stripe.paymentIntents.create>>;
+    try {
+      pi = await this.stripe.paymentIntents.create(piParams, {
+        idempotencyKey,
+      });
+    } catch (err: unknown) {
+      const stripeErr = err as { type?: string; message?: string; statusCode?: number };
+      if (stripeErr.statusCode === 401 || stripeErr.type === "StripeAuthenticationError") {
+        throw Object.assign(
+          new Error("Stripe API key is invalid. Please check STRIPE_TEST_SK in your environment secrets."),
+          { isStripeAuthError: true },
+        );
+      }
+      throw err;
+    }
+
+    await db.insert(paymentsTable).values({
+      bookingId,
+      provider: "STRIPE",
+      providerPaymentId: pi.id,
+      amount: totalAmount,
+      currency: "EUR",
+      feeAmount,
+      feePercent: appliedFeePercent,
+      feeWaived,
+      status: "PENDING",
+      paymentType,
+      idempotencyKey,
+      metadata: { stripePaymentIntentId: pi.id },
+    });
+
+    return {
+      providerPaymentId: pi.id,
+      amount: totalAmount,
+      feeAmount,
+      feePercent: appliedFeePercent,
+      feeWaived,
+      currency: "EUR",
+      clientSecret: pi.client_secret ?? undefined,
+    };
+  }
+
+  async confirmPayment(providerPaymentId: string): Promise<{ success: boolean; errorMessage?: string }> {
+    try {
+      const pi = await this.stripe.paymentIntents.retrieve(providerPaymentId);
+
+      if (pi.status === "succeeded") {
+        return { success: true };
+      }
+
+      if (pi.status === "requires_payment_method" || pi.status === "canceled") {
+        return { success: false, errorMessage: `Payment not completed (status: ${pi.status})` };
+      }
+
+      // Other statuses: requires_action, processing, requires_capture — not yet succeeded
+      return { success: false, errorMessage: `Payment pending (status: ${pi.status})` };
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message ?? "Stripe error";
+      return { success: false, errorMessage: message };
+    }
+  }
+
+  async refundPayment(opts: {
+    providerPaymentId: string;
+    amount: string;
+    reason?: string;
+  }): Promise<{ success: boolean; refundId: string }> {
+    const amountCents = Math.round(parseFloat(opts.amount) * 100);
+
+    const refund = await this.stripe.refunds.create({
+      payment_intent: opts.providerPaymentId,
+      amount: amountCents,
+      reason: (opts.reason as "duplicate" | "fraudulent" | "requested_by_customer") ?? "requested_by_customer",
+    });
+
+    return { success: refund.status === "succeeded" || refund.status === "pending", refundId: refund.id };
+  }
+}
+
+// ─── Provider Factory ─────────────────────────────────────────────────────────
+// Instantiate StripePaymentProvider when STRIPE_TEST_SK is present, else MockPaymentProvider.
+
+function createPaymentProvider(): PaymentProvider {
+  const stripeKey = process.env.STRIPE_TEST_SK;
+  if (stripeKey) {
+    console.info("[payment-provider] Using StripePaymentProvider (STRIPE_TEST_SK is set)");
+    return new StripePaymentProvider(stripeKey);
+  }
+  console.info("[payment-provider] Using MockPaymentProvider (STRIPE_TEST_SK not set)");
+  return new MockPaymentProvider();
+}
+
+export const paymentProvider: PaymentProvider = createPaymentProvider();

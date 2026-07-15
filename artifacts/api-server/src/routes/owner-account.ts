@@ -7,7 +7,7 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 const router: IRouter = Router();
 
 function getStripe() {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = process.env.STRIPE_TEST_SK;
   if (!key) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Stripe = require("stripe");

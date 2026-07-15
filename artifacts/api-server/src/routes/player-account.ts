@@ -9,7 +9,7 @@ const router: IRouter = Router();
 // ─── Stripe helpers ───────────────────────────────────────────────────────────
 
 function getStripe() {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = process.env.STRIPE_TEST_SK;
   if (!key) return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Stripe = require("stripe");
@@ -49,7 +49,7 @@ async function getOrCreateStripeCustomer(
 // Returns the Stripe publishable key so the client can initialise StripeProvider.
 
 router.get("/player/payment-methods/config", requireAuth, requireRole("PLAYER"), (_req, res) => {
-  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY ?? null;
+  const publishableKey = process.env.STRIPE_TEST_PK ?? null;
   res.json({ publishableKey, demoMode: !publishableKey });
 });
 

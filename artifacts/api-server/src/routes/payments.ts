@@ -29,8 +29,26 @@ async function getOrSeedAdminSettings() {
   return seeded!;
 }
 
+/** Format a payment record for API responses. */
+function formatPayment(payment: typeof paymentsTable.$inferSelect) {
+  return {
+    id: payment.id,
+    amount: payment.amount,
+    feeAmount: payment.feeAmount,
+    feePercent: payment.feePercent,
+    feeWaived: payment.feeWaived,
+    paymentType: payment.paymentType,
+    currency: payment.currency,
+    status: payment.status,
+    provider: payment.provider,
+    createdAt: payment.createdAt.toISOString(),
+    updatedAt: payment.updatedAt.toISOString(),
+  };
+}
+
 // ─── POST /bookings/:bookingId/checkout ──────────────────────────────────────
-// Creates a MockPaymentIntent, confirms it, moves booking → CONFIRMED.
+// Creates a PaymentIntent, and for mock mode immediately confirms booking.
+// For Stripe mode, returns clientSecret so the mobile app can present payment sheet.
 
 router.post<{ bookingId: string }>(
   "/bookings/:bookingId/checkout",
@@ -65,11 +83,7 @@ router.post<{ bookingId: string }>(
         .limit(1);
 
       if (existingPayment) {
-        // An existing payment record for this booking + key exists.
-        // Return a deterministic response regardless of status to avoid
-        // hitting the DB unique constraint on a second insert attempt.
         if (existingPayment.status === "SUCCEEDED") {
-          // Fetch booking with player ownership check to prevent cross-user data exposure
           const [alreadyBooking] = await db
             .select()
             .from(bookingsTable)
@@ -91,22 +105,21 @@ router.post<{ bookingId: string }>(
                   endAt: alreadyBooking.endAt.toISOString(),
                 }
               : { id: bookingId, status: "CONFIRMED" },
-            payment: {
-              id: existingPayment.id,
-              amount: existingPayment.amount,
-              feeAmount: existingPayment.feeAmount,
-              feePercent: existingPayment.feePercent,
-              feeWaived: existingPayment.feeWaived,
-              paymentType: existingPayment.paymentType,
-              currency: existingPayment.currency,
-              status: existingPayment.status,
-              provider: existingPayment.provider,
-              createdAt: existingPayment.createdAt.toISOString(),
-              updatedAt: existingPayment.updatedAt.toISOString(),
-            },
+            payment: formatPayment(existingPayment),
+          });
+        } else if (existingPayment.status === "PENDING" && existingPayment.provider === "STRIPE") {
+          // Stripe payment is PENDING — client may need to re-present the payment sheet.
+          // Return the existing providerPaymentId so client can retrieve the client_secret if needed.
+          const publishableKey = process.env.STRIPE_TEST_PK ?? null;
+          res.status(202).json({
+            requiresClientAction: true,
+            providerPaymentId: existingPayment.providerPaymentId,
+            publishableKey,
+            booking: { id: bookingId, status: "PENDING" },
+            payment: formatPayment(existingPayment),
           });
         } else {
-          // FAILED or PENDING with this key — client must supply a fresh idempotency key to retry.
+          // FAILED or other PENDING state — client must supply a fresh idempotency key to retry.
           res.status(409).json({
             error: `A payment with this idempotency key already exists with status: ${existingPayment.status}. Use a new idempotency key to retry.`,
           });
@@ -160,7 +173,7 @@ router.post<{ bookingId: string }>(
         return;
       }
 
-      // Calculate subtotal from pricing rules (or policy snapshot)
+      // Calculate subtotal from pricing rules
       const pricingRules = await db
         .select()
         .from(pricingRulesTable)
@@ -174,7 +187,7 @@ router.post<{ bookingId: string }>(
           : 0;
       const subtotal = subtotalNum.toFixed(2);
 
-      // Compute deposit amount from venue pricing rule config (not a hardcoded %)
+      // Compute deposit amount from venue pricing rule config
       let depositAmountOverride: string | undefined;
       if (paymentType === "DEPOSIT") {
         if (!rule || rule.depositType === "NONE") {
@@ -193,9 +206,7 @@ router.post<{ bookingId: string }>(
         }
       }
 
-      // Create payment intent via MockPaymentProvider (race-safe)
-      // If a concurrent request inserted the same idempotency key, the unique constraint
-      // will fire. Catch it, re-read the winning payment, and return a deterministic response.
+      // Create payment intent (race-safe)
       let intent: Awaited<ReturnType<typeof paymentProvider.createPaymentIntent>>;
       try {
         intent = await paymentProvider.createPaymentIntent({
@@ -242,19 +253,7 @@ router.post<{ bookingId: string }>(
                     endAt: raceBooking.endAt.toISOString(),
                   }
                 : { id: bookingId, status: "CONFIRMED" },
-              payment: {
-                id: racePayment.id,
-                amount: racePayment.amount,
-                feeAmount: racePayment.feeAmount,
-                feePercent: racePayment.feePercent,
-                feeWaived: racePayment.feeWaived,
-                paymentType: racePayment.paymentType,
-                currency: racePayment.currency,
-                status: racePayment.status,
-                provider: racePayment.provider,
-                createdAt: racePayment.createdAt.toISOString(),
-                updatedAt: racePayment.updatedAt.toISOString(),
-              },
+              payment: racePayment ? formatPayment(racePayment) : null,
             });
           } else {
             res.status(409).json({
@@ -268,11 +267,33 @@ router.post<{ bookingId: string }>(
         throw insertErr;
       }
 
-      // Check if payment provider would accept this charge (mock: checks MOCK_PAYMENT_FAIL env)
+      // ── Stripe mode: return clientSecret for client-side payment sheet ──
+      if (intent.clientSecret) {
+        const publishableKey = process.env.STRIPE_TEST_PK ?? null;
+        res.status(202).json({
+          requiresClientAction: true,
+          clientSecret: intent.clientSecret,
+          publishableKey,
+          booking: { id: bookingId, status: "PENDING" },
+          payment: {
+            id: null,
+            amount: intent.amount,
+            feeAmount: intent.feeAmount,
+            feePercent: intent.feePercent,
+            feeWaived: intent.feeWaived,
+            paymentType,
+            currency: intent.currency,
+            status: "PENDING",
+            provider: "STRIPE",
+          },
+        });
+        return;
+      }
+
+      // ── Mock mode: immediately confirm ──
       const confirmation = await paymentProvider.confirmPayment(intent.providerPaymentId);
 
       if (!confirmation.success) {
-        // Mark payment FAILED + write audit log atomically
         await db.transaction(async (tx) => {
           await tx
             .update(paymentsTable)
@@ -291,7 +312,6 @@ router.post<{ bookingId: string }>(
             metadata: { error: confirmation.errorMessage ?? "Unknown error" },
           });
 
-          // Also write PAYMENT_STATUS_CHANGED on the booking entity so it shows in booking trail
           await logBookingAudit(tx, {
             bookingId,
             actorUserId: req.user!.userId,
@@ -308,121 +328,15 @@ router.post<{ bookingId: string }>(
         return;
       }
 
-      // Atomically: mark payment SUCCEEDED + conditionally confirm booking (PENDING → CONFIRMED)
-      // The conditional WHERE on booking prevents double-charge when concurrent checkouts race.
-      let alreadyConfirmedConcurrently = false;
-      await db.transaction(async (tx) => {
-        // Confirm booking only if still PENDING — returns 0 rows if concurrent request won
-        const updatedBookings = await tx
-          .update(bookingsTable)
-          .set({ status: "CONFIRMED", updatedAt: new Date() })
-          .where(
-            and(
-              eq(bookingsTable.id, bookingId),
-              eq(bookingsTable.status, "PENDING"),
-            ),
-          )
-          .returning({ id: bookingsTable.id });
-
-        if (updatedBookings.length === 0) {
-          // A concurrent checkout already confirmed this booking. Our payment intent was
-          // created but the booking is confirmed — mark payment SUCCEEDED anyway for
-          // consistency and signal to the caller to return alreadyProcessed.
-          alreadyConfirmedConcurrently = true;
-        }
-
-        // Mark payment as SUCCEEDED (consistent with confirmation) inside the same transaction
-        await tx
-          .update(paymentsTable)
-          .set({ status: "SUCCEEDED", updatedAt: new Date() })
-          .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId));
-
-        await tx.insert(auditLogTable).values({
-          actorUserId: req.user!.userId,
-          actorRole: "PLAYER",
-          entityType: "PAYMENT",
-          entityId: bookingId,
-          action: "PAYMENT_CREATED",
-          previousValue: { status: "PENDING" },
-          newValue: { status: "SUCCEEDED" },
-          notes: null,
-          metadata: {
-            providerPaymentId: intent.providerPaymentId,
-            amount: intent.amount,
-            feeAmount: intent.feeAmount,
-            feePercent: intent.feePercent,
-            feeWaived: intent.feeWaived,
-          },
-        });
-
-        // PAYMENT_STATUS_CHANGED + BOOKING_CONFIRMED on the booking entity
-        await logBookingAudit(tx, {
-          bookingId,
-          actorUserId: req.user!.userId,
-          actorRole: "PLAYER",
-          action: "PAYMENT_STATUS_CHANGED",
-          previousValue: { paymentStatus: "PENDING" },
-          newValue: { paymentStatus: "SUCCEEDED" },
-          notes: null,
-          metadata: { via: "checkout", amount: intent.amount },
-        });
-
-        if (!alreadyConfirmedConcurrently) {
-          await logBookingAudit(tx, {
-            bookingId,
-            actorUserId: req.user!.userId,
-            actorRole: "PLAYER",
-            action: "BOOKING_STATUS_CHANGED",
-            previousValue: { status: "PENDING" },
-            newValue: { status: "CONFIRMED" },
-            notes: null,
-            metadata: { via: "checkout" },
-          });
-        }
-        await logBookingAudit(tx, {
-          bookingId,
-          actorUserId: req.user!.userId,
-          actorRole: "PLAYER",
-          action: alreadyConfirmedConcurrently ? "BOOKING_ALREADY_CONFIRMED" : "BOOKING_CONFIRMED",
-          previousValue: alreadyConfirmedConcurrently ? null : { status: "PENDING" },
-          newValue: alreadyConfirmedConcurrently ? null : { status: "CONFIRMED" },
-          notes: alreadyConfirmedConcurrently ? "Concurrent checkout — booking already confirmed" : null,
-          metadata: { via: "checkout", concurrent: alreadyConfirmedConcurrently },
-        });
+      await confirmBookingAfterPayment({
+        bookingId,
+        actorUserId: req.user!.userId,
+        providerPaymentId: intent.providerPaymentId,
+        intent,
+        pitchRow,
+        booking,
       });
 
-      // Send notifications — skip if concurrent checkout already confirmed + notified
-      if (!alreadyConfirmedConcurrently) {
-        try {
-          const [player] = await db
-            .select({ id: usersTable.id, name: usersTable.name })
-            .from(usersTable)
-            .where(eq(usersTable.id, req.user!.userId))
-            .limit(1);
-
-          await sendBookingConfirmedNotifications({
-            bookingId,
-            playerId: req.user!.userId,
-            playerName: player?.name ?? "Player",
-            ownerId: pitchRow.venueOwnerId,
-            venueName: pitchRow.venueName,
-            pitchName: pitchRow.name,
-            startAt: booking.startAt,
-          });
-          logBookingAuditFireAndForget(db, {
-            bookingId,
-            actorUserId: req.user!.userId,
-            actorRole: "PLAYER",
-            action: "NOTIFICATION_SENT",
-            notes: "Booking confirmed notifications dispatched to player and owner",
-            metadata: { types: ["BOOKING_CONFIRMED", "NEW_BOOKING_OWNER"] },
-          });
-        } catch (notifErr) {
-          console.warn("Notification dispatch failed (non-fatal):", notifErr);
-        }
-      }
-
-      // Fetch updated payment record
       const [payment] = await db
         .select()
         .from(paymentsTable)
@@ -431,18 +345,7 @@ router.post<{ bookingId: string }>(
 
       res.json({
         booking: { id: bookingId, status: "CONFIRMED" },
-        payment: {
-          id: payment!.id,
-          amount: payment!.amount,
-          feeAmount: payment!.feeAmount,
-          feePercent: payment!.feePercent,
-          feeWaived: payment!.feeWaived,
-          paymentType: payment!.paymentType,
-          currency: payment!.currency,
-          status: payment!.status,
-          provider: payment!.provider,
-          createdAt: payment!.createdAt.toISOString(),
-        },
+        payment: payment ? formatPayment(payment) : null,
       });
     } catch (err) {
       console.error("POST /bookings/:bookingId/checkout error:", err);
@@ -450,6 +353,280 @@ router.post<{ bookingId: string }>(
     }
   },
 );
+
+// ─── POST /bookings/:bookingId/capture ───────────────────────────────────────
+// Called by the mobile app after the Stripe payment sheet succeeds.
+// Verifies PaymentIntent status on Stripe's side, then confirms the booking.
+
+router.post<{ bookingId: string }>(
+  "/bookings/:bookingId/capture",
+  requireAuth,
+  requireRole("PLAYER"),
+  async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+
+      // Verify booking belongs to this player
+      const [booking] = await db
+        .select()
+        .from(bookingsTable)
+        .where(
+          and(
+            eq(bookingsTable.id, bookingId),
+            eq(bookingsTable.playerId, req.user!.userId),
+          ),
+        )
+        .limit(1);
+
+      if (!booking) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      if (booking.status === "CONFIRMED") {
+        // Already confirmed (idempotent)
+        res.json({ booking: { id: bookingId, status: "CONFIRMED" } });
+        return;
+      }
+
+      if (booking.status !== "PENDING") {
+        res.status(400).json({ error: `Booking cannot be captured in status: ${booking.status}` });
+        return;
+      }
+
+      // Find the PENDING payment record for this booking
+      const [payment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(
+          and(
+            eq(paymentsTable.bookingId, bookingId),
+            eq(paymentsTable.status, "PENDING"),
+          ),
+        )
+        .limit(1);
+
+      if (!payment) {
+        res.status(404).json({ error: "No pending payment found for this booking" });
+        return;
+      }
+
+      // Verify the payment with the provider
+      const confirmation = await paymentProvider.confirmPayment(payment.providerPaymentId!);
+
+      if (!confirmation.success) {
+        // Mark payment failed
+        await db.transaction(async (tx) => {
+          await tx
+            .update(paymentsTable)
+            .set({ status: "FAILED", updatedAt: new Date() })
+            .where(eq(paymentsTable.id, payment.id));
+
+          await logBookingAudit(tx, {
+            bookingId,
+            actorUserId: req.user!.userId,
+            actorRole: "PLAYER",
+            action: "PAYMENT_STATUS_CHANGED",
+            previousValue: { paymentStatus: "PENDING" },
+            newValue: { paymentStatus: "FAILED" },
+            notes: confirmation.errorMessage ?? "Payment verification failed",
+            metadata: { via: "capture" },
+          });
+        });
+
+        res.status(402).json({ error: confirmation.errorMessage ?? "Payment verification failed" });
+        return;
+      }
+
+      // Look up pitch info for notifications
+      const [pitchRow] = await db
+        .select({
+          id: pitchesTable.id,
+          name: pitchesTable.name,
+          slotDurationMinutes: pitchesTable.slotDurationMinutes,
+          venueId: pitchesTable.venueId,
+          venueName: venuesTable.name,
+          venueOwnerId: venuesTable.ownerId,
+        })
+        .from(pitchesTable)
+        .innerJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+        .where(eq(pitchesTable.id, booking.pitchId))
+        .limit(1);
+
+      const intentForCapture = {
+        providerPaymentId: payment.providerPaymentId!,
+        amount: payment.amount,
+        feeAmount: payment.feeAmount,
+        feePercent: payment.feePercent,
+        feeWaived: payment.feeWaived,
+        currency: payment.currency,
+      };
+
+      await confirmBookingAfterPayment({
+        bookingId,
+        actorUserId: req.user!.userId,
+        providerPaymentId: payment.providerPaymentId!,
+        intent: intentForCapture,
+        pitchRow: pitchRow ?? null,
+        booking,
+      });
+
+      const [updatedPayment] = await db
+        .select()
+        .from(paymentsTable)
+        .where(eq(paymentsTable.id, payment.id))
+        .limit(1);
+
+      res.json({
+        booking: { id: bookingId, status: "CONFIRMED" },
+        payment: updatedPayment ? formatPayment(updatedPayment) : null,
+      });
+    } catch (err) {
+      console.error("POST /bookings/:bookingId/capture error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ─── Shared helper: atomically confirm booking after payment success ───────────
+
+async function confirmBookingAfterPayment(opts: {
+  bookingId: string;
+  actorUserId: string;
+  providerPaymentId: string;
+  intent: {
+    providerPaymentId: string;
+    amount: string;
+    feeAmount: string;
+    feePercent: string;
+    feeWaived: boolean;
+    currency: string;
+  };
+  pitchRow: {
+    id: string;
+    name: string;
+    slotDurationMinutes: number;
+    venueId: string;
+    venueName: string;
+    venueOwnerId: string;
+  } | null;
+  booking: {
+    id: string;
+    pitchId: string;
+    startAt: Date;
+    endAt: Date;
+    playerId: string;
+  };
+}) {
+  const { bookingId, actorUserId, providerPaymentId, intent, pitchRow, booking } = opts;
+
+  let alreadyConfirmedConcurrently = false;
+
+  await db.transaction(async (tx) => {
+    const updatedBookings = await tx
+      .update(bookingsTable)
+      .set({ status: "CONFIRMED", updatedAt: new Date() })
+      .where(
+        and(
+          eq(bookingsTable.id, bookingId),
+          eq(bookingsTable.status, "PENDING"),
+        ),
+      )
+      .returning({ id: bookingsTable.id });
+
+    if (updatedBookings.length === 0) {
+      alreadyConfirmedConcurrently = true;
+    }
+
+    await tx
+      .update(paymentsTable)
+      .set({ status: "SUCCEEDED", updatedAt: new Date() })
+      .where(eq(paymentsTable.providerPaymentId, providerPaymentId));
+
+    await tx.insert(auditLogTable).values({
+      actorUserId,
+      actorRole: "PLAYER",
+      entityType: "PAYMENT",
+      entityId: bookingId,
+      action: "PAYMENT_CREATED",
+      previousValue: { status: "PENDING" },
+      newValue: { status: "SUCCEEDED" },
+      notes: null,
+      metadata: {
+        providerPaymentId: intent.providerPaymentId,
+        amount: intent.amount,
+        feeAmount: intent.feeAmount,
+        feePercent: intent.feePercent,
+        feeWaived: intent.feeWaived,
+      },
+    });
+
+    await logBookingAudit(tx, {
+      bookingId,
+      actorUserId,
+      actorRole: "PLAYER",
+      action: "PAYMENT_STATUS_CHANGED",
+      previousValue: { paymentStatus: "PENDING" },
+      newValue: { paymentStatus: "SUCCEEDED" },
+      notes: null,
+      metadata: { via: "capture", amount: intent.amount },
+    });
+
+    if (!alreadyConfirmedConcurrently) {
+      await logBookingAudit(tx, {
+        bookingId,
+        actorUserId,
+        actorRole: "PLAYER",
+        action: "BOOKING_STATUS_CHANGED",
+        previousValue: { status: "PENDING" },
+        newValue: { status: "CONFIRMED" },
+        notes: null,
+        metadata: { via: "capture" },
+      });
+    }
+
+    await logBookingAudit(tx, {
+      bookingId,
+      actorUserId,
+      actorRole: "PLAYER",
+      action: alreadyConfirmedConcurrently ? "BOOKING_ALREADY_CONFIRMED" : "BOOKING_CONFIRMED",
+      previousValue: alreadyConfirmedConcurrently ? null : { status: "PENDING" },
+      newValue: alreadyConfirmedConcurrently ? null : { status: "CONFIRMED" },
+      notes: alreadyConfirmedConcurrently ? "Concurrent checkout — booking already confirmed" : null,
+      metadata: { via: "capture", concurrent: alreadyConfirmedConcurrently },
+    });
+  });
+
+  if (!alreadyConfirmedConcurrently && pitchRow) {
+    try {
+      const [player] = await db
+        .select({ id: usersTable.id, name: usersTable.name })
+        .from(usersTable)
+        .where(eq(usersTable.id, actorUserId))
+        .limit(1);
+
+      await sendBookingConfirmedNotifications({
+        bookingId,
+        playerId: actorUserId,
+        playerName: player?.name ?? "Player",
+        ownerId: pitchRow.venueOwnerId,
+        venueName: pitchRow.venueName,
+        pitchName: pitchRow.name,
+        startAt: booking.startAt,
+      });
+      logBookingAuditFireAndForget(db, {
+        bookingId,
+        actorUserId,
+        actorRole: "PLAYER",
+        action: "NOTIFICATION_SENT",
+        notes: "Booking confirmed notifications dispatched to player and owner",
+        metadata: { types: ["BOOKING_CONFIRMED", "NEW_BOOKING_OWNER"] },
+      });
+    } catch (notifErr) {
+      console.warn("Notification dispatch failed (non-fatal):", notifErr);
+    }
+  }
+}
 
 // ─── GET /player/bookings/:id/payment ────────────────────────────────────────
 // Fetch the payment record for a booking
@@ -486,20 +663,7 @@ router.get<{ bookingId: string }>(
         return;
       }
 
-      res.json({
-        payment: {
-          id: payment.id,
-          amount: payment.amount,
-          feeAmount: payment.feeAmount,
-          feePercent: payment.feePercent,
-          feeWaived: payment.feeWaived,
-          paymentType: payment.paymentType,
-          currency: payment.currency,
-          status: payment.status,
-          provider: payment.provider,
-          createdAt: payment.createdAt.toISOString(),
-        },
-      });
+      res.json({ payment: formatPayment(payment) });
     } catch (err) {
       console.error("GET /bookings/:bookingId/payment error:", err);
       res.status(500).json({ error: "Internal server error" });
@@ -608,7 +772,7 @@ router.patch<{ venueId: string }>(
   },
 );
 
-// ─── GET /admin/notifications ─────────────────────────────────────────────────
+// ─── GET /checkout/fee ────────────────────────────────────────────────────────
 // Preview: get current fee to display on checkout
 
 router.get("/checkout/fee", requireAuth, async (req, res) => {

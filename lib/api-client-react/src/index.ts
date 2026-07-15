@@ -78,6 +78,13 @@ export type {
   ListBlocksResponse,
 } from "./blocks-api";
 export {
+  captureBookingPayment,
+} from "./booking-capture-api";
+export type {
+  CheckoutResponse,
+  CaptureResponse,
+} from "./booking-capture-api";
+export {
   useOwnerNotifications,
   useMarkNotificationsRead,
 } from "./owner-notifications-api";

@@ -4,14 +4,17 @@ export function StripeProvider({ children }: { children: React.ReactNode; publis
   return children as React.ReactElement;
 }
 
+type UnsupportedError = { error: { code: string; message: string } };
+
+const webUnsupported = async (..._args: unknown[]): Promise<UnsupportedError> => ({
+  error: { code: "WebUnsupported", message: "Stripe native SDK is not available on web." },
+});
+
 export function useStripe() {
-  const unsupported = async () => ({
-    error: { code: "WebUnsupported" as const, message: "Stripe native SDK is not available on web." },
-  });
   return {
-    initPaymentSheet: unsupported,
-    presentPaymentSheet: unsupported,
-    confirmSetupIntent: unsupported,
-    createToken: unsupported,
+    initPaymentSheet: webUnsupported,
+    presentPaymentSheet: webUnsupported,
+    confirmSetupIntent: webUnsupported,
+    createToken: webUnsupported,
   };
 }

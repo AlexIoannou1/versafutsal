@@ -91,6 +91,37 @@ Drizzle wraps PG errors — check `err.cause?.code === "23505"` for unique const
 - Card dark: `#1C2B39`
 - Border radius: `12`
 
+## Stripe Integration (Test Mode)
+
+### Environment Variables Required
+| Variable | Description |
+|----------|-------------|
+| `STRIPE_TEST_SK` | Stripe secret key (test mode, starts with `sk_test_`) |
+| `STRIPE_TEST_PK` | Stripe publishable key (test mode, starts with `pk_test_`) |
+
+When neither key is set, the app falls back to `MockPaymentProvider` (instant confirm, no real card needed).
+
+### Test Cards
+| Card Number | Expected Result |
+|-------------|----------------|
+| `4242 4242 4242 4242` | Payment succeeds → booking CONFIRMED |
+| `4000 0000 0000 0002` | Card declined → booking stays PENDING |
+| `4000 0025 0000 3155` | Requires 3D Secure authentication |
+
+Use any future expiry (e.g. 12/34), any 3-digit CVC, any postal code.
+
+### Stripe Dashboard Verification
+After a successful test booking with `4242…`:
+- PaymentIntent with status `succeeded` appears in the [Stripe test dashboard → Payments](https://dashboard.stripe.com/test/payments)
+- If the owner has a connected Stripe Express account: a Transfer to the Connect account appears with the net amount (total minus platform fee)
+- Platform fee appears as `application_fee_amount` on the PaymentIntent
+
+### Owner Stripe Connect Flow
+1. Owner opens **Settings → Payments** in the app
+2. Taps **Connect Stripe Account** — this creates a Stripe Express account and opens the onboarding link
+3. After completing onboarding, `charges_enabled` and `payouts_enabled` turn green
+4. Future bookings for that owner's venues will route funds to their Stripe account automatically
+
 ## Key Commands
 
 - `pnpm run typecheck` — full typecheck across all packages

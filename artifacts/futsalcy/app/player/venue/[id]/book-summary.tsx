@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -19,7 +19,10 @@ import {
   useCheckoutBooking,
   useGetCheckoutFee,
   getGetPitchAvailabilityQueryKey,
+  captureBookingPayment,
+  getStripeConfig,
 } from "@workspace/api-client-react";
+import { StripeProvider, useStripe } from "@/lib/stripe-native";
 
 const MONTHS_FULL = [
   "January","February","March","April","May","June",
@@ -47,7 +50,7 @@ function makeIdempotencyKey() {
 
 type PaymentType = "FULL" | "DEPOSIT";
 
-export default function BookSummaryScreen() {
+function BookSummaryInner() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -61,6 +64,7 @@ export default function BookSummaryScreen() {
   }>();
 
   const queryClient = useQueryClient();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [paymentType, setPaymentType] = useState<PaymentType>("FULL");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -119,6 +123,61 @@ export default function BookSummaryScreen() {
   const { mutate: createBooking } = useCreateBooking();
   const { mutate: checkoutBooking } = useCheckoutBooking();
 
+  // ── Stripe payment sheet flow ───────────────────────────────────────────────
+
+  /**
+   * After checkout returns a clientSecret, initialize the Stripe payment sheet
+   * and present it. On success, call /capture to confirm the booking server-side.
+   */
+  async function handleStripePayment(
+    bookingId: string,
+    clientSecret: string,
+    publishableKey: string,
+  ) {
+    // initPaymentSheet with the server-provided client secret
+    const initResult = await initPaymentSheet({
+      paymentIntentClientSecret: clientSecret,
+      merchantDisplayName: "FutsalCY",
+      style: "automatic",
+    });
+
+    if (initResult.error) {
+      setIsProcessing(false);
+      idempotencyKeyRef.current = makeIdempotencyKey();
+      setCheckoutError(initResult.error.message ?? "Could not initialise payment sheet.");
+      return;
+    }
+
+    const presentResult = await presentPaymentSheet();
+
+    if (presentResult.error) {
+      setIsProcessing(false);
+      // Regenerate key so next retry creates a fresh PaymentIntent
+      idempotencyKeyRef.current = makeIdempotencyKey();
+      if ((presentResult.error.code as string) === "Canceled") {
+        setCheckoutError("Payment cancelled. Tap Pay Now to try again.");
+      } else {
+        setCheckoutError(presentResult.error.message ?? "Payment failed. Tap Pay Now to try again.");
+      }
+      return;
+    }
+
+    // Payment sheet succeeded — confirm on the server
+    try {
+      await captureBookingPayment(bookingId);
+      setIsProcessing(false);
+      router.replace(`/player/booking/${bookingId}`);
+    } catch (captureErr: unknown) {
+      setIsProcessing(false);
+      idempotencyKeyRef.current = makeIdempotencyKey();
+      const msg =
+        (captureErr as { data?: { error?: string } })?.data?.error ??
+        (captureErr as { message?: string })?.message ??
+        "Payment succeeded but booking confirmation failed. Please contact support.";
+      setCheckoutError(msg);
+    }
+  }
+
   // Inner function: perform checkout against an existing booking ID
   function doCheckout(bookingId: string) {
     checkoutBooking(
@@ -130,7 +189,16 @@ export default function BookSummaryScreen() {
         },
       },
       {
-        onSuccess: () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onSuccess: (res: any) => {
+          // Stripe mode: server returned clientSecret for payment sheet
+          if (res?.requiresClientAction && res?.clientSecret) {
+            const pk: string = res.publishableKey ?? "";
+            void handleStripePayment(bookingId, res.clientSecret as string, pk);
+            return;
+          }
+
+          // Mock mode or already processed: booking is confirmed directly
           setIsProcessing(false);
           router.replace(`/player/booking/${bookingId}`);
         },
@@ -176,8 +244,6 @@ export default function BookSummaryScreen() {
             (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
             "Could not reserve slot. Please try again.";
           if (status === 409) {
-            // Slot was taken by a concurrent request — invalidate the availability
-            // cache so the slot grid shows fresh data when the user goes back.
             if (venueId && pitchId) {
               void queryClient.invalidateQueries({
                 queryKey: getGetPitchAvailabilityQueryKey(venueId, pitchId),
@@ -556,7 +622,7 @@ export default function BookSummaryScreen() {
         <View style={s.disclaimerCard}>
           <FeatherIcons name="shield" size={14} color={colors.mutedForeground} style={{ marginTop: 2 }} />
           <Text style={s.disclaimerText}>
-            Secure payment via MockPaymentProvider. Cancellations made within{" "}
+            Secure payment powered by Stripe. Cancellations made within{" "}
             {venue?.cancellationWindowHours ?? 48} hours of the booking may incur a fee.
           </Text>
         </View>
@@ -606,5 +672,23 @@ export default function BookSummaryScreen() {
         )}
       </View>
     </View>
+  );
+}
+
+export default function BookSummaryScreen() {
+  const [publishableKey, setPublishableKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    getStripeConfig()
+      .then((cfg) => {
+        if (cfg.publishableKey) setPublishableKey(cfg.publishableKey);
+      })
+      .catch(() => {});
+  }, []);
+
+  return (
+    <StripeProvider publishableKey={publishableKey ?? ""}>
+      <BookSummaryInner />
+    </StripeProvider>
   );
 }
