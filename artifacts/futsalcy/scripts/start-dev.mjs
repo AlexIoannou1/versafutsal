@@ -1,66 +1,100 @@
+#!/usr/bin/env node
 /**
- * Dev startup script: opens a localtunnel for the assigned $PORT so Expo Go
- * on Android/iOS can reach the Metro bundler via a public port-80 URL instead
- * of trying to hit $PORT directly (which Replit's firewall blocks externally).
+ * Dev launcher: starts expo with --tunnel, then pre-warms the Android bundle
+ * via localhost so it's cached before the user scans the QR code.
  *
- * Flow:
- *  1. Write .env.local with EXPO_PUBLIC_* vars
- *  2. Open localtunnel → get a URL like https://xxx.loca.lt
- *  3. Extract hostname (no port) → set REACT_NATIVE_PACKAGER_HOSTNAME
- *  4. Spawn `expo start --port $PORT`
- *
- * QR code then reads exp://xxx.loca.lt  (port 80, no explicit port)
- * rather than exp://domain:20728 which is blocked externally.
+ * The serveo tunnel drops idle HTTP connections — and Metro takes ~42 s to
+ * compile Hermes bytecode for 1999 modules. By pre-warming via localhost
+ * (no tunnel, no timeout), the bundle is cached and served in ~93ms when
+ * Expo Go actually connects.
  */
+import { spawn } from "child_process";
+import http from "http";
+import { writeFileSync } from "fs";
 
-import localtunnel from 'localtunnel';
-import { spawn } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+const PORT = parseInt(process.env.PORT || "20728");
 
-const port = parseInt(process.env.PORT || '8081');
-const replDomain = process.env.REPLIT_DEV_DOMAIN || '';
-const replId = process.env.REPL_ID || '';
-
+const replDomain = process.env.REPLIT_DEV_DOMAIN || "";
+const replId = process.env.REPL_ID || "";
 writeFileSync(
-  '.env.local',
-  `EXPO_PUBLIC_DOMAIN=${replDomain}\nEXPO_PUBLIC_REPL_ID=${replId}\n`,
+  ".env.local",
+  `EXPO_PUBLIC_DOMAIN=${replDomain}\nEXPO_PUBLIC_REPL_ID=${replId}\n`
 );
 
-console.log(`Opening tunnel on local port ${port}...`);
+// ── 1. Start expo --tunnel ──────────────────────────────────────────────────
+const expo = spawn(
+  "pnpm",
+  ["exec", "expo", "start", "--tunnel", "--port", String(PORT)],
+  { stdio: "inherit", env: process.env }
+);
+expo.on("exit", (code) => process.exit(code ?? 0));
 
-let hostname;
-try {
-  const tunnel = await localtunnel({ port });
-  hostname = new URL(tunnel.url).hostname;
-  console.log(`\n✅ Tunnel ready: ${tunnel.url}  (hostname: ${hostname})\n`);
+// ── 2. Fetch the Expo manifest to discover the exact bundle URL ─────────────
+// Then pre-warm that URL via localhost (bypassing the tunnel timeout).
 
-  tunnel.on('error', (err) => {
-    console.error('Tunnel error (non-fatal):', err.message);
+function get(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, { headers }, (res) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) }));
+    });
+    req.on("error", reject);
+    req.setTimeout(0);
   });
-
-  // Re-open tunnel if it closes unexpectedly
-  tunnel.on('close', () => {
-    console.warn('Tunnel closed — Metro may still be reachable via Replit proxy');
-  });
-} catch (err) {
-  console.warn(`Tunnel failed (${err.message}), falling back to Replit Expo domain`);
-  hostname = process.env.REPLIT_EXPO_DEV_DOMAIN || '';
 }
 
-const env = {
-  ...process.env,
-  ...(hostname ? { REACT_NATIVE_PACKAGER_HOSTNAME: hostname } : {}),
-};
+async function prewarm() {
+  // Wait for Metro to be ready
+  process.stdout.write("[dev] Waiting for Metro...\n");
+  for (;;) {
+    try {
+      const r = await get(`http://localhost:${PORT}/status`);
+      if (r.status === 200) break;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 3000));
+  }
 
-const expo = spawn(
-  'pnpm',
-  ['exec', 'expo', 'start', '--port', String(port)],
-  { env, stdio: 'inherit', shell: false },
-);
+  // Fetch the Expo manifest (same headers Expo Go sends) to get bundle URL
+  process.stdout.write("[dev] Metro ready — reading manifest to find bundle URL...\n");
+  let bundleUrl;
+  try {
+    const r = await get(`http://localhost:${PORT}/`, {
+      "Expo-Protocol-Version": "1",
+      "Expo-Platform": "android",
+      Accept: "application/expo+json,application/json",
+      "User-Agent": "Expo Go Android",
+    });
+    if (r.status === 200) {
+      const manifest = JSON.parse(r.body.toString());
+      const rawUrl = manifest?.launchAsset?.url;
+      if (rawUrl) {
+        // Replace the tunnel hostname with localhost for the pre-warm request
+        const u = new URL(rawUrl);
+        u.hostname = "localhost";
+        u.port = String(PORT);
+        u.protocol = "http:";
+        bundleUrl = u.toString();
+      }
+    }
+  } catch (e) {
+    process.stderr.write(`[dev] Manifest fetch failed: ${e.message}\n`);
+  }
 
-expo.on('close', (code) => {
-  process.exit(code ?? 0);
-});
+  if (!bundleUrl) {
+    process.stderr.write("[dev] Could not determine bundle URL — skipping pre-warm\n");
+    return;
+  }
 
-process.on('SIGTERM', () => expo.kill('SIGTERM'));
-process.on('SIGINT', () => expo.kill('SIGINT'));
+  process.stdout.write(`[dev] Pre-warming: ${bundleUrl.slice(0, 80)}...\n`);
+  try {
+    const r = await get(bundleUrl);
+    const kb = Math.round(r.body.length / 1024);
+    process.stdout.write(`[dev] Android bundle cached (${kb} KB, HTTP ${r.status}) — QR code ready!\n`);
+  } catch (e) {
+    process.stderr.write(`[dev] Pre-warm error (non-fatal): ${e.message}\n`);
+  }
+}
+
+// Give Metro a head start before we start polling
+setTimeout(prewarm, 8000);
