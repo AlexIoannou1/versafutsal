@@ -59,62 +59,17 @@ function startProxy() {
         headers: { ...req.headers, host: `localhost:${PORT}` },
       },
       (proxyRes) => {
-        if (isManifest && proxyRes.statusCode === 200) {
-          // Buffer the manifest, rewrite bundle + asset URLs, send modified response
-          const chunks = [];
-          proxyRes.on("data", (c) => chunks.push(c));
-          proxyRes.on("end", () => {
-            const body = Buffer.concat(chunks);
-            try {
-              const manifest = JSON.parse(body.toString("utf8"));
-
-              // Rewrite main JS bundle URL
-              if (manifest.launchAsset?.url) {
-                const u = new URL(manifest.launchAsset.url);
-                manifest.launchAsset.url =
-                  `https://${replDomain}:3000${u.pathname}${u.search}`;
-                process.stdout.write(
-                  `[proxy] manifest bundle → https://${replDomain}:3000` +
-                  `${u.pathname.slice(0, 50)}...\n`
-                );
-              }
-
-              // Rewrite static asset URLs (fonts, images)
-              if (Array.isArray(manifest.assets)) {
-                manifest.assets = manifest.assets.map((a) => {
-                  if (a.url) {
-                    try {
-                      const u = new URL(a.url);
-                      a.url = `https://${replDomain}:3000${u.pathname}${u.search}`;
-                    } catch (_) {}
-                  }
-                  return a;
-                });
-              }
-
-              const newBody = Buffer.from(JSON.stringify(manifest), "utf8");
-
-              // Preserve all headers except content-length (length changed)
-              const headers = {};
-              for (const [k, v] of Object.entries(proxyRes.headers)) {
-                if (k.toLowerCase() !== "content-length") headers[k] = v;
-              }
-              headers["content-length"] = String(newBody.length);
-
-              res.writeHead(proxyRes.statusCode, headers);
-              res.end(newBody);
-            } catch (e) {
-              // Fallback: send original manifest unmodified
-              process.stderr.write(`[proxy] manifest rewrite failed: ${e.message}\n`);
-              res.writeHead(proxyRes.statusCode, proxyRes.headers);
-              res.end(body);
-            }
-          });
-        } else {
-          // Transparent proxy for all non-manifest requests
-          res.writeHead(proxyRes.statusCode, proxyRes.headers);
-          proxyRes.pipe(res, { end: true });
-        }
+        // Transparent proxy: let everything — bundle, assets, manifest —
+      // flow through the tunnel → our proxy → Metro.
+      // Metro's gzip middleware handles compression (13 MB → 2.2 MB).
+      // We no longer rewrite URLs to https://REPLIT_DEV_DOMAIN:3000 because
+      // Replit's external HTTPS proxy interferes with Content-Encoding: gzip,
+      // causing "Compiling JS failed: 1:4 ';' expected" on Android.
+      if (isManifest && proxyRes.statusCode === 200) {
+        process.stdout.write(`[proxy] manifest → forwarding through tunnel\n`);
+      }
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
       }
     );
 
@@ -146,9 +101,8 @@ function startProxy() {
   });
 
   server.listen(PROXY_PORT, () => {
-    process.stdout.write(`[proxy] Manifest proxy started on port ${PROXY_PORT}\n`);
     process.stdout.write(
-      `[proxy] Bundle/asset URLs will be rewritten → https://${replDomain}:3000/...\n`
+      `[proxy] Transparent proxy started on port ${PROXY_PORT} → Metro on port ${PORT}\n`
     );
   });
 }
