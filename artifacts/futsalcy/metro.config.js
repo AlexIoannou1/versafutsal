@@ -39,15 +39,30 @@ config.server.enhanceMiddleware = (middleware) => {
     }
 
     // ── Gzip compression for bundle downloads ────────────────────────────
-    // Metro sends raw Hermes bytecode (~13 MB) with no compression.
-    // Over the serveo SSH tunnel this takes 50-100 s and often drops.
-    // JS/bytecode gzips to ~25% of its original size (~3 MB), making the
-    // download 4-5× faster and reliable enough for Expo Go on Android.
+    // Metro sends raw Hermes bytecode (~13 MB) with no compression even
+    // though it sets Vary: Accept-Encoding. Over the serveo SSH tunnel
+    // this takes 50-100 s and often drops, causing Expo Go on Android to
+    // hang forever on "Loading from …serveousercontent.com".
+    //
+    // OkHttp (used by Expo Go) sends Accept-Encoding: gzip on every request
+    // and decompresses transparently, so no Expo Go changes are needed.
+    //
+    // Implementation notes:
+    //  - Use gzipSync (not async) so there is no gap between buffering and
+    //    sending in which Metro/Node could flush headers early.
+    //  - Intercept res.writeHead as well to prevent Metro from committing
+    //    headers (including Content-Length) before we can replace them.
     const acceptsGzip = (req.headers["accept-encoding"] || "").includes("gzip");
     if (acceptsGzip && req.url && req.url.includes(".bundle")) {
       const chunks = [];
       const _end = res.end.bind(res);
-      const _write = res.write.bind(res);
+      const _writeHead = res.writeHead.bind(res);
+
+      // Suppress early header flush — we will call _writeHead from res.end
+      res.writeHead = function (statusCode) {
+        res.statusCode = statusCode;
+        // intentionally a no-op until our res.end wrapper runs
+      };
 
       res.write = function (chunk, encoding, cb) {
         if (chunk) {
@@ -70,19 +85,22 @@ config.server.enhanceMiddleware = (middleware) => {
               : Buffer.from(chunk, typeof encoding === "string" ? encoding : "utf8")
           );
         }
+
+        // Restore writeHead so _end can flush headers normally
+        res.writeHead = _writeHead;
+
         const body = Buffer.concat(chunks);
-        zlib.gzip(body, { level: 6 }, (err, compressed) => {
-          if (err) {
-            // Fallback: send uncompressed if gzip fails
-            console.warn("[metro-gzip] compression failed, sending raw:", err.message);
-            _end(body);
-          } else {
-            res.removeHeader("Content-Length");
-            res.setHeader("Content-Encoding", "gzip");
-            res.setHeader("Content-Length", String(compressed.length));
-            _end(compressed);
-          }
-        });
+        try {
+          const compressed = zlib.gzipSync(body, { level: 6 });
+          res.removeHeader("Content-Length");
+          res.setHeader("Content-Encoding", "gzip");
+          res.setHeader("Content-Length", String(compressed.length));
+          _end(compressed);
+        } catch (err) {
+          // Fallback: send uncompressed if gzip fails
+          console.warn("[metro-gzip] compression failed, sending raw:", err.message);
+          _end(body);
+        }
       };
     }
 
