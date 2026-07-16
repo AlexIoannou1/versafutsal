@@ -46,12 +46,23 @@ ssh -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax
 ## Bundle size fix
 
 The `@expo/ngrok` patch is NOT persisted across `pnpm install`. Must re-apply after any install.
+The patch lives at the workspace root: `/home/runner/workspace/node_modules/.pnpm/@expo+ngrok@4.1.3/node_modules/@expo/ngrok/index.js`
 
 Added to `metro.config.js` to fix "stuck on bundling" over slow tunnel:
 ```js
 config.transformer = config.transformer || {};
 config.transformer.inlineRequires = true;
 ```
-This lazy-loads modules so initial bundle is much smaller (only first screen's modules).
 
-**Why:** 1999 modules take ~44s to compile + large transfer over tunnel. Inline requires sends only ~200 modules initially, rest loaded on demand.
+## Gzip compression fix (critical for Android "stuck on Loading from...")
+
+Metro sends uncompressed Hermes bytecode bundles (~13 MB) with no gzip, even though it sends `Vary: Accept-Encoding`. Through the serveo tunnel this takes 50-100 s and reliably drops or times out, causing Expo Go to hang on "Loading from xxx.serveousercontent.com" forever.
+
+**Fix:** Added a gzip compression wrapper in `metro.config.js → enhanceMiddleware` that:
+1. Detects `.bundle` URLs with `Accept-Encoding: gzip` (Expo Go / OkHttp sends this automatically)
+2. Intercepts `res.write` and `res.end` to buffer the full response
+3. Gzips with level 6, updates `Content-Encoding` and `Content-Length`
+
+Result: 13.2 MB → 2.2 MB (83% reduction), download time ~17 s instead of ~106 s.
+
+**Why:** OkHttp (used by Expo Go on Android) automatically adds `Accept-Encoding: gzip` and handles decompression transparently — no Expo Go changes needed. Metro serves from its own cache so the 13 MB is already compiled; we just compress it on the way out.
