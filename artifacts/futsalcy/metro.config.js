@@ -4,9 +4,9 @@ const zlib = require("zlib");
 
 const config = getDefaultConfig(__dirname);
 
-// Lazy-load modules: only bundle code for the first screen on startup,
-// then load the rest on demand. Dramatically reduces initial bundle size
-// and fixes "stuck on bundling" over slow/tunnelled connections.
+// Lazy-load modules: only evaluate code for the first screen on startup,
+// then load the rest on demand. Reduces initial parse/eval time and avoids
+// pulling in heavy native modules (e.g. Stripe) before they are needed.
 config.transformer = config.transformer || {};
 config.transformer.inlineRequires = true;
 
@@ -14,6 +14,9 @@ config.server = config.server || {};
 config.server.enhanceMiddleware = (middleware) => {
   return (req, res, next) => {
     // ── API proxy ────────────────────────────────────────────────────────
+    // Expo web and native both call /api/... which gets forwarded to the
+    // API server on port 8080. This avoids cross-origin issues and keeps
+    // a single base URL for all client code.
     if (req.url && req.url.startsWith("/api")) {
       const options = {
         hostname: "localhost",
@@ -39,19 +42,17 @@ config.server.enhanceMiddleware = (middleware) => {
     }
 
     // ── Gzip compression for bundle downloads ────────────────────────────
-    // Metro sends raw Hermes bytecode (~13 MB) with no compression even
-    // though it sets Vary: Accept-Encoding. Over the serveo SSH tunnel
-    // this takes 50-100 s and often drops, causing Expo Go on Android to
-    // hang forever on "Loading from …serveousercontent.com".
-    //
-    // OkHttp (used by Expo Go) sends Accept-Encoding: gzip on every request
-    // and decompresses transparently, so no Expo Go changes are needed.
+    // Metro serves raw Hermes bytecode (~13 MB) with no compression even
+    // though it sets Vary: Accept-Encoding. When Android downloads the
+    // bundle via https://REPLIT_DEV_DOMAIN:3000/... (rewritten by our
+    // proxy in start-dev.mjs), OkHttp sends Accept-Encoding: gzip and
+    // we compress the response here: 13 MB → ~2.2 MB.
     //
     // Implementation notes:
-    //  - Use gzipSync (not async) so there is no gap between buffering and
-    //    sending in which Metro/Node could flush headers early.
-    //  - Intercept res.writeHead as well to prevent Metro from committing
-    //    headers (including Content-Length) before we can replace them.
+    //  - Use gzipSync (not async) to avoid a gap where Metro/Node could
+    //    flush headers early before we can update Content-Length.
+    //  - Intercept res.writeHead to suppress the early header flush;
+    //    restore it before calling the original res.end.
     const acceptsGzip = (req.headers["accept-encoding"] || "").includes("gzip");
     if (acceptsGzip && req.url && req.url.includes(".bundle")) {
       const chunks = [];
@@ -61,7 +62,6 @@ config.server.enhanceMiddleware = (middleware) => {
       // Suppress early header flush — we will call _writeHead from res.end
       res.writeHead = function (statusCode) {
         res.statusCode = statusCode;
-        // intentionally a no-op until our res.end wrapper runs
       };
 
       res.write = function (chunk, encoding, cb) {
@@ -97,7 +97,6 @@ config.server.enhanceMiddleware = (middleware) => {
           res.setHeader("Content-Length", String(compressed.length));
           _end(compressed);
         } catch (err) {
-          // Fallback: send uncompressed if gzip fails
           console.warn("[metro-gzip] compression failed, sending raw:", err.message);
           _end(body);
         }
