@@ -59,9 +59,19 @@ config.server.enhanceMiddleware = (middleware) => {
       const _end = res.end.bind(res);
       const _writeHead = res.writeHead.bind(res);
 
-      // Suppress early header flush — we will call _writeHead from res.end
-      res.writeHead = function (statusCode) {
+      // Suppress early header flush — capture Metro's headers for later use
+      res.writeHead = function (statusCode, rawHeaders) {
         res.statusCode = statusCode;
+        // Preserve all headers Metro sets except Content-Length/Content-Encoding
+        // (those are replaced by our gzip versions)
+        if (rawHeaders && typeof rawHeaders === "object") {
+          Object.entries(rawHeaders).forEach(([key, val]) => {
+            const lk = key.toLowerCase();
+            if (lk !== "content-length" && lk !== "content-encoding") {
+              try { res.setHeader(key, val); } catch (_) {}
+            }
+          });
+        }
       };
 
       res.write = function (chunk, encoding, cb) {
