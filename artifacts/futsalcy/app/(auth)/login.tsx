@@ -113,10 +113,28 @@ export default function LoginScreen() {
       router.replace("/");
     } catch (err: unknown) {
       const e = err as Record<string, unknown> | null;
-      const message =
-        (e?.data as Record<string, unknown>)?.error as string ||
-        (e?.message as string) ||
-        "Login failed. Please check your credentials and try again.";
+      let message = "Invalid email or password. Please try again.";
+      if (e?.status === 429) {
+        const headers = e?.headers as
+          | { get?: (name: string) => string | null }
+          | undefined;
+        const retryAfterHeader = headers?.get?.("retry-after");
+        const retryAfterSeconds = Number(retryAfterHeader);
+        if (
+          Number.isInteger(retryAfterSeconds) &&
+          retryAfterSeconds >= 1 &&
+          retryAfterSeconds <= 15 * 60
+        ) {
+          const waitText =
+            retryAfterSeconds >= 60
+              ? `${Math.ceil(retryAfterSeconds / 60)} minutes`
+              : `${retryAfterSeconds} seconds`;
+          message = `Too many sign-in attempts. Please try again in about ${waitText}.`;
+        } else {
+          message =
+            "Too many sign-in attempts. Please wait a few minutes and try again.";
+        }
+      }
       setError(message);
     } finally {
       setLoading(false);

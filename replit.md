@@ -23,6 +23,11 @@ Cyprus futsal booking platform (two-sided marketplace).
 - **Backend**: Express 5 API at `artifacts/api-server/`
 - **Auth**: JWT (email/password), 3 roles: PLAYER, VENUE_OWNER, ADMIN
 
+### Login protection
+- Login attempts are limited to 10 per 15-minute fixed window for both the caller's socket peer address and the normalized email identifier. The 11th attempt in either scope receives HTTP 429 with a `Retry-After` header.
+- PostgreSQL stores only HMAC-SHA256 digests of those identifiers in `login_rate_limit_buckets`; the HMAC key is derived from the server-side session/JWT secret. Bucket increments use an atomic PostgreSQL upsert, so state is shared across API processes and survives restarts.
+- Client addresses intentionally come from `req.socket.remoteAddress`; forwarded headers are not trusted by the application. If a future deployment puts the server behind a trusted proxy, configure address resolution at that edge before changing this assumption.
+
 ### Demo credentials (after seeding)
 | Role | Email | Password |
 |------|-------|----------|

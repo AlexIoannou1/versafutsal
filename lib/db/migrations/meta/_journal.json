@@ -127,6 +127,13 @@
       "when": 1752451200000,
       "tag": "0018_match_finished_notif_type",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788172324000,
+      "tag": "0019_login_rate_limit_buckets",
+      "breakpoints": true
     }
   ]
 }

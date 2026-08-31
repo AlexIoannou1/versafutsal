@@ -4,3 +4,4 @@ export * from "./bookings";
 export * from "./payments";
 export * from "./admin";
 export * from "./notifications";
+export * from "./login-rate-limit";

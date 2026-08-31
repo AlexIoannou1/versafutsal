@@ -88,6 +88,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+        "429":
+          description: Too many login attempts; retry after the indicated delay
+          headers:
+            Retry-After:
+              description: Minimum number of seconds to wait before trying again
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 
   /auth/me:
     get:

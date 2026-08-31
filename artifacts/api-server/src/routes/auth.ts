@@ -2,11 +2,23 @@ import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { signToken, requireAuth } from "../middlewares/auth";
 import type { UserRole } from "@workspace/db";
+import {
+  canonicalizeAccountIdentifier,
+  createLoginRateLimiter,
+  getCanonicalClientAddress,
+  INVALID_CREDENTIALS_MESSAGE,
+  LOGIN_RATE_LIMIT_MESSAGE,
+} from "../lib/login-rate-limiter";
+import { databaseLoginRateLimitStore } from "../lib/login-rate-limiter-store";
 
 const router: IRouter = Router();
+const loginRateLimiter = createLoginRateLimiter({
+  store: databaseLoginRateLimitStore,
+  secret: process.env.SESSION_SECRET ?? process.env.JWT_SECRET ?? "",
+});
 
 // POST /auth/register
 router.post("/auth/register", async (req, res) => {
@@ -102,7 +114,29 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
-    const normalised = email.toLowerCase();
+    const normalised = canonicalizeAccountIdentifier(email);
+
+    const rateLimit = await loginRateLimiter.check({
+      accountIdentifier: normalised,
+      clientAddress: getCanonicalClientAddress(req),
+    });
+    if (!rateLimit.allowed) {
+      const retryAfterSeconds = rateLimit.retryAfterSeconds ?? 1;
+      req.log.warn(
+        {
+          event: "auth.login.rate_limited",
+          requestId: req.id,
+          scopes: rateLimit.blockedScopes,
+          retryAfterSeconds,
+        },
+        "Login rate limit exceeded",
+      );
+      res
+        .set("Retry-After", String(retryAfterSeconds))
+        .status(429)
+        .json({ error: LOGIN_RATE_LIMIT_MESSAGE });
+      return;
+    }
 
     const [user] = await db
       .select()
@@ -111,32 +145,18 @@ router.post("/auth/login", async (req, res) => {
       .limit(1);
 
     if (!user) {
-      // Check if the address belongs to a soft-deleted account (email was anonymised)
-      const [deletedUser] = await db
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(
-          and(eq(usersTable.deletedOriginalEmail, normalised), isNotNull(usersTable.deletedAt)),
-        )
-        .limit(1);
-
-      if (deletedUser) {
-        res.status(401).json({ error: "This account has been deleted" });
-        return;
-      }
-
-      res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: INVALID_CREDENTIALS_MESSAGE });
       return;
     }
 
     if (user.deletedAt) {
-      res.status(401).json({ error: "This account has been deleted" });
+      res.status(401).json({ error: INVALID_CREDENTIALS_MESSAGE });
       return;
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      res.status(401).json({ error: "Invalid credentials" });
+      res.status(401).json({ error: INVALID_CREDENTIALS_MESSAGE });
       return;
     }
 
@@ -160,7 +180,10 @@ router.post("/auth/login", async (req, res) => {
       token,
     });
   } catch (err) {
-    console.error("Login error:", err);
+    req.log.error(
+      { event: "auth.login.failed", requestId: req.id },
+      "Login request failed",
+    );
     res.status(500).json({ error: "Internal server error" });
   }
 });
