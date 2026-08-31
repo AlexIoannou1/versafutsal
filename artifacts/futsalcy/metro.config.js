@@ -43,10 +43,9 @@ config.server.enhanceMiddleware = (middleware) => {
 
     // ── Gzip compression for bundle downloads ────────────────────────────
     // Metro serves raw Hermes bytecode (~13 MB) with no compression even
-    // though it sets Vary: Accept-Encoding. When Android downloads the
-    // bundle via https://REPLIT_DEV_DOMAIN:3000/... (rewritten by our
-    // proxy in start-dev.mjs), OkHttp sends Accept-Encoding: gzip and
-    // we compress the response here: 13 MB → ~2.2 MB.
+    // though it sets Vary: Accept-Encoding. When Expo Go downloads the
+    // bundle via the public Replit HTTPS endpoint, OkHttp sends
+    // Accept-Encoding: gzip and we compress the response here.
     //
     // Implementation notes:
     //  - Use gzipSync (not async) to avoid a gap where Metro/Node could
