@@ -424,13 +424,23 @@ export default function OwnerVenueDetailScreen() {
       Alert.alert("Error", "Pitch name is required.");
       return;
     }
+    const slotValue = pitchSlot.trim();
+    if (!/^\d+$/.test(slotValue)) {
+      Alert.alert("Invalid slot duration", "Please enter a whole number of minutes.");
+      return;
+    }
+    const slotDurationMinutes = Number(slotValue);
+    if (!Number.isSafeInteger(slotDurationMinutes) || slotDurationMinutes < 15 || slotDurationMinutes > 240) {
+      Alert.alert("Invalid slot duration", "Slot duration must be between 15 and 240 minutes.");
+      return;
+    }
     setPitchAdding(true);
     try {
       await createPitch(id!, {
         name: pitchName.trim(),
         size: pitchSize.trim() || "5v5",
         type: pitchType,
-        slotDurationMinutes: parseInt(pitchSlot, 10) || 60,
+        slotDurationMinutes,
       });
       setPitchModalVisible(false);
       invalidate();
@@ -483,13 +493,18 @@ export default function OwnerVenueDetailScreen() {
   const handleSavePricing = async () => {
     if (!pricingTargetPitch) return;
     const rules = samePrice
-      ? [{ dayType: "ALL" as const, pricePerHour: allDayPrice, depositType: "NONE" }]
+      ? [{ dayType: "ALL" as const, pricePerHour: allDayPrice, depositType: "NONE" as const }]
       : [
-          { dayType: "WEEKDAY" as const, pricePerHour: weekdayPrice, depositType: "NONE" },
-          { dayType: "WEEKEND" as const, pricePerHour: weekendPrice, depositType: "NONE" },
+          { dayType: "WEEKDAY" as const, pricePerHour: weekdayPrice, depositType: "NONE" as const },
+          { dayType: "WEEKEND" as const, pricePerHour: weekendPrice, depositType: "NONE" as const },
         ];
 
-    const hasEmpty = rules.some((r) => !r.pricePerHour.trim() || isNaN(parseFloat(r.pricePerHour)));
+    const hasEmpty = rules.some((r) => {
+      const value = r.pricePerHour.trim();
+      if (!/^\d+(?:[.,]\d{1,2})?$/.test(value)) return true;
+      const price = Number(value.replace(",", "."));
+      return !Number.isFinite(price) || price < 0;
+    });
     if (hasEmpty) {
       Alert.alert("Error", "Please enter valid prices.");
       return;
@@ -1195,6 +1210,8 @@ export default function OwnerVenueDetailScreen() {
                     onChangeText={(v) => updateHourField(h.dayOfWeek, "openTime", v)}
                     placeholder="08:00"
                     placeholderTextColor={colors.mutedForeground}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
                   />
                   <Text style={s.timeSep}>–</Text>
                   <TextInput
@@ -1203,6 +1220,8 @@ export default function OwnerVenueDetailScreen() {
                     onChangeText={(v) => updateHourField(h.dayOfWeek, "closeTime", v)}
                     placeholder="22:00"
                     placeholderTextColor={colors.mutedForeground}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
                   />
                 </>
               )}
@@ -1229,11 +1248,11 @@ export default function OwnerVenueDetailScreen() {
             <Text style={s.modalTitle}>Add Pitch</Text>
             <View style={s.mField}>
               <Text style={s.mLabel}>Pitch Name</Text>
-              <TextInput style={s.mInput} value={pitchName} onChangeText={setPitchName} placeholder="e.g. Pitch A" placeholderTextColor={colors.mutedForeground} />
+              <TextInput style={s.mInput} value={pitchName} onChangeText={setPitchName} placeholder="e.g. Pitch A" placeholderTextColor={colors.mutedForeground} autoCapitalize="words" maxLength={100} />
             </View>
             <View style={s.mField}>
               <Text style={s.mLabel}>Size</Text>
-              <TextInput style={s.mInput} value={pitchSize} onChangeText={setPitchSize} placeholder="5v5, 7v7, Futsal…" placeholderTextColor={colors.mutedForeground} />
+              <TextInput style={s.mInput} value={pitchSize} onChangeText={setPitchSize} placeholder="5v5, 7v7, Futsal…" placeholderTextColor={colors.mutedForeground} autoCapitalize="none" maxLength={20} />
             </View>
             <View style={s.mField}>
               <Text style={s.mLabel}>Type</Text>
@@ -1254,7 +1273,7 @@ export default function OwnerVenueDetailScreen() {
             </View>
             <View style={s.mField}>
               <Text style={s.mLabel}>Slot Duration (minutes)</Text>
-              <TextInput style={s.mInput} value={pitchSlot} onChangeText={setPitchSlot} keyboardType="numeric" placeholder="60" placeholderTextColor={colors.mutedForeground} />
+              <TextInput style={s.mInput} value={pitchSlot} onChangeText={setPitchSlot} keyboardType="numeric" inputMode="numeric" maxLength={3} placeholder="60" placeholderTextColor={colors.mutedForeground} />
             </View>
             <View style={s.mActions}>
               <TouchableOpacity style={s.mCancelBtn} onPress={() => setPitchModalVisible(false)}>
@@ -1457,7 +1476,7 @@ export default function OwnerVenueDetailScreen() {
             {/* Label */}
             <View style={s.mField}>
               <Text style={s.mLabel}>Label (optional)</Text>
-              <TextInput style={s.mInput} value={avBlockLabel} onChangeText={setAvBlockLabel} placeholder="e.g. National Holiday, Team Training" placeholderTextColor={colors.mutedForeground} />
+              <TextInput style={s.mInput} value={avBlockLabel} onChangeText={setAvBlockLabel} placeholder="e.g. National Holiday, Team Training" placeholderTextColor={colors.mutedForeground} maxLength={200} />
             </View>
 
             {/* Weekly Repeat Toggle */}
@@ -1534,17 +1553,17 @@ export default function OwnerVenueDetailScreen() {
             {samePrice ? (
               <View style={s.mField}>
                 <Text style={s.mLabel}>Price per Hour (€)</Text>
-                <TextInput style={s.mInput} value={allDayPrice} onChangeText={setAllDayPrice} keyboardType="decimal-pad" placeholder="e.g. 25.00" placeholderTextColor={colors.mutedForeground} />
+                <TextInput style={s.mInput} value={allDayPrice} onChangeText={setAllDayPrice} keyboardType="decimal-pad" inputMode="decimal" maxLength={10} placeholder="e.g. 25.00" placeholderTextColor={colors.mutedForeground} />
               </View>
             ) : (
               <>
                 <View style={s.mField}>
                   <Text style={s.mLabel}>Weekday Price per Hour (€)</Text>
-                  <TextInput style={s.mInput} value={weekdayPrice} onChangeText={setWeekdayPrice} keyboardType="decimal-pad" placeholder="e.g. 20.00" placeholderTextColor={colors.mutedForeground} />
+                  <TextInput style={s.mInput} value={weekdayPrice} onChangeText={setWeekdayPrice} keyboardType="decimal-pad" inputMode="decimal" maxLength={10} placeholder="e.g. 20.00" placeholderTextColor={colors.mutedForeground} />
                 </View>
                 <View style={s.mField}>
                   <Text style={s.mLabel}>Weekend Price per Hour (€)</Text>
-                  <TextInput style={s.mInput} value={weekendPrice} onChangeText={setWeekendPrice} keyboardType="decimal-pad" placeholder="e.g. 30.00" placeholderTextColor={colors.mutedForeground} />
+                  <TextInput style={s.mInput} value={weekendPrice} onChangeText={setWeekendPrice} keyboardType="decimal-pad" inputMode="decimal" maxLength={10} placeholder="e.g. 30.00" placeholderTextColor={colors.mutedForeground} />
                 </View>
               </>
             )}

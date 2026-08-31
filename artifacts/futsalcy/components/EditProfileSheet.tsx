@@ -15,7 +15,12 @@ import {
 import FeatherIcons from "@/components/FeatherIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { updateProfile, changePassword } from "@workspace/api-client-react";
+import {
+  updateProfile,
+  changePassword,
+  validateRequestBody,
+  validationMessage,
+} from "@workspace/api-client-react";
 import type { AuthUser } from "@/context/AuthContext";
 
 const CYPRUS_CITIES = [
@@ -75,22 +80,20 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
   }, [visible, user]);
 
   const handleSaveProfile = async () => {
-    if (!name.trim()) {
-      Alert.alert("Validation", "Name cannot be empty.");
-      return;
-    }
-    if (!email.trim()) {
-      Alert.alert("Validation", "Email cannot be empty.");
+    const payload = {
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phoneNumber: phoneNumber.trim() || undefined,
+      city: city.trim() || undefined,
+    };
+    const validation = validateRequestBody<typeof payload>("PATCH", "/api/auth/profile", payload);
+    if (!validation.success) {
+      Alert.alert("Validation", validationMessage(validation.issues[0]!));
       return;
     }
     setSaving(true);
     try {
-      const res = await updateProfile({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phoneNumber: phoneNumber.trim() || undefined,
-        city: city.trim() || null,
-      });
+      const res = await updateProfile(validation.data);
       onSaved({
         name: res.user.name,
         email: res.user.email,
@@ -122,9 +125,22 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
       Alert.alert("Validation", "New passwords do not match.");
       return;
     }
+    const passwordPayload = {
+      currentPassword: currentPwd,
+      newPassword: newPwd,
+    };
+    const validation = validateRequestBody<typeof passwordPayload>(
+      "PATCH",
+      "/api/auth/password",
+      passwordPayload,
+    );
+    if (!validation.success) {
+      Alert.alert("Validation", validationMessage(validation.issues[0]!));
+      return;
+    }
     setSaving(true);
     try {
-      await changePassword({ currentPassword: currentPwd, newPassword: newPwd });
+      await changePassword(validation.data);
       Alert.alert("Success", "Password changed successfully.");
       setCurrentPwd("");
       setNewPwd("");
@@ -304,6 +320,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       placeholder="Your name"
                       placeholderTextColor={colors.mutedForeground}
                       autoCapitalize="words"
+                      maxLength={120}
                     />
                   </View>
                 </View>
@@ -319,6 +336,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       placeholderTextColor={colors.mutedForeground}
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      maxLength={254}
                     />
                   </View>
                 </View>
@@ -333,6 +351,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       placeholder="+357 99 000000"
                       placeholderTextColor={colors.mutedForeground}
                       keyboardType="phone-pad"
+                      maxLength={32}
                     />
                   </View>
                 </View>
@@ -382,6 +401,9 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       placeholder="Enter current password"
                       placeholderTextColor={colors.mutedForeground}
                       secureTextEntry={!showCurrent}
+                      autoComplete="current-password"
+                      textContentType="password"
+                      maxLength={256}
                     />
                     <TouchableOpacity
                       style={s.eyeBtn}
@@ -406,6 +428,9 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       placeholder="Min. 6 characters"
                       placeholderTextColor={colors.mutedForeground}
                       secureTextEntry={!showNew}
+                      autoComplete="new-password"
+                      textContentType="newPassword"
+                      maxLength={256}
                     />
                     <TouchableOpacity style={s.eyeBtn} onPress={() => setShowNew((v) => !v)}>
                       <FeatherIcons

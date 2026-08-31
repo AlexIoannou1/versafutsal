@@ -14,7 +14,7 @@ import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
-import { registerUser } from "@workspace/api-client-react";
+import { registerUser, validateRequestBody, validationMessage } from "@workspace/api-client-react";
 import type { AppMode } from "@/context/AuthContext";
 
 const MODE_LABELS: Record<string, string> = {
@@ -107,28 +107,26 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     setError(null);
 
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setError("Please fill in all required fields.");
+    const payload = {
+      email: email.trim().toLowerCase(),
+      password,
+      name: name.trim(),
+      role: selectedMode || "PLAYER",
+      phoneNumber: phoneNumber.trim() || undefined,
+    };
+    const validation = validateRequestBody<typeof payload>("POST", "/api/auth/register", payload);
+    if (!validation.success) {
+      setError(validationMessage(validation.issues[0]!));
       return;
     }
     if (isOwner && !phoneNumber.trim()) {
       setError("Phone number is required for venue owners so we can verify your account.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
 
     setLoading(true);
     try {
-      const data = await registerUser({
-        email: email.trim().toLowerCase(),
-        password,
-        name: name.trim(),
-        role: selectedMode || "PLAYER",
-        phoneNumber: phoneNumber.trim() || undefined,
-      });
+      const data = await registerUser(validation.data);
 
       await login(
         {
@@ -293,6 +291,7 @@ export default function RegisterScreen() {
               placeholder="Your name"
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="words"
+              maxLength={120}
               testID="register-name"
             />
           </View>
@@ -310,6 +309,7 @@ export default function RegisterScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              maxLength={254}
               testID="register-email"
             />
           </View>
@@ -327,6 +327,7 @@ export default function RegisterScreen() {
               placeholder="+357 99 000000"
               placeholderTextColor={colors.mutedForeground}
               keyboardType="phone-pad"
+              maxLength={32}
               testID="register-phone"
             />
           </View>
@@ -347,6 +348,9 @@ export default function RegisterScreen() {
               placeholder="Min. 6 characters"
               placeholderTextColor={colors.mutedForeground}
               secureTextEntry={!showPassword}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              maxLength={256}
               testID="register-password"
             />
             <TouchableOpacity

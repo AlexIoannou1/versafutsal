@@ -84,8 +84,13 @@ export default function AdminSettingsScreen() {
   }
 
   function handleSaveFeePercent() {
-    const parsed = parseFloat(feePercentInput);
-    if (isNaN(parsed) || parsed < 0 || parsed > 100) {
+    const value = feePercentInput.trim();
+    if (!/^\d+(?:[.,]\d{1,2})?$/.test(value)) {
+      Alert.alert("Invalid", "Please enter a valid percentage between 0 and 100 (e.g. 6.00)");
+      return;
+    }
+    const parsed = Number(value.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
       Alert.alert("Invalid", "Please enter a valid percentage between 0 and 100 (e.g. 6.00)");
       return;
     }
@@ -338,6 +343,8 @@ export default function AdminSettingsScreen() {
                   value={feePercentInput}
                   onChangeText={setFeePercentInput}
                   keyboardType="decimal-pad"
+                  inputMode="decimal"
+                  maxLength={6}
                   selectTextOnFocus
                   autoFocus
                 />

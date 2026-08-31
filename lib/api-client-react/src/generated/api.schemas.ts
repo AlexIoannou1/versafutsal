@@ -46,6 +46,7 @@ export const VenueStatus = {
   PENDING: "PENDING",
   APPROVED: "APPROVED",
   REJECTED: "REJECTED",
+  DISABLED: "DISABLED",
 } as const;
 
 export type PitchType = (typeof PitchType)[keyof typeof PitchType];
@@ -68,6 +69,9 @@ export interface UserProfile {
   id: string;
   email: string;
   name: string;
+  phoneNumber?: string | null;
+  avatarUrl?: string | null;
+  city?: string | null;
   role: UserRole;
   createdAt: string;
 }
@@ -85,9 +89,17 @@ export const RegisterRequestRole = {
 } as const;
 
 export interface RegisterRequest {
+  /** @maxLength 254 */
   email: string;
-  /** @minLength 6 */
+  /**
+   * @minLength 6
+   * @maxLength 256
+   */
   password: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
   name: string;
   /** Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.
    */
@@ -98,7 +110,12 @@ export interface RegisterRequest {
 }
 
 export interface LoginRequest {
+  /** @maxLength 254 */
   email: string;
+  /**
+   * @minLength 6
+   * @maxLength 256
+   */
   password: string;
 }
 
@@ -129,6 +146,7 @@ export interface VenueRecord {
   cancellationWindowHours: number;
   contactPhone?: string | null;
   rejectionReason?: string | null;
+  disabledReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -198,10 +216,21 @@ export interface OpeningHoursInput {
   isClosed: boolean;
 }
 
+export type PricingRuleInputDepositType =
+  (typeof PricingRuleInputDepositType)[keyof typeof PricingRuleInputDepositType];
+
+export const PricingRuleInputDepositType = {
+  NONE: "NONE",
+  FIXED: "FIXED",
+  PERCENT: "PERCENT",
+} as const;
+
 export interface PricingRuleInput {
   dayType: DayType;
+  /** @pattern ^(?:0|[1-9][0-9]{0,7})(\.[0-9]{1,2})?$ */
   pricePerHour: string;
-  depositType: string;
+  depositType: PricingRuleInputDepositType;
+  /** @pattern ^(?:0|[1-9][0-9]{0,7})(\.[0-9]{1,2})?$ */
   depositAmount?: string | null;
 }
 
@@ -269,45 +298,121 @@ export type AdminVenueDetail = VenueRecord & {
 };
 
 export interface CreateVenueRequest {
+  /**
+   * @minLength 1
+   * @maxLength 160
+   */
   name: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
   district: string;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
   address: string;
+  /** @maxLength 4000 */
   description?: string;
+  /** @maxItems 50 */
   amenities?: string[];
+  /**
+   * @minimum 0
+   * @maximum 168
+   */
   cancellationWindowHours?: number;
+  /**
+   * @minLength 5
+   * @maxLength 32
+   */
   contactPhone: string;
 }
 
 export interface UpdateVenueRequest {
+  /**
+   * @minLength 1
+   * @maxLength 160
+   */
   name?: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
   district?: string;
+  /**
+   * @minLength 1
+   * @maxLength 300
+   */
   address?: string;
+  /** @maxLength 4000 */
   description?: string;
+  /** @maxItems 50 */
   amenities?: string[];
+  /**
+   * @minimum 0
+   * @maximum 168
+   */
   cancellationWindowHours?: number;
+  /**
+   * @minLength 5
+   * @maxLength 32
+   */
   contactPhone?: string;
 }
 
 export interface CreatePitchRequest {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
   name: string;
+  /**
+   * @minLength 1
+   * @maxLength 80
+   */
   size: string;
   type?: PitchType;
+  /**
+   * @minimum 15
+   * @maximum 240
+   */
   slotDurationMinutes?: number;
 }
 
 export interface UpdatePitchRequest {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
   name?: string;
+  /**
+   * @minLength 1
+   * @maxLength 80
+   */
   size?: string;
   type?: PitchType;
+  /**
+   * @minimum 15
+   * @maximum 240
+   */
   slotDurationMinutes?: number;
 }
 
 export interface AddVenuePhotoRequest {
   url: string;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
   sortOrder?: number;
 }
 
 export interface SetOpeningHoursRequest {
+  /**
+   * @minItems 1
+   * @maxItems 7
+   */
   hours: OpeningHoursInput[];
 }
 
@@ -316,6 +421,7 @@ export interface SetPricingRulesRequest {
 }
 
 export interface RejectVenueRequest {
+  /** @maxLength 1000 */
   reason?: string;
 }
 
@@ -389,11 +495,15 @@ export interface CreateBookingRequest {
 export interface CreateMaintenanceBlockRequest {
   startAt: string;
   endAt: string;
+  /** @maxLength 1000 */
   reason?: string;
 }
 
 export interface CancelBookingRequest {
-  /** Optional cancellation reason */
+  /**
+   * Optional cancellation reason
+   * @maxLength 1000
+   */
   reason?: string | null;
 }
 
@@ -494,7 +604,12 @@ export interface CheckoutResponse {
 }
 
 export interface RegisterPushTokenRequest {
-  /** Expo push token, e.g. ExponentPushToken[...] */
+  /**
+   * Expo push token, e.g. ExponentPushToken[...]
+   * @minLength 1
+   * @maxLength 512
+   * @pattern ^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$
+   */
   pushToken: string;
 }
 
@@ -515,6 +630,7 @@ export interface AdminSettingsRecord {
 
 export interface UpdateAdminSettingsRequest {
   feeEnabled?: boolean;
+  /** @pattern ^(?:0|[1-9][0-9]{0,2})(\.[0-9]{1,2})?$ */
   feePercent?: string;
 }
 

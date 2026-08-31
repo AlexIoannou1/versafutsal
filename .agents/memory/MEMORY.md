@@ -4,3 +4,4 @@
 - [Drizzle migration generation is interactive](drizzle-migration-workflow.md) — column rename/retype needs hand-written SQL + journal entry, not `drizzle-kit generate`, in this project.
 - [Expo web API base URL routing](expo-api-base-url-routing.md) — on web, derive API base URL from window.location.hostname (strip .expo.); never rely on EXPO_PUBLIC_DOMAIN which goes stale.
 - [Expo ImagePicker FormData — web vs native](expo-imagepicker-formdata.md) — the RN { uri, type, name } FormData trick only works on native; on web you must fetch(uri) to get a real Blob then append a File object.
+- [Expo static build port assumption](expo-static-build-port.md) — the static build expects Metro on 8081; concurrent workflows can make its non-interactive port prompt fail.

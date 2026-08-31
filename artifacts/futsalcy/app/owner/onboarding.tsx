@@ -22,6 +22,7 @@ import {
   setOpeningHours,
   submitVenueForApproval,
   getListOwnerVenuesQueryKey,
+  validateRequestBody,
   type PitchType,
   type OpeningHoursInput,
 } from "@workspace/api-client-react";
@@ -253,21 +254,33 @@ export default function OwnerOnboardingScreen() {
       if (!address.trim()) { setAddressError("Address is required."); hasError = true; }
       if (!contactPhone.trim()) { setContactPhoneError("Contact phone number is required."); hasError = true; }
       if (hasError) return;
+      const cancellationValue = cancellationWindowHours.trim();
+      if (!/^\d+$/.test(cancellationValue)) {
+        setNameError("Cancellation window must be a whole number.");
+        return;
+      }
+      const cancellationHours = Number(cancellationValue);
+      if (!Number.isSafeInteger(cancellationHours) || cancellationHours < 0 || cancellationHours > 168) {
+        setNameError("Cancellation window must be between 0 and 168 hours.");
+        return;
+      }
+      const venuePayload = {
+        name: name.trim(),
+        district,
+        address: address.trim(),
+        description: description.trim() || undefined,
+        amenities: selectedAmenities,
+        cancellationWindowHours: cancellationHours,
+        contactPhone: contactPhone.trim(),
+      };
+      if (!validateRequestBody("POST", "/owner/venues", venuePayload).success) {
+        setNameError("Please review the venue details and try again.");
+        return;
+      }
 
       setStepLoading(true);
       try {
-        const result = await createVenue({
-          name: name.trim(),
-          district,
-          address: address.trim(),
-          description: description.trim() || undefined,
-          amenities: selectedAmenities,
-          cancellationWindowHours: (() => {
-            const v = parseInt(cancellationWindowHours, 10);
-            return isNaN(v) ? 24 : v;
-          })(),
-          contactPhone: contactPhone.trim(),
-        });
+        const result = await createVenue(venuePayload);
         const id = result?.venue?.id;
         if (!id) throw new Error("No venue ID returned");
         setVenueId(id);
@@ -286,16 +299,35 @@ export default function OwnerOnboardingScreen() {
       if (!pitchName.trim()) { setPitchNameError("Pitch name is required."); hasError = true; }
       if (!pitchSize.trim()) { setPitchSizeError("Pitch size / format is required."); hasError = true; }
       if (hasError) return;
+      const durationValue = pitchSlotDuration.trim();
+      if (!/^\d+$/.test(durationValue)) {
+        setPitchSizeError("Slot duration must be a whole number.");
+        return;
+      }
+      const slotDurationMinutes = Number(durationValue);
+      if (!Number.isSafeInteger(slotDurationMinutes) || slotDurationMinutes < 15 || slotDurationMinutes > 240) {
+        setPitchSizeError("Slot duration must be between 15 and 240 minutes.");
+        return;
+      }
+      if (pitchPrice.trim() && !/^(?:0|[1-9]\d{0,7})(?:[.,]\d{1,2})?$/.test(pitchPrice.trim())) {
+        setPitchSizeError("Please enter a valid hourly price.");
+        return;
+      }
 
       setStepLoading(true);
       try {
         if (!pitchSaved) {
-          const pitchResult = await createPitch(venueId, {
+          const pitchPayload = {
             name: pitchName.trim(),
             type: pitchType,
             size: pitchSize.trim(),
-            slotDurationMinutes: parseInt(pitchSlotDuration, 10) || 60,
-          });
+            slotDurationMinutes,
+          };
+          if (!validateRequestBody("POST", "/owner/venues/:id/pitches", pitchPayload).success) {
+            setPitchSizeError("Please review the pitch details and try again.");
+            return;
+          }
+          const pitchResult = await createPitch(venueId, pitchPayload);
           const pid = pitchResult?.pitch?.id;
           if (pid && pitchPrice.trim()) {
             await setPricingRules(venueId, pid, {
@@ -608,6 +640,7 @@ export default function OwnerOnboardingScreen() {
                 onChangeText={(v) => { setName(v); if (v.trim()) setNameError(""); }}
                 placeholder="e.g. Champions Arena"
                 placeholderTextColor={colors.mutedForeground}
+                maxLength={160}
                 autoCapitalize="words"
               />
               {!!nameError && <Text style={s.errorText}>{nameError}</Text>}
@@ -648,6 +681,7 @@ export default function OwnerOnboardingScreen() {
                 onChangeText={(v) => { setAddress(v); if (v.trim()) setAddressError(""); }}
                 placeholder="Street, city"
                 placeholderTextColor={colors.mutedForeground}
+                maxLength={300}
               />
               {!!addressError && <Text style={s.errorText}>{addressError}</Text>}
             </View>
@@ -662,6 +696,7 @@ export default function OwnerOnboardingScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="phone-pad"
                 autoComplete="tel"
+                maxLength={32}
               />
               {!!contactPhoneError
                 ? <Text style={s.errorText}>{contactPhoneError}</Text>
@@ -677,6 +712,7 @@ export default function OwnerOnboardingScreen() {
                 onChangeText={setDescription}
                 placeholder="Tell players about your venue…"
                 placeholderTextColor={colors.mutedForeground}
+                maxLength={4000}
                 multiline
                 numberOfLines={3}
               />
@@ -689,6 +725,8 @@ export default function OwnerOnboardingScreen() {
                 value={cancellationWindowHours}
                 onChangeText={setCancellationWindowHours}
                 keyboardType="numeric"
+                inputMode="numeric"
+                maxLength={3}
                 placeholder="24"
                 placeholderTextColor={colors.mutedForeground}
               />
@@ -733,6 +771,7 @@ export default function OwnerOnboardingScreen() {
                 onChangeText={(v) => { setPitchName(v); if (v.trim()) setPitchNameError(""); }}
                 placeholder="e.g. Pitch A"
                 placeholderTextColor={colors.mutedForeground}
+                maxLength={80}
                 autoCapitalize="words"
               />
               {!!pitchNameError && <Text style={s.errorText}>{pitchNameError}</Text>}
@@ -767,6 +806,8 @@ export default function OwnerOnboardingScreen() {
                 onChangeText={(v) => { setPitchSize(v); if (v.trim()) setPitchSizeError(""); }}
                 placeholder="e.g. 5v5, 6v6, 7v7"
                 placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                maxLength={80}
               />
               {!!pitchSizeError && <Text style={s.errorText}>{pitchSizeError}</Text>}
             </View>

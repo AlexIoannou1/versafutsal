@@ -14,7 +14,7 @@ import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import * as Haptics from "expo-haptics";
-import { loginUser } from "@workspace/api-client-react";
+import { loginUser, validateRequestBody, validationMessage } from "@workspace/api-client-react";
 import type { AppMode } from "@/context/AuthContext";
 
 const MODE_LABELS: Record<string, string> = {
@@ -55,14 +55,16 @@ export default function LoginScreen() {
     setError(null);
     setWrongMode(null);
 
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
+    const payload = { email: email.trim().toLowerCase(), password };
+    const validation = validateRequestBody<typeof payload>("POST", "/api/auth/login", payload);
+    if (!validation.success) {
+      setError(validationMessage(validation.issues[0]!));
       return;
     }
 
     setLoading(true);
     try {
-      const data = await loginUser({ email: email.trim().toLowerCase(), password });
+      const data = await loginUser(validation.data);
 
       if (data.user.role !== selectedMode) {
         const actualLabel = MODE_LABELS[data.user.role] || data.user.role;
@@ -321,6 +323,7 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              maxLength={254}
               testID="login-email"
             />
           </View>
@@ -337,6 +340,8 @@ export default function LoginScreen() {
               placeholderTextColor={colors.mutedForeground}
               secureTextEntry={!showPassword}
               autoComplete="password"
+              textContentType="password"
+              maxLength={256}
               testID="login-password"
             />
             <TouchableOpacity

@@ -137,12 +137,12 @@ type AdminAuditEntryRowProps = {
 };
 
 function AdminAuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: AdminAuditEntryRowProps) {
-  const { icon, color, label } = getAuditActionMeta(entry.action, entry.previousValue, entry.newValue);
+  const { icon, color, label } = getAuditActionMeta(entry.action, entry.previousValue ?? null, entry.newValue ?? null);
   const roleLabel = entry.actorRole ? (ROLE_LABELS[entry.actorRole] ?? entry.actorRole) : null;
   const actorDisplay = entry.actorName
     ? `${entry.actorName}${roleLabel ? ` · ${roleLabel}` : ""}`
     : roleLabel ?? null;
-  const diffNode = renderValueDiff(entry.previousValue, entry.newValue, muted, foreground);
+  const diffNode = renderValueDiff(entry.previousValue ?? null, entry.newValue ?? null, muted, foreground);
   return (
     <View
       style={{
@@ -640,6 +640,7 @@ export default function AdminBookingDetailScreen() {
               value={refundReason}
               onChangeText={setRefundReason}
               multiline
+              maxLength={500}
             />
 
             <View style={s.modalBtnRow}>

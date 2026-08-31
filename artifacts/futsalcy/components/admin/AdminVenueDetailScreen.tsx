@@ -756,6 +756,7 @@ export default function AdminVenueDetailScreen({ venueId, visible, onClose }: Pr
               placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={3}
+              maxLength={500}
             />
             <View style={s.modalActions}>
               <TouchableOpacity
@@ -796,6 +797,7 @@ export default function AdminVenueDetailScreen({ venueId, visible, onClose }: Pr
               placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={3}
+              maxLength={500}
             />
             <View style={s.modalActions}>
               <TouchableOpacity

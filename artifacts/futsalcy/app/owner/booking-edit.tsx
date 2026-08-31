@@ -595,6 +595,7 @@ export default function OwnerBookingEditScreen() {
             placeholder="Full name of the player"
             placeholderTextColor={colors.mutedForeground}
             autoCapitalize="words"
+            maxLength={100}
           />
         </View>
         <View>
@@ -606,6 +607,9 @@ export default function OwnerBookingEditScreen() {
             placeholder="+357 99 123456"
             placeholderTextColor={colors.mutedForeground}
             keyboardType="phone-pad"
+            inputMode="tel"
+            autoComplete="tel"
+            maxLength={32}
           />
         </View>
       </View>

@@ -148,12 +148,12 @@ type AuditEntryRowProps = {
 };
 
 function AuditEntryRow({ entry, isFirst, borderColor, foreground, muted }: AuditEntryRowProps) {
-  const { icon, color, label } = getAuditActionMeta(entry.action, entry.previousValue, entry.newValue);
+  const { icon, color, label } = getAuditActionMeta(entry.action, entry.previousValue ?? null, entry.newValue ?? null);
   const roleLabel = entry.actorRole ? (ROLE_LABELS[entry.actorRole] ?? entry.actorRole) : null;
   const actorDisplay = entry.actorName
     ? `${entry.actorName}${roleLabel ? ` · ${roleLabel}` : ""}`
     : roleLabel ?? null;
-  const diffNode = renderValueDiff(entry.previousValue, entry.newValue, muted, foreground);
+  const diffNode = renderValueDiff(entry.previousValue ?? null, entry.newValue ?? null, muted, foreground);
   return (
     <View
       style={{
@@ -469,8 +469,13 @@ export default function OwnerBookingDetailScreen() {
       status: string;
     } | null;
   }).payment ?? null;
-  const paymentTotal = payment ? parseFloat(payment.amount) : null;
-  const paymentFee = payment ? parseFloat(payment.feeAmount) : null;
+  const parseFiniteAmount = (value: string): number | null => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const paymentTotal = payment ? parseFiniteAmount(payment.amount) : null;
+  const paymentFee = payment ? parseFiniteAmount(payment.feeAmount) : null;
+  const paymentFeePercent = payment ? parseFiniteAmount(payment.feePercent) : null;
   const ownerPayout =
     paymentTotal != null && paymentFee != null ? paymentTotal - paymentFee : null;
   const guestName = (booking as { guestName?: string | null }).guestName ?? null;
@@ -596,7 +601,7 @@ export default function OwnerBookingDetailScreen() {
             </View>
             <View style={s.row}>
               <Text style={[s.rowLabel, { width: 130 }]}>
-                Platform fee{payment.feeWaived ? " (waived)" : ` (${parseFloat(payment.feePercent).toFixed(2).replace(/\.00$/, "")}%)`}
+                Platform fee{payment.feeWaived || paymentFeePercent == null ? " (waived)" : ` (${paymentFeePercent.toFixed(2).replace(/\.00$/, "")}%)`}
               </Text>
               <Text style={[s.rowValue, { textAlign: "right" }]}>−€{paymentFee.toFixed(2)}</Text>
             </View>
@@ -702,6 +707,7 @@ export default function OwnerBookingDetailScreen() {
               value={cancelReason}
               onChangeText={setCancelReason}
               multiline
+            maxLength={500}
             />
 
             <View style={s.modalBtnRow}>

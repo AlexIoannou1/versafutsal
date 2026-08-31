@@ -17,12 +17,20 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Register a new user
  */
+export const registerUserBodyEmailMax = 254;
+
 export const registerUserBodyPasswordMin = 6;
+export const registerUserBodyPasswordMax = 256;
+
+export const registerUserBodyNameMax = 120;
 
 export const RegisterUserBody = zod.object({
-  email: zod.string().email(),
-  password: zod.string().min(registerUserBodyPasswordMin),
-  name: zod.string(),
+  email: zod.string().email().max(registerUserBodyEmailMax),
+  password: zod
+    .string()
+    .min(registerUserBodyPasswordMin)
+    .max(registerUserBodyPasswordMax),
+  name: zod.string().min(1).max(registerUserBodyNameMax),
   role: zod
     .enum(["PLAYER", "VENUE_OWNER"])
     .optional()
@@ -40,9 +48,17 @@ export const RegisterUserBody = zod.object({
 /**
  * @summary Login with email and password
  */
+export const loginUserBodyEmailMax = 254;
+
+export const loginUserBodyPasswordMin = 6;
+export const loginUserBodyPasswordMax = 256;
+
 export const LoginUserBody = zod.object({
-  email: zod.string().email(),
-  password: zod.string(),
+  email: zod.string().email().max(loginUserBodyEmailMax),
+  password: zod
+    .string()
+    .min(loginUserBodyPasswordMin)
+    .max(loginUserBodyPasswordMax),
 });
 
 export const LoginUserResponse = zod.object({
@@ -50,6 +66,9 @@ export const LoginUserResponse = zod.object({
     id: zod.string().uuid(),
     email: zod.string().email(),
     name: zod.string(),
+    phoneNumber: zod.string().nullish(),
+    avatarUrl: zod.string().nullish(),
+    city: zod.string().nullish(),
     role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
     createdAt: zod.coerce.date(),
   }),
@@ -86,10 +105,19 @@ export const ListVenuesResponse = zod.object({
       address: zod.string(),
       amenities: zod.array(zod.string()),
       coverPhoto: zod.string().nullish(),
+      photos: zod.array(
+        zod.object({
+          id: zod.string().uuid(),
+          venueId: zod.string().uuid(),
+          url: zod.string(),
+          sortOrder: zod.number(),
+          createdAt: zod.coerce.date(),
+        }),
+      ),
       minPrice: zod.number().nullish(),
       maxPrice: zod.number().nullish(),
       pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
-      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
       createdAt: zod.coerce.date(),
     }),
   ),
@@ -110,7 +138,7 @@ export const GetVenueResponse = zod.object({
     .object({
       id: zod.string().uuid(),
       ownerId: zod.string().uuid(),
-      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
       name: zod.string(),
       district: zod.string(),
       address: zod.string(),
@@ -119,6 +147,7 @@ export const GetVenueResponse = zod.object({
       cancellationWindowHours: zod.number(),
       contactPhone: zod.string().nullish(),
       rejectionReason: zod.string().nullish(),
+      disabledReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
     })
@@ -199,10 +228,19 @@ export const ListOwnerVenuesResponse = zod.object({
         address: zod.string(),
         amenities: zod.array(zod.string()),
         coverPhoto: zod.string().nullish(),
+        photos: zod.array(
+          zod.object({
+            id: zod.string().uuid(),
+            venueId: zod.string().uuid(),
+            url: zod.string(),
+            sortOrder: zod.number(),
+            createdAt: zod.coerce.date(),
+          }),
+        ),
         minPrice: zod.number().nullish(),
         maxPrice: zod.number().nullish(),
         pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
-        status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+        status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
         createdAt: zod.coerce.date(),
       })
       .and(
@@ -217,18 +255,43 @@ export const ListOwnerVenuesResponse = zod.object({
 /**
  * @summary Create a new venue
  */
+export const createVenueBodyNameMax = 160;
+
+export const createVenueBodyDistrictMax = 120;
+
+export const createVenueBodyAddressMax = 300;
+
+export const createVenueBodyDescriptionMax = 4000;
+
+export const createVenueBodyAmenitiesItemMax = 80;
+
+export const createVenueBodyAmenitiesMax = 50;
+
 export const createVenueBodyCancellationWindowHoursDefault = 24;
+export const createVenueBodyCancellationWindowHoursMin = 0;
+export const createVenueBodyCancellationWindowHoursMax = 168;
+
+export const createVenueBodyContactPhoneMin = 5;
+export const createVenueBodyContactPhoneMax = 32;
 
 export const CreateVenueBody = zod.object({
-  name: zod.string(),
-  district: zod.string(),
-  address: zod.string(),
-  description: zod.string().optional(),
-  amenities: zod.array(zod.string()).optional(),
+  name: zod.string().min(1).max(createVenueBodyNameMax),
+  district: zod.string().min(1).max(createVenueBodyDistrictMax),
+  address: zod.string().min(1).max(createVenueBodyAddressMax),
+  description: zod.string().max(createVenueBodyDescriptionMax).optional(),
+  amenities: zod
+    .array(zod.string().min(1).max(createVenueBodyAmenitiesItemMax))
+    .max(createVenueBodyAmenitiesMax)
+    .optional(),
   cancellationWindowHours: zod
     .number()
+    .min(createVenueBodyCancellationWindowHoursMin)
+    .max(createVenueBodyCancellationWindowHoursMax)
     .default(createVenueBodyCancellationWindowHoursDefault),
-  contactPhone: zod.string(),
+  contactPhone: zod
+    .string()
+    .min(createVenueBodyContactPhoneMin)
+    .max(createVenueBodyContactPhoneMax),
 });
 
 /**
@@ -246,7 +309,7 @@ export const GetOwnerVenueResponse = zod.object({
     .object({
       id: zod.string().uuid(),
       ownerId: zod.string().uuid(),
-      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
       name: zod.string(),
       district: zod.string(),
       address: zod.string(),
@@ -255,6 +318,7 @@ export const GetOwnerVenueResponse = zod.object({
       cancellationWindowHours: zod.number(),
       contactPhone: zod.string().nullish(),
       rejectionReason: zod.string().nullish(),
+      disabledReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
     })
@@ -329,21 +393,50 @@ export const UpdateVenueParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const updateVenueBodyNameMax = 160;
+
+export const updateVenueBodyDistrictMax = 120;
+
+export const updateVenueBodyAddressMax = 300;
+
+export const updateVenueBodyDescriptionMax = 4000;
+
+export const updateVenueBodyAmenitiesItemMax = 80;
+
+export const updateVenueBodyAmenitiesMax = 50;
+
+export const updateVenueBodyCancellationWindowHoursMin = 0;
+export const updateVenueBodyCancellationWindowHoursMax = 168;
+
+export const updateVenueBodyContactPhoneMin = 5;
+export const updateVenueBodyContactPhoneMax = 32;
+
 export const UpdateVenueBody = zod.object({
-  name: zod.string().optional(),
-  district: zod.string().optional(),
-  address: zod.string().optional(),
-  description: zod.string().optional(),
-  amenities: zod.array(zod.string()).optional(),
-  cancellationWindowHours: zod.number().optional(),
-  contactPhone: zod.string().optional(),
+  name: zod.string().min(1).max(updateVenueBodyNameMax).optional(),
+  district: zod.string().min(1).max(updateVenueBodyDistrictMax).optional(),
+  address: zod.string().min(1).max(updateVenueBodyAddressMax).optional(),
+  description: zod.string().max(updateVenueBodyDescriptionMax).optional(),
+  amenities: zod
+    .array(zod.string().min(1).max(updateVenueBodyAmenitiesItemMax))
+    .max(updateVenueBodyAmenitiesMax)
+    .optional(),
+  cancellationWindowHours: zod
+    .number()
+    .min(updateVenueBodyCancellationWindowHoursMin)
+    .max(updateVenueBodyCancellationWindowHoursMax)
+    .optional(),
+  contactPhone: zod
+    .string()
+    .min(updateVenueBodyContactPhoneMin)
+    .max(updateVenueBodyContactPhoneMax)
+    .optional(),
 });
 
 export const UpdateVenueResponse = zod.object({
   venue: zod.object({
     id: zod.string().uuid(),
     ownerId: zod.string().uuid(),
-    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
     name: zod.string(),
     district: zod.string(),
     address: zod.string(),
@@ -352,6 +445,7 @@ export const UpdateVenueResponse = zod.object({
     cancellationWindowHours: zod.number(),
     contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
+    disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -375,7 +469,7 @@ export const SubmitVenueForApprovalResponse = zod.object({
   venue: zod.object({
     id: zod.string().uuid(),
     ownerId: zod.string().uuid(),
-    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
     name: zod.string(),
     district: zod.string(),
     address: zod.string(),
@@ -384,6 +478,7 @@ export const SubmitVenueForApprovalResponse = zod.object({
     cancellationWindowHours: zod.number(),
     contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
+    disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -396,9 +491,16 @@ export const AddVenuePhotoParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const addVenuePhotoBodySortOrderMin = 0;
+export const addVenuePhotoBodySortOrderMax = 100;
+
 export const AddVenuePhotoBody = zod.object({
   url: zod.string().url(),
-  sortOrder: zod.number().optional(),
+  sortOrder: zod
+    .number()
+    .min(addVenuePhotoBodySortOrderMin)
+    .max(addVenuePhotoBodySortOrderMax)
+    .optional(),
 });
 
 /**
@@ -416,14 +518,22 @@ export const CreatePitchParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const createPitchBodyNameMax = 120;
+
+export const createPitchBodySizeMax = 80;
+
 export const createPitchBodySlotDurationMinutesDefault = 60;
+export const createPitchBodySlotDurationMinutesMin = 15;
+export const createPitchBodySlotDurationMinutesMax = 240;
 
 export const CreatePitchBody = zod.object({
-  name: zod.string(),
-  size: zod.string(),
+  name: zod.string().min(1).max(createPitchBodyNameMax),
+  size: zod.string().min(1).max(createPitchBodySizeMax),
   type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]).optional(),
   slotDurationMinutes: zod
     .number()
+    .min(createPitchBodySlotDurationMinutesMin)
+    .max(createPitchBodySlotDurationMinutesMax)
     .default(createPitchBodySlotDurationMinutesDefault),
 });
 
@@ -435,11 +545,22 @@ export const UpdatePitchParams = zod.object({
   pitchId: zod.coerce.string().uuid(),
 });
 
+export const updatePitchBodyNameMax = 120;
+
+export const updatePitchBodySizeMax = 80;
+
+export const updatePitchBodySlotDurationMinutesMin = 15;
+export const updatePitchBodySlotDurationMinutesMax = 240;
+
 export const UpdatePitchBody = zod.object({
-  name: zod.string().optional(),
-  size: zod.string().optional(),
+  name: zod.string().min(1).max(updatePitchBodyNameMax).optional(),
+  size: zod.string().min(1).max(updatePitchBodySizeMax).optional(),
   type: zod.enum(["INDOOR", "OUTDOOR", "HYBRID"]).optional(),
-  slotDurationMinutes: zod.number().optional(),
+  slotDurationMinutes: zod
+    .number()
+    .min(updatePitchBodySlotDurationMinutesMin)
+    .max(updatePitchBodySlotDurationMinutesMax)
+    .optional(),
 });
 
 export const UpdatePitchResponse = zod.object({
@@ -472,18 +593,23 @@ export const SetOpeningHoursParams = zod.object({
 export const setOpeningHoursBodyHoursItemDayOfWeekMin = 0;
 export const setOpeningHoursBodyHoursItemDayOfWeekMax = 6;
 
+export const setOpeningHoursBodyHoursMax = 7;
+
 export const SetOpeningHoursBody = zod.object({
-  hours: zod.array(
-    zod.object({
-      dayOfWeek: zod
-        .number()
-        .min(setOpeningHoursBodyHoursItemDayOfWeekMin)
-        .max(setOpeningHoursBodyHoursItemDayOfWeekMax),
-      openTime: zod.string(),
-      closeTime: zod.string(),
-      isClosed: zod.boolean(),
-    }),
-  ),
+  hours: zod
+    .array(
+      zod.object({
+        dayOfWeek: zod
+          .number()
+          .min(setOpeningHoursBodyHoursItemDayOfWeekMin)
+          .max(setOpeningHoursBodyHoursItemDayOfWeekMax),
+        openTime: zod.string(),
+        closeTime: zod.string(),
+        isClosed: zod.boolean(),
+      }),
+    )
+    .min(1)
+    .max(setOpeningHoursBodyHoursMax),
 });
 
 export const setOpeningHoursResponseOpeningHoursItemDayOfWeekMin = 0;
@@ -513,13 +639,25 @@ export const SetPricingRulesParams = zod.object({
   pitchId: zod.coerce.string().uuid(),
 });
 
+export const setPricingRulesBodyRulesItemPricePerHourRegExp = new RegExp(
+  "^(?:0|[1-9][0-9]{0,7})(\\.[0-9]{1,2})?$",
+);
+export const setPricingRulesBodyRulesItemDepositAmountRegExp = new RegExp(
+  "^(?:0|[1-9][0-9]{0,7})(\\.[0-9]{1,2})?$",
+);
+
 export const SetPricingRulesBody = zod.object({
   rules: zod.array(
     zod.object({
       dayType: zod.enum(["WEEKDAY", "WEEKEND", "ALL"]),
-      pricePerHour: zod.string(),
-      depositType: zod.string(),
-      depositAmount: zod.string().nullish(),
+      pricePerHour: zod
+        .string()
+        .regex(setPricingRulesBodyRulesItemPricePerHourRegExp),
+      depositType: zod.enum(["NONE", "FIXED", "PERCENT"]),
+      depositAmount: zod
+        .string()
+        .regex(setPricingRulesBodyRulesItemDepositAmountRegExp)
+        .nullish(),
     }),
   ),
 });
@@ -862,10 +1000,12 @@ export const CreateMaintenanceBlockParams = zod.object({
   pitchId: zod.coerce.string().uuid(),
 });
 
+export const createMaintenanceBlockBodyReasonMax = 1000;
+
 export const CreateMaintenanceBlockBody = zod.object({
   startAt: zod.coerce.date(),
   endAt: zod.coerce.date(),
-  reason: zod.string().optional(),
+  reason: zod.string().max(createMaintenanceBlockBodyReasonMax).optional(),
 });
 
 /**
@@ -884,8 +1024,14 @@ export const CancelBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const cancelBookingBodyReasonMax = 1000;
+
 export const CancelBookingBody = zod.object({
-  reason: zod.string().nullish().describe("Optional cancellation reason"),
+  reason: zod
+    .string()
+    .max(cancelBookingBodyReasonMax)
+    .nullish()
+    .describe("Optional cancellation reason"),
 });
 
 export const CancelBookingResponse = zod.object({
@@ -939,7 +1085,7 @@ export const AdminListVenuesResponse = zod.object({
       .object({
         id: zod.string().uuid(),
         ownerId: zod.string().uuid(),
-        status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+        status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
         name: zod.string(),
         district: zod.string(),
         address: zod.string(),
@@ -948,6 +1094,7 @@ export const AdminListVenuesResponse = zod.object({
         cancellationWindowHours: zod.number(),
         contactPhone: zod.string().nullish(),
         rejectionReason: zod.string().nullish(),
+        disabledReason: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
       })
@@ -980,7 +1127,7 @@ export const AdminGetVenueResponse = zod.object({
     .object({
       id: zod.string().uuid(),
       ownerId: zod.string().uuid(),
-      status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+      status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
       name: zod.string(),
       district: zod.string(),
       address: zod.string(),
@@ -989,6 +1136,7 @@ export const AdminGetVenueResponse = zod.object({
       cancellationWindowHours: zod.number(),
       contactPhone: zod.string().nullish(),
       rejectionReason: zod.string().nullish(),
+      disabledReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
     })
@@ -1076,7 +1224,7 @@ export const ApproveVenueResponse = zod.object({
   venue: zod.object({
     id: zod.string().uuid(),
     ownerId: zod.string().uuid(),
-    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
     name: zod.string(),
     district: zod.string(),
     address: zod.string(),
@@ -1085,6 +1233,7 @@ export const ApproveVenueResponse = zod.object({
     cancellationWindowHours: zod.number(),
     contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
+    disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1097,15 +1246,17 @@ export const RejectVenueParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const rejectVenueBodyReasonMax = 1000;
+
 export const RejectVenueBody = zod.object({
-  reason: zod.string().optional(),
+  reason: zod.string().max(rejectVenueBodyReasonMax).optional(),
 });
 
 export const RejectVenueResponse = zod.object({
   venue: zod.object({
     id: zod.string().uuid(),
     ownerId: zod.string().uuid(),
-    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
     name: zod.string(),
     district: zod.string(),
     address: zod.string(),
@@ -1114,6 +1265,7 @@ export const RejectVenueResponse = zod.object({
     cancellationWindowHours: zod.number(),
     contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
+    disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1134,7 +1286,7 @@ export const AdminDisableVenueResponse = zod.object({
   venue: zod.object({
     id: zod.string().uuid(),
     ownerId: zod.string().uuid(),
-    status: zod.enum(["PENDING", "APPROVED", "REJECTED"]),
+    status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
     name: zod.string(),
     district: zod.string(),
     address: zod.string(),
@@ -1143,6 +1295,7 @@ export const AdminDisableVenueResponse = zod.object({
     cancellationWindowHours: zod.number(),
     contactPhone: zod.string().nullish(),
     rejectionReason: zod.string().nullish(),
+    disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1316,8 +1469,14 @@ export const AdminRefundBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const adminRefundBookingBodyReasonMax = 1000;
+
 export const AdminRefundBookingBody = zod.object({
-  reason: zod.string().nullish().describe("Optional cancellation reason"),
+  reason: zod
+    .string()
+    .max(adminRefundBookingBodyReasonMax)
+    .nullish()
+    .describe("Optional cancellation reason"),
 });
 
 export const AdminRefundBookingResponse = zod.object({
@@ -1455,9 +1614,18 @@ export const GetBookingPaymentResponse = zod.object({
 /**
  * @summary Register or update Expo push token for the current user
  */
+export const registerPushTokenBodyPushTokenMax = 512;
+
+export const registerPushTokenBodyPushTokenRegExp = new RegExp(
+  "^(?:ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_-]+\\]$",
+);
+
 export const RegisterPushTokenBody = zod.object({
   pushToken: zod
     .string()
+    .min(1)
+    .max(registerPushTokenBodyPushTokenMax)
+    .regex(registerPushTokenBodyPushTokenRegExp)
     .describe("Expo push token, e.g. ExponentPushToken[...]"),
 });
 
@@ -1487,9 +1655,16 @@ export const GetAdminSettingsResponse = zod.object({
 /**
  * @summary Update global fee settings
  */
+export const updateAdminSettingsBodyFeePercentRegExp = new RegExp(
+  "^(?:0|[1-9][0-9]{0,2})(\\.[0-9]{1,2})?$",
+);
+
 export const UpdateAdminSettingsBody = zod.object({
   feeEnabled: zod.boolean().optional(),
-  feePercent: zod.string().optional(),
+  feePercent: zod
+    .string()
+    .regex(updateAdminSettingsBodyFeePercentRegExp)
+    .optional(),
 });
 
 export const UpdateAdminSettingsResponse = zod.object({

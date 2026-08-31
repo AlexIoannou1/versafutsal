@@ -5,6 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { requestParseError, requestValidation } from "./middlewares/request-validation";
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -34,9 +35,11 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "100kb", strict: true }));
+app.use(express.urlencoded({ extended: false, limit: "32kb", parameterLimit: 50 }));
+app.use(requestValidation);
 
 app.use("/api", router);
+app.use(requestParseError);
 
 export default app;

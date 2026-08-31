@@ -1,3 +1,5 @@
+import { validateRequestBody } from "./validation";
+
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
 };
@@ -140,7 +142,10 @@ function getStringField(value: unknown, key: string): string | undefined {
   const candidate = (value as Record<string, unknown>)[key];
   if (typeof candidate !== "string") return undefined;
 
-  const trimmed = candidate.trim();
+  const trimmed = candidate
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .normalize("NFC")
+    .trim();
   return trimmed === "" ? undefined : trimmed;
 }
 
@@ -152,7 +157,7 @@ function buildErrorMessage(response: Response, data: unknown): string {
   const prefix = `HTTP ${response.status} ${response.statusText}`;
 
   if (typeof data === "string") {
-    const text = data.trim();
+    const text = data.replace(/[\u0000-\u001F\u007F]/g, " ").normalize("NFC").trim();
     return text ? `${prefix}: ${truncate(text)}` : prefix;
   }
 
@@ -343,6 +348,26 @@ export async function customFetch<T = unknown>(
     looksLikeJson(init.body)
   ) {
     headers.set("content-type", "application/json");
+  }
+
+  if (
+    typeof init.body === "string" &&
+    headers.get("content-type")?.toLowerCase().includes("json")
+  ) {
+    let bodyValue: unknown;
+    try {
+      bodyValue = JSON.parse(init.body);
+    } catch {
+      throw new TypeError("customFetch: request body must be valid JSON.");
+    }
+    const requestUrl = isRequest(input) ? input.url : String(input);
+    const pathname = new URL(requestUrl, "http://localhost").pathname;
+    const validation = validateRequestBody(method, pathname, bodyValue);
+    if (!validation.success) {
+      const error = new TypeError("Invalid request input.");
+      Object.assign(error, { code: "REQUEST_BODY_INVALID", issues: validation.issues });
+      throw error;
+    }
   }
 
   if (responseType === "json" && !headers.has("accept")) {

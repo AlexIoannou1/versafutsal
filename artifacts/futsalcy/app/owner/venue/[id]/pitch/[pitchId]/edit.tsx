@@ -20,6 +20,7 @@ import {
   useGetOwnerVenue,
   getGetOwnerVenueQueryKey,
   updatePitch,
+  validateRequestBody,
 } from "@workspace/api-client-react";
 
 const TYPE_LABELS: Record<string, string> = { INDOOR: "Indoor", OUTDOOR: "Outdoor", HYBRID: "Hybrid" };
@@ -88,8 +89,9 @@ export default function EditPitchScreen() {
       setSizeError("Size is required (e.g. 5v5, 7v7).");
       valid = false;
     }
-    const dur = parseInt(slotDuration, 10);
-    if (isNaN(dur) || dur < 15 || dur > 240) {
+    const durationValue = slotDuration.trim();
+    const dur = /^\d+$/.test(durationValue) ? Number(durationValue) : NaN;
+    if (!Number.isSafeInteger(dur) || dur < 15 || dur > 240) {
       setDurationError("Slot duration must be between 15 and 240 minutes.");
       valid = false;
     }
@@ -98,14 +100,19 @@ export default function EditPitchScreen() {
 
   const handleSave = async () => {
     if (!validate()) return;
+    const pitchPayload = {
+      name: pitchName.trim(),
+      size: pitchSize.trim(),
+      type: pitchType,
+      slotDurationMinutes: Number(slotDuration.trim()),
+    };
+    if (!validateRequestBody("PUT", `/owner/venues/${id}/pitches/${pitchId}`, pitchPayload).success) {
+      Alert.alert("Invalid pitch", "Please review the pitch details and try again.");
+      return;
+    }
     setSaving(true);
     try {
-      await updatePitch(id!, pitchId!, {
-        name: pitchName.trim(),
-        size: pitchSize.trim(),
-        type: pitchType,
-        slotDurationMinutes: parseInt(slotDuration, 10),
-      });
+      await updatePitch(id!, pitchId!, pitchPayload);
       queryClient.invalidateQueries({ queryKey: getGetOwnerVenueQueryKey(id!) });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
@@ -297,6 +304,8 @@ export default function EditPitchScreen() {
             onChangeText={(v) => { setPitchName(v); setNameError(""); }}
             placeholder="e.g. Pitch A"
             placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="words"
+            maxLength={100}
           />
           {nameError ? <Text style={s.errorText}>{nameError}</Text> : null}
         </View>
@@ -312,6 +321,7 @@ export default function EditPitchScreen() {
             placeholder="e.g. 5v5, 7v7, Futsal"
             placeholderTextColor={colors.mutedForeground}
             autoCapitalize="none"
+            maxLength={20}
           />
           {sizeError ? <Text style={s.errorText}>{sizeError}</Text> : null}
         </View>
@@ -349,6 +359,8 @@ export default function EditPitchScreen() {
             value={slotDuration}
             onChangeText={(v) => { setSlotDuration(v); setDurationError(""); setConflictError(null); setConflictingBookings([]); }}
             keyboardType="numeric"
+            inputMode="numeric"
+            maxLength={3}
             placeholder="60"
             placeholderTextColor={colors.mutedForeground}
           />

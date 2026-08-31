@@ -9,6 +9,8 @@ export { uploadVenuePhoto, reorderVenuePhotos } from "./venue-photos-api";
 export type { VenuePhoto, UploadVenuePhotoResponse } from "./venue-photos-api";
 export { setBaseUrl, setAuthTokenGetter } from "./custom-fetch";
 export type { AuthTokenGetter } from "./custom-fetch";
+export { validateRequestBody, validationMessage } from "./validation";
+export type { ValidationIssue, ValidationResult } from "./validation";
 export { updateProfile, changePassword } from "./profile-api";
 export { uploadAvatar } from "./uploadAvatar";
 export type {
@@ -77,13 +79,8 @@ export type {
   CreateBlockResponse,
   ListBlocksResponse,
 } from "./blocks-api";
-export {
-  captureBookingPayment,
-} from "./booking-capture-api";
-export type {
-  CheckoutResponse,
-  CaptureResponse,
-} from "./booking-capture-api";
+export { captureBookingPayment } from "./booking-capture-api";
+export type { CheckoutResponse, CaptureResponse } from "./booking-capture-api";
 export {
   useOwnerNotifications,
   useMarkNotificationsRead,

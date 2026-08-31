@@ -186,8 +186,14 @@ export default function PlayerVenuesScreen() {
   const favouriteIds = new Set(favouriteIdsData?.venueIds ?? []);
   const toggleFavourite = useToggleFavourite();
 
-  const minPrice = minPriceText.trim() !== "" ? parseFloat(minPriceText) : undefined;
-  const maxPrice = maxPriceText.trim() !== "" ? parseFloat(maxPriceText) : undefined;
+  const parsePrice = (value: string): number | undefined => {
+    const trimmed = value.trim();
+    if (!/^\d+(?:[.,]\d{1,2})?$/.test(trimmed)) return undefined;
+    const parsed = Number(trimmed.replace(",", "."));
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  };
+  const minPrice = parsePrice(minPriceText);
+  const maxPrice = parsePrice(maxPriceText);
 
   const activeFilterCount =
     (selectedDistrict ? 1 : 0) +
@@ -198,8 +204,8 @@ export default function PlayerVenuesScreen() {
   const params: Record<string, string | number> = {};
   if (selectedDistrict) params.district = selectedDistrict;
   if (selectedType) params.type = selectedType;
-  if (minPrice != null && !isNaN(minPrice)) params.minPrice = minPrice;
-  if (maxPrice != null && !isNaN(maxPrice)) params.maxPrice = maxPrice;
+  if (minPrice != null) params.minPrice = minPrice;
+  if (maxPrice != null) params.maxPrice = maxPrice;
 
   const { data, isLoading, refetch, isRefetching } = useListVenues(
     Object.keys(params).length > 0 ? (params as Parameters<typeof useListVenues>[0]) : undefined,
@@ -467,6 +473,9 @@ export default function PlayerVenuesScreen() {
               onChangeText={setSearch}
               placeholder="Search venues or districts…"
               placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={100}
             />
             {search.length > 0 && (
               <TouchableOpacity onPress={() => setSearch("")}>
@@ -572,6 +581,8 @@ export default function PlayerVenuesScreen() {
                   placeholder="Min"
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="numeric"
+                  inputMode="decimal"
+                  maxLength={10}
                   returnKeyType="done"
                 />
                 <Text style={s.priceSep}>–</Text>
@@ -582,6 +593,8 @@ export default function PlayerVenuesScreen() {
                   placeholder="Max"
                   placeholderTextColor={colors.mutedForeground}
                   keyboardType="numeric"
+                  inputMode="decimal"
+                  maxLength={10}
                   returnKeyType="done"
                 />
               </View>

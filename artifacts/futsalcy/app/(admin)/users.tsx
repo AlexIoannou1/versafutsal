@@ -514,6 +514,7 @@ export default function AdminUsersScreen() {
             placeholderTextColor={colors.mutedForeground}
             autoCapitalize="none"
             autoCorrect={false}
+            maxLength={100}
           />
           {search !== "" && (
             <TouchableOpacity onPress={() => handleSearchChange("")}>

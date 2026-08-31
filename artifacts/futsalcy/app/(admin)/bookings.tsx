@@ -322,6 +322,9 @@ export default function AdminBookingsScreen() {
             onChangeText={setSearch}
             placeholder="Venue, district…"
             placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={100}
           />
           {search !== "" && (
             <TouchableOpacity onPress={() => setSearch("")}>
@@ -401,6 +404,9 @@ export default function AdminBookingsScreen() {
                 onChangeText={setSelectedPlayerSearch}
                 placeholder="Search player…"
                 placeholderTextColor={colors.mutedForeground}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={100}
               />
               {selectedPlayerSearch !== "" && (
                 <TouchableOpacity onPress={() => setSelectedPlayerSearch("")}>
@@ -421,6 +427,9 @@ export default function AdminBookingsScreen() {
                   onChangeText={setDateFrom}
                   placeholder="From"
                   placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numbers-and-punctuation"
+                  inputMode="numeric"
+                  maxLength={10}
                 />
               </View>
               <View style={s.dateField}>
@@ -430,6 +439,9 @@ export default function AdminBookingsScreen() {
                   onChangeText={setDateTo}
                   placeholder="To"
                   placeholderTextColor={colors.mutedForeground}
+                  keyboardType="numbers-and-punctuation"
+                  inputMode="numeric"
+                  maxLength={10}
                 />
               </View>
             </View>

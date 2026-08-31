@@ -516,6 +516,7 @@ export default function AdminVenuesScreen() {
               placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={3}
+              maxLength={500}
             />
             <View style={s.modalActions}>
               <TouchableOpacity

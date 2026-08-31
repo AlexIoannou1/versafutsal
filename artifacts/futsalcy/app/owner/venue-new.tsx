@@ -23,6 +23,7 @@ import {
   setOpeningHours,
   submitVenueForApproval,
   getListOwnerVenuesQueryKey,
+  validateRequestBody,
   type PitchType,
   type OpeningHoursInput,
 } from "@workspace/api-client-react";
@@ -118,21 +119,33 @@ export default function VenueNewScreen() {
       if (!district) { Alert.alert("Required", "Please select a district."); return; }
       if (!address.trim()) { Alert.alert("Required", "Address is required."); return; }
       if (!contactPhone.trim()) { Alert.alert("Required", "Contact phone number is required."); return; }
+      const windowValue = cancellationWindowHours.trim();
+      if (!/^\d+$/.test(windowValue)) {
+        Alert.alert("Invalid", "Cancellation window must be a whole number.");
+        return;
+      }
+      const cancellationHours = Number(windowValue);
+      if (!Number.isSafeInteger(cancellationHours) || cancellationHours < 0 || cancellationHours > 168) {
+        Alert.alert("Invalid", "Cancellation window must be between 0 and 168 hours.");
+        return;
+      }
+      const venuePayload = {
+        name: name.trim(),
+        district,
+        address: address.trim(),
+        description: description.trim() || undefined,
+        amenities: selectedAmenities,
+        cancellationWindowHours: cancellationHours,
+        contactPhone: contactPhone.trim(),
+      };
+      if (!validateRequestBody("POST", "/owner/venues", venuePayload).success) {
+        Alert.alert("Invalid venue", "Please review the venue details and try again.");
+        return;
+      }
 
       setStepLoading(true);
       try {
-        const result = await createVenue({
-          name: name.trim(),
-          district,
-          address: address.trim(),
-          description: description.trim() || undefined,
-          amenities: selectedAmenities,
-          cancellationWindowHours: (() => {
-            const v = parseInt(cancellationWindowHours, 10);
-            return isNaN(v) ? 24 : v;
-          })(),
-          contactPhone: contactPhone.trim(),
-        });
+        const result = await createVenue(venuePayload);
         const id = result?.venue?.id;
         if (!id) throw new Error("No venue ID returned");
         setVenueId(id);
@@ -414,6 +427,7 @@ export default function VenueNewScreen() {
                 placeholder="e.g. Champions Arena"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="words"
+                maxLength={100}
               />
             </View>
 
@@ -456,6 +470,7 @@ export default function VenueNewScreen() {
                 onChangeText={setAddress}
                 placeholder="Street, city"
                 placeholderTextColor={colors.mutedForeground}
+                maxLength={200}
               />
             </View>
 
@@ -469,6 +484,7 @@ export default function VenueNewScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="phone-pad"
                 autoComplete="tel"
+                maxLength={32}
               />
               <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 4 }}>
                 Use the number listed on Google Maps or social media. Admins will call this to verify your venue.
@@ -485,6 +501,7 @@ export default function VenueNewScreen() {
                 placeholderTextColor={colors.mutedForeground}
                 multiline
                 numberOfLines={3}
+                maxLength={1000}
               />
             </View>
 
@@ -495,6 +512,8 @@ export default function VenueNewScreen() {
                 value={cancellationWindowHours}
                 onChangeText={setCancellationWindowHours}
                 keyboardType="numeric"
+                inputMode="numeric"
+                maxLength={3}
                 placeholder="24"
                 placeholderTextColor={colors.mutedForeground}
               />
@@ -555,6 +574,7 @@ export default function VenueNewScreen() {
                 placeholder="e.g. Pitch A"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="words"
+                maxLength={100}
               />
               {!!pitchNameError && (
                 <Text style={{ fontSize: 12, color: colors.destructive, marginTop: 4, fontFamily: "PlusJakartaSans_400Regular" }}>
@@ -613,6 +633,7 @@ export default function VenueNewScreen() {
                 onChangeText={setPitchSize}
                 placeholder="e.g. 5v5, 6v6, 7v7"
                 placeholderTextColor={colors.mutedForeground}
+                maxLength={20}
               />
             </View>
 
@@ -625,6 +646,8 @@ export default function VenueNewScreen() {
                 placeholder="e.g. 50"
                 placeholderTextColor={colors.mutedForeground}
                 keyboardType="numeric"
+                inputMode="decimal"
+                maxLength={10}
               />
             </View>
 
@@ -662,6 +685,8 @@ export default function VenueNewScreen() {
                         onChangeText={(v) => updateDay(i, { openTime: v })}
                         placeholder="08:00"
                         placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        maxLength={5}
                       />
                       <Text style={s.timeSep}>–</Text>
                       <TextInput
@@ -670,6 +695,8 @@ export default function VenueNewScreen() {
                         onChangeText={(v) => updateDay(i, { closeTime: v })}
                         placeholder="22:00"
                         placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        maxLength={5}
                       />
                     </>
                   )}

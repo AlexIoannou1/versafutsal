@@ -21,6 +21,7 @@ import {
   getGetOwnerVenueQueryKey,
   getListOwnerVenuesQueryKey,
   updateVenue,
+  validateRequestBody,
 } from "@workspace/api-client-react";
 
 const DISTRICTS = ["Nicosia", "Limassol", "Larnaca", "Paphos", "Ayia Napa", "Protaras", "Kyrenia"];
@@ -109,8 +110,9 @@ export default function EditVenueScreen() {
       setPhoneError("Contact phone number is required.");
       valid = false;
     }
-    const windowVal = parseInt(cancellationWindowHours, 10);
-    if (isNaN(windowVal) || windowVal < 0 || windowVal > 168) {
+    const windowValue = cancellationWindowHours.trim();
+    const windowVal = /^\d+$/.test(windowValue) ? Number(windowValue) : NaN;
+    if (!Number.isSafeInteger(windowVal) || windowVal < 0 || windowVal > 168) {
       setWindowError("Must be between 0 and 168 hours.");
       valid = false;
     }
@@ -119,17 +121,22 @@ export default function EditVenueScreen() {
 
   const handleSave = async () => {
     if (!validate()) return;
+    const venuePayload = {
+      name: name.trim(),
+      district: district || undefined,
+      address: address.trim(),
+      description: description.trim() || undefined,
+      contactPhone: contactPhone.trim(),
+      cancellationWindowHours: Number(cancellationWindowHours.trim()),
+      amenities: selectedAmenities,
+    };
+    if (!validateRequestBody("PUT", `/owner/venues/${id}`, venuePayload).success) {
+      Alert.alert("Invalid venue", "Please review the venue details and try again.");
+      return;
+    }
     setSaving(true);
     try {
-      await updateVenue(id!, {
-        name: name.trim(),
-        district: district || undefined,
-        address: address.trim(),
-        description: description.trim() || undefined,
-        contactPhone: contactPhone.trim(),
-        cancellationWindowHours: parseInt(cancellationWindowHours, 10),
-        amenities: selectedAmenities,
-      });
+      await updateVenue(id!, venuePayload);
       queryClient.invalidateQueries({ queryKey: getGetOwnerVenueQueryKey(id!) });
       queryClient.invalidateQueries({ queryKey: getListOwnerVenuesQueryKey() });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -246,6 +253,7 @@ export default function EditVenueScreen() {
             placeholder="e.g. Champions Arena"
             placeholderTextColor={colors.mutedForeground}
             autoCapitalize="words"
+            maxLength={100}
           />
           {nameError ? <Text style={s.errorText}>{nameError}</Text> : null}
         </View>
@@ -286,6 +294,7 @@ export default function EditVenueScreen() {
             onChangeText={(v) => { setAddress(v); setAddressError(""); }}
             placeholder="Street, city"
             placeholderTextColor={colors.mutedForeground}
+            maxLength={200}
           />
           {addressError ? <Text style={s.errorText}>{addressError}</Text> : null}
         </View>
@@ -302,6 +311,7 @@ export default function EditVenueScreen() {
             placeholderTextColor={colors.mutedForeground}
             keyboardType="phone-pad"
             autoComplete="tel"
+            maxLength={32}
           />
           {phoneError ? <Text style={s.errorText}>{phoneError}</Text> : null}
           <Text style={s.hintText}>Use the number listed on Google Maps or social media.</Text>
@@ -317,6 +327,7 @@ export default function EditVenueScreen() {
             placeholderTextColor={colors.mutedForeground}
             multiline
             numberOfLines={3}
+            maxLength={1000}
           />
         </View>
 
@@ -353,6 +364,8 @@ export default function EditVenueScreen() {
             value={cancellationWindowHours}
             onChangeText={(v) => { setCancellationWindowHours(v); setWindowError(""); }}
             keyboardType="numeric"
+            inputMode="numeric"
+            maxLength={3}
             placeholder="24"
             placeholderTextColor={colors.mutedForeground}
           />
