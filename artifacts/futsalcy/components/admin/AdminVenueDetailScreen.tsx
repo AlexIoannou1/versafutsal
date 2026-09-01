@@ -439,7 +439,7 @@ export default function AdminVenueDetailScreen({ venueId, visible, onClose }: Pr
     }
 
     const statusColor = STATUS_COLORS[venue.status] ?? colors.mutedForeground;
-    const stripeConnected = !!(venue.owner as { stripeConnectAccountId?: string | null } | null | undefined)?.stripeConnectAccountId;
+    const stripeConnected = venue.owner?.stripeConnected ?? false;
 
     return (
       <ScrollView style={s.scroll} contentContainerStyle={{ paddingBottom: 8 }}>
@@ -501,11 +501,6 @@ export default function AdminVenueDetailScreen({ venueId, visible, onClose }: Pr
                   {stripeConnected ? "✓ Stripe Connected" : "Stripe not connected"}
                 </Text>
               </View>
-              {stripeConnected && (
-                <Text style={[s.metaText, { marginTop: 4, fontSize: 12 }]}>
-                  ID: {(venue.owner as { stripeConnectAccountId: string }).stripeConnectAccountId}
-                </Text>
-              )}
             </>
           ) : (
             <Text style={s.noContent}>Owner information not available.</Text>

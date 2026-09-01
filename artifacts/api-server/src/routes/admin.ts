@@ -12,7 +12,7 @@ import {
   refundsTable,
   auditLogTable,
 } from "@workspace/db/schema";
-import { eq, inArray, and, gte, lte, desc, ilike, or, isNull, ne } from "drizzle-orm";
+import { eq, inArray, and, gte, lte, desc, ilike, or, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 import { sendNotification } from "../lib/notifications";
@@ -97,7 +97,7 @@ router.get<{ id: string }>(
           name: usersTable.name,
           email: usersTable.email,
           phoneNumber: usersTable.phoneNumber,
-          stripeConnectAccountId: usersTable.stripeConnectAccountId,
+          stripeConnected: sql<boolean>`${usersTable.stripeConnectAccountId} IS NOT NULL`,
         })
         .from(usersTable)
         .where(eq(usersTable.id, venue.ownerId))
@@ -703,7 +703,7 @@ router.get("/admin/users", requireAuth, requireRole("ADMIN"), async (req, res) =
         avatarUrl: usersTable.avatarUrl,
         createdAt: usersTable.createdAt,
         deletedAt: usersTable.deletedAt,
-        stripeConnectAccountId: usersTable.stripeConnectAccountId,
+        stripeConnected: sql<boolean>`${usersTable.stripeConnectAccountId} IS NOT NULL`,
       })
       .from(usersTable)
       .where(whereClause)

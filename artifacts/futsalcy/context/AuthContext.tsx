@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 
 export type AppMode = "PLAYER" | "VENUE_OWNER" | "ADMIN";
@@ -40,6 +41,45 @@ const STORAGE_KEYS = {
   MODE: "@futsalcy/mode",
 };
 
+async function getPersistedToken(): Promise<string | null> {
+  try {
+    const token = await SecureStore.getItemAsync(STORAGE_KEYS.TOKEN);
+    if (token) return token;
+  } catch {
+    // SecureStore is unavailable on some web or constrained runtime environments.
+  }
+
+  const legacyToken = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+  if (!legacyToken) return null;
+
+  try {
+    // Only remove the plaintext copy after the secure write succeeds.
+    await SecureStore.setItemAsync(STORAGE_KEYS.TOKEN, legacyToken);
+    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+  } catch {
+    // Keep the legacy token as a safe fallback when SecureStore is unavailable.
+  }
+
+  return legacyToken;
+}
+
+async function persistToken(token: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(STORAGE_KEYS.TOKEN, token);
+    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
+  } catch {
+    // On platforms without SecureStore, retain the existing storage fallback.
+    await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
+  }
+}
+
+async function removePersistedToken(): Promise<void> {
+  await Promise.allSettled([
+    SecureStore.deleteItemAsync(STORAGE_KEYS.TOKEN),
+    AsyncStorage.removeItem(STORAGE_KEYS.TOKEN),
+  ]);
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -55,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const [token, userJson, mode] = await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.TOKEN),
+          getPersistedToken(),
           AsyncStorage.getItem(STORAGE_KEYS.USER),
           AsyncStorage.getItem(STORAGE_KEYS.MODE),
         ]);
@@ -88,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (user: AuthUser, token: string) => {
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token),
+      persistToken(token),
       AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)),
       AsyncStorage.setItem(STORAGE_KEYS.MODE, user.role),
     ]);
@@ -114,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await Promise.all([
-      AsyncStorage.removeItem(STORAGE_KEYS.TOKEN),
+      removePersistedToken(),
       AsyncStorage.removeItem(STORAGE_KEYS.USER),
     ]);
     setAuthTokenGetter(null);

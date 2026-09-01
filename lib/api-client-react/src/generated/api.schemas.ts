@@ -340,7 +340,7 @@ export interface AdminUserRecord {
   avatarUrl?: string | null;
   createdAt: string;
   deletedAt?: string | null;
-  stripeConnectAccountId?: string | null;
+  stripeConnected: boolean;
 }
 
 export type AdminVenueSummaryOwner = {
@@ -358,7 +358,7 @@ export interface AdminVenueOwner {
   name: string;
   email: string;
   phoneNumber?: string | null;
-  stripeConnectAccountId?: string | null;
+  stripeConnected: boolean;
 }
 
 export type AdminVenueDetail = VenueRecord & {

@@ -54,9 +54,8 @@ function getInitials(name: string): string {
     .join("");
 }
 
-function stripeStatus(accountId: string | null): "connected" | "pending" | "none" {
-  if (!accountId) return "none";
-  return "connected";
+function stripeStatus(isConnected: boolean): "connected" | "pending" | "none" {
+  return isConnected ? "connected" : "none";
 }
 
 // ─── Avatar ──────────────────────────────────────────────────────────────────
@@ -116,7 +115,7 @@ function AdminUserCard({
 }) {
   const roleColor = ROLE_COLORS[user.role] ?? colors.mutedForeground;
   const isDeleted = !!user.deletedAt;
-  const stripeState = stripeStatus(user.stripeConnectAccountId);
+  const stripeState = stripeStatus(user.stripeConnected);
 
   return (
     <TouchableOpacity
@@ -261,7 +260,7 @@ function UserDetailModal({
 
   const roleColor = ROLE_COLORS[user.role] ?? colors.mutedForeground;
   const isDeleted = !!user.deletedAt;
-  const stripeState = stripeStatus(user.stripeConnectAccountId);
+  const stripeState = stripeStatus(user.stripeConnected);
 
   return (
     <Modal
@@ -397,13 +396,6 @@ function UserDetailModal({
                   </Text>
                 </View>
               </View>
-              {user.stripeConnectAccountId && (
-                <DetailRow
-                  label="Account ID"
-                  value={user.stripeConnectAccountId}
-                  colors={colors}
-                />
-              )}
             </>
           )}
         </View>

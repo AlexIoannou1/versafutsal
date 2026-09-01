@@ -2214,7 +2214,7 @@ components:
 
     AdminUserRecord:
       type: object
-      required: [id, name, email, role, createdAt]
+      required: [id, name, email, role, createdAt, stripeConnected]
       properties:
         id:
           type: string
@@ -2239,9 +2239,8 @@ components:
           type: string
           format: date-time
           nullable: true
-        stripeConnectAccountId:
-          type: string
-          nullable: true
+        stripeConnected:
+          type: boolean
 
     AdminVenueSummary:
       allOf:
@@ -2276,10 +2275,9 @@ components:
         phoneNumber:
           type: string
           nullable: true
-        stripeConnectAccountId:
-          type: string
-          nullable: true
-      required: [id, name, email]
+        stripeConnected:
+          type: boolean
+      required: [id, name, email, stripeConnected]
 
     AdminVenueDetail:
       allOf:

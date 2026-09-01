@@ -1322,7 +1322,7 @@ export const AdminGetVenueResponse = zod.object({
             name: zod.string(),
             email: zod.string().email(),
             phoneNumber: zod.string().nullish(),
-            stripeConnectAccountId: zod.string().nullish(),
+            stripeConnected: zod.boolean(),
           })
           .nullish(),
         photos: zod.array(
@@ -1496,7 +1496,7 @@ export const AdminListUsersResponse = zod.object({
       avatarUrl: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       deletedAt: zod.coerce.date().nullish(),
-      stripeConnectAccountId: zod.string().nullish(),
+      stripeConnected: zod.boolean(),
     }),
   ),
   total: zod.number(),
