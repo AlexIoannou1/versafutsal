@@ -1,13 +1,28 @@
 import assert from "node:assert/strict";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createRequire } from "node:module";
-import { db, pool } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
 
 type ApiResult = {
   status: number;
   data: Record<string, unknown>;
 };
+
+type RegisteredUser = {
+  id: string;
+  phoneNumber: string | null;
+};
+
+function registeredUser(result: ApiResult): RegisteredUser {
+  const user = result.data.user as Partial<RegisteredUser> | undefined;
+  assert.equal(typeof user?.id, "string");
+  assert.equal(typeof user?.phoneNumber, "string");
+  return user as RegisteredUser;
+}
+
+function token(result: ApiResult): string {
+  assert.equal(typeof result.data.token, "string");
+  return result.data.token as string;
+}
 
 async function request(
   baseUrl: string,
@@ -49,11 +64,19 @@ async function patchProfile(
 }
 
 async function main() {
+  if (!process.env.TEST_DATABASE_URL || process.env.DATABASE_URL !== process.env.TEST_DATABASE_URL) {
+    throw new Error("The unique-phone integration test must run with DATABASE_URL set to TEST_DATABASE_URL");
+  }
+
   // payment-provider.ts still uses CommonJS require for Stripe. The
   // production bundle supplies it; provide the equivalent only for this
   // unbundled ESM integration-test process.
   (globalThis as typeof globalThis & { require: NodeJS.Require }).require = createRequire(import.meta.url);
-  const { default: app } = await import("./app");
+  const [{ db, pool }, { usersTable }, { default: app }] = await Promise.all([
+    import("@workspace/db"),
+    import("@workspace/db/schema"),
+    import("./app"),
+  ]);
   const server = app.listen(0);
   const address = await new Promise<{ port: number }>((resolve, reject) => {
     server.once("error", reject);
@@ -73,6 +96,8 @@ async function main() {
   const profilePhoneA = `9${suffix}2`;
   const profilePhoneB = `9${suffix}3`;
   const targetPhone = `9${suffix}4`;
+  const canonicalRacePhone = `+357${racePhone}`;
+  const canonicalTargetPhone = `+357${targetPhone}`;
   const createdUserIds: string[] = [];
 
   try {
@@ -97,10 +122,17 @@ async function main() {
     );
     const raceConflict = raceResults.find((result) => result.status === 409);
     assert.equal(raceConflict?.data.field, "phoneNumber");
-    for (const result of raceResults) {
-      const user = result.data.user as { id?: string } | undefined;
-      if (user?.id) createdUserIds.push(user.id);
-    }
+    const raceSuccess = raceResults.find((result) => result.status === 201);
+    assert.ok(raceSuccess);
+    const raceUser = registeredUser(raceSuccess);
+    assert.equal(raceUser.phoneNumber, canonicalRacePhone);
+    createdUserIds.push(raceUser.id);
+
+    const raceRows = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.phoneNumber, canonicalRacePhone));
+    assert.equal(raceRows.length, 1);
 
     const [profileA, profileB] = await Promise.all([
       request(baseUrl, "/api/auth/register", {
@@ -119,15 +151,15 @@ async function main() {
     assert.equal(profileA.status, 201);
     assert.equal(profileB.status, 201);
 
-    const profileAUser = profileA.data.user as { id: string };
-    const profileBUser = profileB.data.user as { id: string };
-    const profileAToken = profileA.data.token as string;
-    const profileBToken = profileB.data.token as string;
+    const profileAUser = registeredUser(profileA);
+    const profileBUser = registeredUser(profileB);
+    const profileAToken = token(profileA);
+    const profileBToken = token(profileB);
     createdUserIds.push(profileAUser.id, profileBUser.id);
 
     const profileResults = await Promise.all([
-      patchProfile(baseUrl, profileAToken, `+357 ${targetPhone}`),
-      patchProfile(baseUrl, profileBToken, `00357 ${targetPhone}`),
+      patchProfile(baseUrl, profileAToken, targetPhone),
+      patchProfile(baseUrl, profileBToken, `+357 ${targetPhone}`),
     ]);
     assert.deepEqual(
       profileResults.map((result) => result.status).sort((a, b) => a - b),
@@ -135,6 +167,16 @@ async function main() {
     );
     const profileConflict = profileResults.find((result) => result.status === 409);
     assert.equal(profileConflict?.data.field, "phoneNumber");
+    const profileSuccess = profileResults.find((result) => result.status === 200);
+    assert.ok(profileSuccess);
+    const updatedUser = registeredUser(profileSuccess);
+    assert.equal(updatedUser.phoneNumber, canonicalTargetPhone);
+
+    const targetRows = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.phoneNumber, canonicalTargetPhone));
+    assert.equal(targetRows.length, 1);
 
     console.log("unique phone concurrency checks passed");
   } finally {
@@ -146,7 +188,7 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error("unique phone integration test failed", error instanceof Error ? error.message : "unknown error");
+main().catch(() => {
+  console.error("unique phone integration test failed");
   process.exitCode = 1;
 });
