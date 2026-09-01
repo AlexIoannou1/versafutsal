@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import FeatherIcons from "@/components/FeatherIcons";
 import PhoneNumberField from "@/components/PhoneNumberField";
+import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -64,6 +65,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
   const [confirmPwd, setConfirmPwd] = useState("");
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
@@ -76,6 +78,9 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
       setCurrentPwd("");
       setNewPwd("");
       setConfirmPwd("");
+      setShowCurrent(false);
+      setShowNew(false);
+      setShowConfirm(false);
       setTab("profile");
     }
   }, [visible, user]);
@@ -116,10 +121,6 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
   const handleChangePassword = async () => {
     if (!currentPwd || !newPwd || !confirmPwd) {
       Alert.alert("Validation", "All password fields are required.");
-      return;
-    }
-    if (newPwd.length < 6) {
-      Alert.alert("Validation", "New password must be at least 6 characters.");
       return;
     }
     if (newPwd !== confirmPwd) {
@@ -244,7 +245,12 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
       fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
-    eyeBtn: { padding: 4 },
+    eyeBtn: {
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     chipsRow: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -400,10 +406,16 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       autoComplete="current-password"
                       textContentType="password"
                       maxLength={256}
+                      accessibilityLabel="Current password"
+                      testID="change-password-current"
                     />
                     <TouchableOpacity
                       style={s.eyeBtn}
                       onPress={() => setShowCurrent((v) => !v)}
+                      accessibilityRole="button"
+                      accessibilityLabel={showCurrent ? "Hide current password" : "Show current password"}
+                      accessibilityHint="Toggles whether the current password is visible"
+                      testID="change-password-current-visibility"
                     >
                       <FeatherIcons
                         name={showCurrent ? "eye-off" : "eye"}
@@ -421,14 +433,23 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       style={s.input}
                       value={newPwd}
                       onChangeText={setNewPwd}
-                      placeholder="Min. 6 characters"
+                      placeholder="At least 8 characters"
                       placeholderTextColor={colors.mutedForeground}
                       secureTextEntry={!showNew}
                       autoComplete="new-password"
                       textContentType="newPassword"
                       maxLength={256}
+                      accessibilityLabel="New password"
+                      testID="change-password-new"
                     />
-                    <TouchableOpacity style={s.eyeBtn} onPress={() => setShowNew((v) => !v)}>
+                    <TouchableOpacity
+                      style={s.eyeBtn}
+                      onPress={() => setShowNew((v) => !v)}
+                      accessibilityRole="button"
+                      accessibilityLabel={showNew ? "Hide new password" : "Show new password"}
+                      accessibilityHint="Toggles whether the new password is visible"
+                      testID="change-password-new-visibility"
+                    >
                       <FeatherIcons
                         name={showNew ? "eye-off" : "eye"}
                         size={18}
@@ -436,6 +457,7 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       />
                     </TouchableOpacity>
                   </View>
+                  <PasswordStrengthMeter password={newPwd} />
                 </View>
 
                 <View style={s.field}>
@@ -447,8 +469,27 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
                       onChangeText={setConfirmPwd}
                       placeholder="Repeat new password"
                       placeholderTextColor={colors.mutedForeground}
-                      secureTextEntry
+                      secureTextEntry={!showConfirm}
+                      autoComplete="new-password"
+                      textContentType="newPassword"
+                      maxLength={256}
+                      accessibilityLabel="Confirm new password"
+                      testID="change-password-confirm"
                     />
+                    <TouchableOpacity
+                      style={s.eyeBtn}
+                      onPress={() => setShowConfirm((v) => !v)}
+                      accessibilityRole="button"
+                      accessibilityLabel={showConfirm ? "Hide confirmed password" : "Show confirmed password"}
+                      accessibilityHint="Toggles whether the confirmation is visible"
+                      testID="change-password-confirm-visibility"
+                    >
+                      <FeatherIcons
+                        name={showConfirm ? "eye-off" : "eye"}
+                        size={18}
+                        color={colors.mutedForeground}
+                      />
+                    </TouchableOpacity>
                   </View>
                 </View>
 

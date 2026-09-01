@@ -240,9 +240,7 @@ export default function LoginScreen() {
       fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
-    eyeBtn: {
-      padding: 4,
-    },
+    eyeBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
     loginBtn: {
       backgroundColor: loading ? colors.muted : colors.primary,
       borderRadius: 12,
@@ -360,11 +358,16 @@ export default function LoginScreen() {
               autoComplete="password"
               textContentType="password"
               maxLength={256}
+              accessibilityLabel="Password"
               testID="login-password"
             />
             <TouchableOpacity
               style={s.eyeBtn}
               onPress={() => setShowPassword((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+              accessibilityHint="Toggles whether the password is visible"
+              testID="login-password-visibility"
             >
               <FeatherIcons
                 name={showPassword ? "eye-off" : "eye"}

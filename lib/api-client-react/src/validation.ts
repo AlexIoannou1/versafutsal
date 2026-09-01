@@ -10,7 +10,15 @@ type RequestParser = {
 
 export type ValidationIssue = {
   field: string;
-  code: "required" | "invalid" | "too_long" | "unsafe";
+  code:
+    | "required"
+    | "invalid"
+    | "too_long"
+    | "unsafe"
+    | "password_too_short"
+    | "password_too_long"
+    | "password_unsafe_characters"
+    | "password_too_common";
 };
 
 export type ValidationResult<T = unknown> =
@@ -36,6 +44,16 @@ function schemaFor(method: string, pathname: string) {
 }
 
 function issueCode(issue: { code?: string; message?: string }): ValidationIssue["code"] {
+  switch (issue.message) {
+    case "PASSWORD_TOO_SHORT":
+      return "password_too_short";
+    case "PASSWORD_TOO_LONG":
+      return "password_too_long";
+    case "PASSWORD_UNSAFE_CHARACTERS":
+      return "password_unsafe_characters";
+    case "PASSWORD_TOO_COMMON":
+      return "password_too_common";
+  }
   if (issue.code === "too_big") return "too_long";
   if (issue.code === "too_small" && issue.message?.toLowerCase().includes("required")) return "required";
   if (issue.message?.toLowerCase().includes("unsafe")) return "unsafe";
@@ -74,6 +92,14 @@ export function validationMessage(issue: ValidationIssue): string {
       return `${field} is too long.`;
     case "unsafe":
       return `${field} contains unsupported characters.`;
+    case "password_too_short":
+      return "Password must be at least 8 characters.";
+    case "password_too_long":
+      return "Password must be 256 characters or fewer.";
+    case "password_unsafe_characters":
+      return "Password contains unsupported control characters.";
+    case "password_too_common":
+      return "That password is too common. Choose a different one.";
     default:
       return `${field} is invalid.`;
   }

@@ -1,5 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
-import { normalizePhoneNumber, requestSchemas, uuid } from "@workspace/api-zod";
+import {
+  assessNewPassword,
+  normalizePhoneNumber,
+  passwordPolicyErrorMessage,
+  requestSchemas,
+  uuid,
+} from "@workspace/api-zod";
 
 type Location = "body" | "params" | "query";
 type Parser = { safeParse(value: unknown): { success: boolean; data?: any } };
@@ -34,11 +40,11 @@ const compiled = routeTemplates.map((entry) => {
   return { entry, method, names, regex: new RegExp(`^${pattern}$`) };
 });
 
-function invalid(res: Response, location: Location, field?: string) {
+function invalid(res: Response, location: Location, field?: string, error = "Invalid request input", code?: string) {
   // Deliberately do not disclose fields, payloads, parser details, or Zod errors.
   res.status(400).json({
-    error: "Invalid request input",
-    code: `REQUEST_${location.toUpperCase()}_INVALID`,
+    error,
+    code: code ?? `REQUEST_${location.toUpperCase()}_INVALID`,
     ...(field ? { field } : {}),
   });
 }
@@ -73,6 +79,27 @@ function invalidBodyField(req: Request): string | undefined {
   return undefined;
 }
 
+function newPasswordPolicyFailure(req: Request) {
+  const body = req.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const input = body as Record<string, unknown>;
+  const pathname = req.path.startsWith("/api/") ? req.path.slice(4) : req.path;
+  const field = pathname === "/auth/register"
+    ? "password"
+    : pathname === "/auth/password"
+      ? "newPassword"
+      : undefined;
+  if (!field || typeof input[field] !== "string") return undefined;
+
+  const assessment = assessNewPassword(input[field]);
+  if (assessment.accepted) return undefined;
+  return {
+    field,
+    code: assessment.issue!,
+    error: passwordPolicyErrorMessage(assessment.issue!),
+  };
+}
+
 export function requestValidation(req: Request, res: Response, next: NextFunction) {
   const pathname = req.path.startsWith("/api/") ? req.path.slice(4) : req.path;
   const route = compiled.find((candidate) => candidate.method === req.method && candidate.regex.test(pathname));
@@ -104,6 +131,10 @@ export function requestValidation(req: Request, res: Response, next: NextFunctio
   // Multer owns multipart parsing. Its body is intentionally not touched, while URL params/query remain protected.
   if (req.is("multipart/*")) return next();
   if (!["GET", "HEAD"].includes(req.method)) {
+    const passwordFailure = newPasswordPolicyFailure(req);
+    if (passwordFailure) {
+      return invalid(res, "body", passwordFailure.field, passwordFailure.error, passwordFailure.code);
+    }
     const bodySchema = schema?.body ?? strictEmpty;
     const parsedBody = bodySchema.safeParse(req.body ?? {});
     if (!parsedBody.success) return invalid(res, "body", invalidBodyField(req));

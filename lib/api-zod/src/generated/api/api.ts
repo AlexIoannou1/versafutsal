@@ -19,7 +19,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const registerUserBodyEmailMax = 254;
 
-export const registerUserBodyPasswordMin = 6;
+export const registerUserBodyPasswordMin = 8;
 export const registerUserBodyPasswordMax = 256;
 
 export const registerUserBodyNameMax = 120;
@@ -31,7 +31,10 @@ export const RegisterUserBody = zod.object({
   password: zod
     .string()
     .min(registerUserBodyPasswordMin)
-    .max(registerUserBodyPasswordMax),
+    .max(registerUserBodyPasswordMax)
+    .describe(
+      "New password. Must not contain control characters or match the locally maintained common-password denylist. Twelve or more characters are recommended.",
+    ),
   name: zod.string().min(1).max(registerUserBodyNameMax),
   role: zod
     .enum(["PLAYER", "VENUE_OWNER"])
@@ -51,15 +54,17 @@ export const RegisterUserBody = zod.object({
  */
 export const loginUserBodyEmailMax = 254;
 
-export const loginUserBodyPasswordMin = 6;
 export const loginUserBodyPasswordMax = 256;
 
 export const LoginUserBody = zod.object({
   email: zod.string().email().max(loginUserBodyEmailMax),
   password: zod
     .string()
-    .min(loginUserBodyPasswordMin)
-    .max(loginUserBodyPasswordMax),
+    .min(1)
+    .max(loginUserBodyPasswordMax)
+    .describe(
+      "Existing credential input. This is intentionally separate from new-password requirements so legacy accounts can sign in.",
+    ),
 });
 
 export const loginUserResponseUserPhoneNumberRegExp = new RegExp(
@@ -139,6 +144,35 @@ export const UpdateProfileResponse = zod.object({
     role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
     createdAt: zod.coerce.date(),
   }),
+});
+
+/**
+ * @summary Change the authenticated user's password
+ */
+export const changePasswordBodyCurrentPasswordMax = 256;
+
+export const changePasswordBodyNewPasswordMin = 8;
+export const changePasswordBodyNewPasswordMax = 256;
+
+export const ChangePasswordBody = zod.object({
+  currentPassword: zod
+    .string()
+    .min(1)
+    .max(changePasswordBodyCurrentPasswordMax)
+    .describe(
+      "Existing credential input. This is intentionally separate from new-password requirements so legacy accounts can sign in.",
+    ),
+  newPassword: zod
+    .string()
+    .min(changePasswordBodyNewPasswordMin)
+    .max(changePasswordBodyNewPasswordMax)
+    .describe(
+      "New password. Must not contain control characters or match the locally maintained common-password denylist. Twelve or more characters are recommended.",
+    ),
+});
+
+export const ChangePasswordResponse = zod.object({
+  ok: zod.boolean(),
 });
 
 /**

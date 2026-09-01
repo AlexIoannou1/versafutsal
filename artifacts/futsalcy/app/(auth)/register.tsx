@@ -14,6 +14,7 @@ import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import PhoneNumberField from "@/components/PhoneNumberField";
+import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import * as Haptics from "expo-haptics";
 import { registerUser, validateRequestBody, validationMessage } from "@workspace/api-client-react";
 import type { AppMode } from "@/context/AuthContext";
@@ -222,7 +223,12 @@ export default function RegisterScreen() {
       fontFamily: "PlusJakartaSans_400Regular",
       color: colors.foreground,
     },
-    eyeBtn: { padding: 4 },
+    eyeBtn: {
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     hint: {
       fontSize: 12,
       fontFamily: "PlusJakartaSans_400Regular",
@@ -328,17 +334,22 @@ export default function RegisterScreen() {
               style={s.input}
               value={password}
               onChangeText={(v) => { setPassword(v); clearError(); }}
-              placeholder="Min. 6 characters"
+              placeholder="At least 8 characters"
               placeholderTextColor={colors.mutedForeground}
               secureTextEntry={!showPassword}
               autoComplete="new-password"
               textContentType="newPassword"
               maxLength={256}
+              accessibilityLabel="New password"
               testID="register-password"
             />
             <TouchableOpacity
               style={s.eyeBtn}
               onPress={() => setShowPassword((v) => !v)}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+              accessibilityHint="Toggles whether the password is visible"
+              testID="register-password-visibility"
             >
               <FeatherIcons
                 name={showPassword ? "eye-off" : "eye"}
@@ -347,6 +358,7 @@ export default function RegisterScreen() {
               />
             </TouchableOpacity>
           </View>
+          <PasswordStrengthMeter password={password} />
         </View>
 
         <TouchableOpacity

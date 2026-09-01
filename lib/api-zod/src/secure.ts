@@ -4,6 +4,7 @@ import { normalizePhoneNumber } from "./phone";
 /** Server input primitives. Text values are NFC-normalised before application code sees them. */
 const forbiddenText = /<\s*\/?\s*[a-z!]|(?:--|\/\*)|(?:\bunion\b\s+\bselect\b)|(?:\bdrop\b\s+\btable\b)|(?:\bjavascript\s*:)/i;
 const unsafeControl = /\p{Cc}/u;
+const unsafePasswordCharacters = /[\p{Cc}\p{Cf}]/u;
 const forbiddenFormatControl = /[\u202A-\u202E\u2066-\u2069]/u;
 const nfc = (value: string) => value.normalize("NFC");
 const canonicalText = (min: number, max: number, allowLineBreaks = false) =>
@@ -24,13 +25,143 @@ const canonicalText = (min: number, max: number, allowLineBreaks = false) =>
     );
 export const plainText = (min = 1, max = 256) => canonicalText(min, max);
 export const multilineText = (min = 0, max = 4000) => canonicalText(min, max, true);
-// Passwords deliberately retain their exact value: no trim, case folding, or Unicode
-// normalization. Control characters are rejected without changing the secret.
-export const password = z
-  .string()
-  .min(6)
-  .max(256)
-  .refine((value) => !unsafeControl.test(value) && !forbiddenFormatControl.test(value), "unsafe password");
+
+export const PASSWORD_POLICY_VERSION = "2026-01";
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_RECOMMENDED_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 256;
+
+/**
+ * This deliberately small, versioned list catches passwords that are commonly
+ * guessed without sending password values to an external service. Matching is
+ * case-insensitive, but password bytes are never transformed or persisted here.
+ */
+const COMMON_PASSWORD_DENYLIST = new Set([
+  "00000000",
+  "11111111",
+  "12345678",
+  "123456789",
+  "1234567890",
+  "abc12345",
+  "admin123",
+  "dragon",
+  "football",
+  "iloveyou",
+  "letmein",
+  "monkey",
+  "passw0rd",
+  "password",
+  "password1",
+  "password123",
+  "princess",
+  "qwerty123",
+  "qwertyuiop",
+  "sunshine",
+  "welcome",
+]);
+
+export type PasswordPolicyIssue =
+  | "PASSWORD_TOO_SHORT"
+  | "PASSWORD_TOO_LONG"
+  | "PASSWORD_UNSAFE_CHARACTERS"
+  | "PASSWORD_TOO_COMMON";
+
+export type PasswordStrength = "invalid" | "weak" | "fair" | "good" | "strong";
+
+export type NewPasswordAssessment = {
+  accepted: boolean;
+  issue?: PasswordPolicyIssue;
+  strength: PasswordStrength;
+  guidance: string;
+};
+
+export function passwordPolicyErrorMessage(issue: PasswordPolicyIssue): string {
+  switch (issue) {
+    case "PASSWORD_TOO_SHORT":
+      return `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
+    case "PASSWORD_TOO_LONG":
+      return `Password must be ${PASSWORD_MAX_LENGTH} characters or fewer.`;
+    case "PASSWORD_UNSAFE_CHARACTERS":
+      return "Password contains unsupported control characters.";
+    case "PASSWORD_TOO_COMMON":
+      return "That password is too common. Choose a different one.";
+  }
+}
+
+/**
+ * Assess a new password without logging, normalizing, or otherwise changing it.
+ * Login/current-password input deliberately uses credentialPassword instead.
+ */
+export function assessNewPassword(value: string): NewPasswordAssessment {
+  if (value.length < PASSWORD_MIN_LENGTH) {
+    return {
+      accepted: false,
+      issue: "PASSWORD_TOO_SHORT",
+      strength: "invalid",
+      guidance: `Use at least ${PASSWORD_MIN_LENGTH} characters. ${PASSWORD_RECOMMENDED_LENGTH}+ is recommended.`,
+    };
+  }
+  if (value.length > PASSWORD_MAX_LENGTH) {
+    return {
+      accepted: false,
+      issue: "PASSWORD_TOO_LONG",
+      strength: "invalid",
+      guidance: `Use ${PASSWORD_MAX_LENGTH} characters or fewer.`,
+    };
+  }
+  if (unsafePasswordCharacters.test(value)) {
+    return {
+      accepted: false,
+      issue: "PASSWORD_UNSAFE_CHARACTERS",
+      strength: "invalid",
+      guidance: "Remove control or invisible formatting characters and try again.",
+    };
+  }
+  if (COMMON_PASSWORD_DENYLIST.has(value.toLocaleLowerCase("en-US"))) {
+    return {
+      accepted: false,
+      issue: "PASSWORD_TOO_COMMON",
+      strength: "invalid",
+      guidance: "Choose a password that is not commonly used.",
+    };
+  }
+
+  if (value.length < PASSWORD_RECOMMENDED_LENGTH) {
+    return {
+      accepted: true,
+      strength: "weak",
+      guidance: `${PASSWORD_RECOMMENDED_LENGTH}+ characters is recommended for stronger protection.`,
+    };
+  }
+
+  const uniqueCharacters = new Set([...value]).size;
+  if (value.length >= 20 || (value.length >= 16 && uniqueCharacters >= 8)) {
+    return { accepted: true, strength: "strong", guidance: "Strong password." };
+  }
+  if (value.length >= 14 || uniqueCharacters >= 7) {
+    return { accepted: true, strength: "good", guidance: "Good password length." };
+  }
+  return {
+    accepted: true,
+    strength: "fair",
+    guidance: "Good start. A longer password is even stronger.",
+  };
+}
+
+// Credential input intentionally remains separate from the new-password policy:
+// existing users can sign in with legacy credentials and verify their current password.
+export const credentialPassword = z.string().min(1).max(PASSWORD_MAX_LENGTH);
+export const newPassword = credentialPassword.superRefine((value, ctx) => {
+  const assessment = assessNewPassword(value);
+  if (!assessment.accepted) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: assessment.issue!,
+    });
+  }
+});
+// Retained for callers that only need a credential-input validator.
+export const password = credentialPassword;
 export const uuid = z.string().uuid();
 export const providerId = z.string().min(1).max(255).regex(/^[A-Za-z0-9_:-]+$/);
 export const phone = z
@@ -81,10 +212,10 @@ const reason = multilineText(1, 1000);
 const dateQuery = z.union([isoDate, isoDateTime]);
 
 export const requestSchemas = {
-  "POST /auth/register": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password, name: plainText(1, 120), role: role.optional(), phoneNumber: accountPhone }) },
-  "POST /auth/login": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password }) },
+  "POST /auth/register": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password: newPassword, name: plainText(1, 120), role: role.optional(), phoneNumber: accountPhone }) },
+  "POST /auth/login": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password: credentialPassword }) },
   "PATCH /auth/profile": { body: strict({ name: plainText(1, 120).optional(), email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()).optional(), phoneNumber: accountPhone.optional(), city: plainText(1, 120).nullable().optional() }).refine((v) => Object.keys(v).length > 0) },
-  "PATCH /auth/password": { body: strict({ currentPassword: password, newPassword: password }) },
+  "PATCH /auth/password": { body: strict({ currentPassword: credentialPassword, newPassword }) },
   "PATCH /auth/push-token": { body: strict({ pushToken: z.string().min(1).max(512).regex(/^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/) }) },
   "DELETE /auth/push-token": {},
   "GET /venues": { query: strict({ district: plainText(1, 120).optional(), type: pitchType.optional(), minPrice: queryNumber(0, 100000).optional(), maxPrice: queryNumber(0, 100000).optional() }) },

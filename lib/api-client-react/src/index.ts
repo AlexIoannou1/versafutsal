@@ -21,13 +21,24 @@ export {
 } from "@workspace/api-zod";
 export type { PhoneCountryCode } from "@workspace/api-zod";
 export type { ValidationIssue, ValidationResult } from "./validation";
-export { updateProfile, changePassword } from "./profile-api";
+export { updateProfile } from "./profile-api";
 export { uploadAvatar } from "./uploadAvatar";
 export type {
   UpdateProfileRequest,
   UpdateProfileResponse,
-  ChangePasswordRequest,
 } from "./profile-api";
+export {
+  assessNewPassword,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_POLICY_VERSION,
+  PASSWORD_RECOMMENDED_LENGTH,
+} from "@workspace/api-zod";
+export type {
+  NewPasswordAssessment,
+  PasswordPolicyIssue,
+  PasswordStrength,
+} from "@workspace/api-zod";
 export {
   useCreateManualBooking,
   useUpdateOwnerBooking,

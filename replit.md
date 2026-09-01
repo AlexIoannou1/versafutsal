@@ -28,12 +28,15 @@ Cyprus futsal booking platform (two-sided marketplace).
 - PostgreSQL stores only HMAC-SHA256 digests of those identifiers in `login_rate_limit_buckets`; the HMAC key is derived from the server-side session/JWT secret. Bucket increments use an atomic PostgreSQL upsert, so state is shared across API processes and survives restarts.
 - Client addresses intentionally come from `req.socket.remoteAddress`; forwarded headers are not trusted by the application. If a future deployment puts the server behind a trusted proxy, configure address resolution at that edge before changing this assumption.
 
-### Demo credentials (after seeding)
-| Role | Email | Password |
-|------|-------|----------|
-| Player | player@futsalcy.com | Demo1234! |
-| Venue Owner | owner@futsalcy.com | Demo1234! |
-| Admin | admin@futsalcy.com | Demo1234! |
+### Demo accounts (after seeding)
+Set `DEMO_SEED_PASSWORD` to a non-production password before seeding. The same
+chosen password applies to each account.
+
+| Role | Email |
+|------|-------|
+| Player | player@futsalcy.com |
+| Venue Owner | owner@futsalcy.com |
+| Admin | admin@futsalcy.com |
 
 ### Key files
 - `artifacts/futsalcy/app/_layout.tsx` — root layout with AuthProvider, QueryClient, fonts

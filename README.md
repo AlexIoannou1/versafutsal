@@ -27,7 +27,11 @@ pnpm --filter @workspace/db run push
 ```
 
 ### Seed demo data
+
+Set a non-production password that meets the app password policy, then:
+
 ```bash
+export DEMO_SEED_PASSWORD='choose-a-unique-demo-password'
 pnpm --filter @workspace/api-server run seed
 ```
 
@@ -43,13 +47,15 @@ pnpm --filter @workspace/futsalcy run dev
 
 ---
 
-## Seeded Demo Credentials
+## Seeded Demo Accounts
 
-| Role | Email | Password |
-|------|-------|----------|
-| Player | player@futsalcy.com | Demo1234! |
-| Venue Owner | owner@futsalcy.com | Demo1234! |
-| Admin | admin@futsalcy.com | Demo1234! |
+All seeded accounts use the `DEMO_SEED_PASSWORD` you choose above.
+
+| Role | Email |
+|------|-------|
+| Player | player@futsalcy.com |
+| Venue Owner | owner@futsalcy.com |
+| Admin | admin@futsalcy.com |
 
 ### Seeded Venues
 1. **Nicosia Futsal Center** — 3 pitches (5v5 x2, 7v7 x1) — **PENDING approval**

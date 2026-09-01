@@ -4,13 +4,10 @@
  * Creates demo data for piloting with venues.
  * Run: pnpm --filter @workspace/api-server run seed
  *
- * Seeded credentials:
- *   PLAYER:       player@futsalcy.com   / Demo1234!
- *   VENUE_OWNER:  owner@futsalcy.com    / Demo1234!
- *   ADMIN:        admin@futsalcy.com    / Demo1234!
+ * Set DEMO_SEED_PASSWORD to choose the demo-account password. It must meet the
+ * same new-password policy as user-created accounts.
  */
 
-import bcrypt from "bcryptjs";
 import { db, pool } from "@workspace/db";
 import {
   usersTable,
@@ -21,6 +18,20 @@ import {
   adminSettingsTable,
 } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { assessNewPassword } from "@workspace/api-zod";
+import { hashNewPassword } from "./lib/passwords";
+
+async function createDemoPasswordHash(): Promise<string> {
+  const seedPassword = process.env.DEMO_SEED_PASSWORD;
+  if (!seedPassword) {
+    throw new Error("DEMO_SEED_PASSWORD must be set before running the seed");
+  }
+  const assessment = assessNewPassword(seedPassword);
+  if (!assessment.accepted) {
+    throw new Error("DEMO_SEED_PASSWORD does not meet the password policy");
+  }
+  return hashNewPassword(seedPassword);
+}
 
 async function seed() {
   console.log("🌱 Seeding Versa database...\n");
@@ -42,7 +53,7 @@ async function seed() {
   }
 
   // ─── Users ───────────────────────────────────────────────────────────────
-  const passwordHash = await bcrypt.hash("Demo1234!", 12);
+  const passwordHash = await createDemoPasswordHash();
 
   const userDefs = [
     { email: "player@futsalcy.com", name: "Alex Petridis", role: "PLAYER" as const, phoneNumber: "+35799123456" },
@@ -62,14 +73,14 @@ async function seed() {
 
     if (existing) {
       userIds[u.email] = existing.id;
-      console.log(`ℹ️  User ${u.email} already exists, skipping`);
+      console.log(`ℹ️  Existing ${u.role} account found, skipping`);
     } else {
       const [user] = await db
         .insert(usersTable)
         .values({ email: u.email, name: u.name, role: u.role, passwordHash, phoneNumber: u.phoneNumber })
         .returning();
       userIds[u.email] = user.id;
-      console.log(`✅ Created ${u.role}: ${u.email}`);
+      console.log(`✅ Created ${u.role} account`);
     }
   }
 
@@ -383,13 +394,6 @@ async function seed() {
   await pool.end();
 
   console.log("\n✅ Seed complete!\n");
-  console.log("─────────────────────────────────────────────");
-  console.log("Demo credentials:");
-  console.log("  PLAYER:       player@futsalcy.com  / Demo1234!");
-  console.log("  VENUE_OWNER:  owner@futsalcy.com   / Demo1234!");
-  console.log("  VENUE_OWNER2: owner2@futsalcy.com  / Demo1234!");
-  console.log("  ADMIN:        admin@futsalcy.com   / Demo1234!");
-  console.log("─────────────────────────────────────────────\n");
 }
 
 seed().catch((err) => {

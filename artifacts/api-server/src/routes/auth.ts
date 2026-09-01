@@ -1,9 +1,12 @@
 import { Router, type IRouter } from "express";
-import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import { normalizePhoneNumber } from "@workspace/api-zod";
+import {
+  assessNewPassword,
+  normalizePhoneNumber,
+  passwordPolicyErrorMessage,
+} from "@workspace/api-zod";
 import { signToken, requireAuth } from "../middlewares/auth";
 import type { UserRole } from "@workspace/db";
 import {
@@ -14,6 +17,7 @@ import {
   LOGIN_RATE_LIMIT_MESSAGE,
 } from "../lib/login-rate-limiter";
 import { databaseLoginRateLimitStore } from "../lib/login-rate-limiter-store";
+import { hashNewPassword, verifyPassword } from "../lib/passwords";
 
 const router: IRouter = Router();
 const loginRateLimiter = createLoginRateLimiter({
@@ -47,8 +51,13 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
-    if (password.length < 6) {
-      res.status(400).json({ error: "Password must be at least 6 characters" });
+    const passwordAssessment = assessNewPassword(password);
+    if (!passwordAssessment.accepted) {
+      res.status(400).json({
+        error: passwordPolicyErrorMessage(passwordAssessment.issue!),
+        code: passwordAssessment.issue,
+        field: "password",
+      });
       return;
     }
 
@@ -83,7 +92,7 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await hashNewPassword(password);
 
     // Public registration only allows PLAYER or VENUE_OWNER.
     // ADMIN accounts must be seeded directly or promoted via a protected admin API.
@@ -192,7 +201,7 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       res.status(401).json({ error: INVALID_CREDENTIALS_MESSAGE });
       return;
@@ -253,7 +262,7 @@ router.get("/auth/me", requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("GET /auth/me error:", err);
+    req.log.error({ event: "auth.me.failed", requestId: req.id }, "Get current user request failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -358,8 +367,13 @@ router.patch("/auth/password", requireAuth, async (req, res) => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      res.status(400).json({ error: "New password must be at least 6 characters" });
+    const passwordAssessment = assessNewPassword(newPassword);
+    if (!passwordAssessment.accepted) {
+      res.status(400).json({
+        error: passwordPolicyErrorMessage(passwordAssessment.issue!),
+        code: passwordAssessment.issue,
+        field: "newPassword",
+      });
       return;
     }
 
@@ -374,13 +388,13 @@ router.patch("/auth/password", requireAuth, async (req, res) => {
       return;
     }
 
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
     if (!valid) {
       res.status(401).json({ error: "Current password is incorrect" });
       return;
     }
 
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await hashNewPassword(newPassword);
     await db
       .update(usersTable)
       .set({ passwordHash, updatedAt: new Date() })
@@ -388,7 +402,10 @@ router.patch("/auth/password", requireAuth, async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("PATCH /auth/password error:", err);
+    req.log.error(
+      { event: "auth.password_change.failed", requestId: req.id },
+      "Password change request failed",
+    );
     res.status(500).json({ error: "Internal server error" });
   }
 });

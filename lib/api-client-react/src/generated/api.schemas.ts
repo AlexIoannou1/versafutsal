@@ -98,6 +98,13 @@ export const RegisterRequestRole = {
 } as const;
 
 /**
+ * New password. Must not contain control characters or match the locally maintained common-password denylist. Twelve or more characters are recommended.
+ * @minLength 8
+ * @maxLength 256
+ */
+export type NewPassword = string;
+
+/**
  * Phone number in international or local format; the API returns canonical E.164.
  * @minLength 1
  * @maxLength 32
@@ -107,11 +114,7 @@ export type PhoneNumberInput = string;
 export interface RegisterRequest {
   /** @maxLength 254 */
   email: string;
-  /**
-   * @minLength 6
-   * @maxLength 256
-   */
-  password: string;
+  password: NewPassword;
   /**
    * @minLength 1
    * @maxLength 120
@@ -147,14 +150,26 @@ export interface UpdateProfileResponse {
  */
 export type PhoneNumber = string;
 
+/**
+ * Existing credential input. This is intentionally separate from new-password requirements so legacy accounts can sign in.
+ * @minLength 1
+ * @maxLength 256
+ */
+export type CredentialPassword = string;
+
 export interface LoginRequest {
   /** @maxLength 254 */
   email: string;
-  /**
-   * @minLength 6
-   * @maxLength 256
-   */
-  password: string;
+  password: CredentialPassword;
+}
+
+export interface PasswordChangeRequest {
+  currentPassword: CredentialPassword;
+  newPassword: NewPassword;
+}
+
+export interface PasswordChangeResponse {
+  ok: boolean;
 }
 
 export interface AuthResponse {

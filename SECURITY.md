@@ -11,8 +11,15 @@ All user-controlled request data follows the same boundary:
 2. **Canonicalize plain text, never secrets.** Names, addresses, labels,
    descriptions, reasons, and searches are trimmed and NFC-normalized, bounded
    by field-specific limits, and reject control characters, markup-like input,
-   and common injection signatures. Passwords are length/control-checked but
-   retain their exact value: they are never trimmed, lowercased, or normalized.
+    and common injection signatures. New passwords are checked against a
+    versioned local common-password denylist, must be 8–256 characters, and
+    reject unsafe controls; 12+ characters are recommended. Credential input
+    for login/current-password verification remains separate so legacy users can
+    still sign in and change passwords. Passwords retain their exact value: they
+    are never trimmed, lowercased, or normalized. New passwords are prehashed
+    with versioned SHA-256 to avoid bcrypt's 72-byte input limit, then stored
+    only as bcrypt cost-12 hashes; legacy direct-bcrypt hashes remain verifiable
+    during the transition.
    Optional fields remain optional; required fields cannot be whitespace-only.
 3. **Preserve Unicode.** Policies do not use ASCII-only content allowlists.
    Greek, accented and combining-mark text, and mixed Greek/Latin content are
@@ -30,8 +37,12 @@ All user-controlled request data follows the same boundary:
 The generated OpenAPI/client artifacts describe the public contract, but
 generated types are not the security boundary. `customFetch` performs the same
 shared request-body validation for immediate client-side feedback, while the
-server repeats it authoritatively and returns only generic, localization-ready
-400 error codes.
+server repeats it authoritatively. New-password policy rejections return a safe,
+actionable field/code without exposing password values or parser details.
+
+API request logging uses structured redaction for request bodies, password
+fields, tokens, and authentication headers. Do not log plaintext passwords, raw
+request bodies, access tokens, or unredacted personal data.
 
 When adding a user-controlled field, add its strict schema and route mapping
 before persisting or displaying it, update the OpenAPI request contract, rerun
