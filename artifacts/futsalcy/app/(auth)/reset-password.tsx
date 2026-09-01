@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -26,8 +26,13 @@ export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ token?: string | string[] }>();
-  const token = Array.isArray(params.token) ? params.token[0] : params.token;
-  const isConfirming = Boolean(token);
+  const hasMultipleTokens = Array.isArray(params.token);
+  const rawToken = hasMultipleTokens ? params.token?.[0] : params.token;
+  const token = typeof rawToken === "string" ? rawToken.trim() : undefined;
+  const isConfirming = rawToken !== undefined;
+  const hasValidToken = Boolean(
+    !hasMultipleTokens && token && /^[A-Za-z0-9_-]{40,60}$/.test(token),
+  );
 
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -36,6 +41,20 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [completed, setCompleted] = useState(false);
+
+  useEffect(() => {
+    if (!isConfirming || hasValidToken) return;
+    setError("This password reset link is invalid or incomplete. Request a new link.");
+  }, [hasValidToken, isConfirming]);
+
+  useEffect(() => {
+    if (!completed) return;
+    const timer = setTimeout(() => {
+      router.replace("/(auth)/login");
+    }, 1_500);
+    return () => clearTimeout(timer);
+  }, [completed, router]);
 
   const handleRequest = async () => {
     setError(null);
@@ -65,8 +84,8 @@ export default function ResetPasswordScreen() {
   const handleConfirm = async () => {
     setError(null);
     setMessage(null);
-    if (!token) {
-      setError("This password reset link is invalid or incomplete.");
+    if (!token || !hasValidToken) {
+      setError("This password reset link is invalid or incomplete. Request a new link.");
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -94,6 +113,7 @@ export default function ResetPasswordScreen() {
     try {
       await confirmPasswordReset(validation.data);
       setMessage("Your password has been reset. You can now sign in with your new password.");
+      setCompleted(true);
     } catch {
       setError("This password reset link is invalid or has expired. Request a new link.");
     } finally {
@@ -207,10 +227,16 @@ export default function ResetPasswordScreen() {
         </TouchableOpacity>
 
         <Text style={styles.title}>
-          {isConfirming ? "Choose a new password" : "Reset your password"}
+          {isConfirming && !hasValidToken
+            ? "Reset link unavailable"
+            : isConfirming
+              ? "Choose a new password"
+              : "Reset your password"}
         </Text>
         <Text style={styles.subtitle}>
-          {isConfirming
+          {isConfirming && !hasValidToken
+            ? "This recovery link is incomplete or malformed. Request a new link and use the most recent email."
+            : isConfirming
             ? "Create a secure password for your player account."
             : "Enter your player email. If an active account exists, we'll send a time-limited reset link."}
         </Text>
@@ -242,7 +268,7 @@ export default function ResetPasswordScreen() {
           </View>
         )}
 
-        {isConfirming ? (
+          {isConfirming && hasValidToken ? (
           <>
             <View style={styles.field}>
               <Text style={styles.label}>New password</Text>
@@ -298,7 +324,7 @@ export default function ResetPasswordScreen() {
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={handleConfirm}
-              disabled={loading || Boolean(message)}
+              disabled={loading || completed}
               accessibilityRole="button"
               testID="reset-password-submit"
             >
@@ -307,7 +333,7 @@ export default function ResetPasswordScreen() {
               </Text>
             </TouchableOpacity>
           </>
-        ) : (
+          ) : !isConfirming ? (
           <>
             <View style={styles.field}>
               <Text style={styles.label}>Email</Text>
@@ -342,15 +368,21 @@ export default function ResetPasswordScreen() {
               </Text>
             </TouchableOpacity>
           </>
-        )}
+          ) : null}
 
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => router.replace("/(auth)/login")}
+          onPress={() =>
+            router.replace(isConfirming && !hasValidToken ? "/(auth)/reset-password" : "/(auth)/login")
+          }
           accessibilityRole="button"
         >
           <Text style={styles.secondaryText}>
-            {message && isConfirming ? "Go to sign in" : "Back to sign in"}
+            {isConfirming && !hasValidToken
+              ? "Request a new link"
+              : message && isConfirming
+                ? "Go to sign in now"
+                : "Back to sign in"}
           </Text>
         </TouchableOpacity>
       </ScrollView>

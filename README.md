@@ -86,6 +86,14 @@ Both venues start in **PENDING** state so the Admin role can demonstrate venue a
 | `JWT_SECRET` | **Yes** | JWT signing secret — server refuses to start without it |
 | `PORT` | Yes | Server port (injected by Replit) |
 | `EXPO_PUBLIC_DOMAIN` | Yes | Domain for Expo → API communication |
+| `PASSWORD_RESET_WEB_URL` | Production | Public HTTPS URL of the Versa `/reset-password` page; no query string or fragment |
+| `PASSWORD_RESET_FROM_EMAIL` | Production | Verified Versa sender for password-recovery email, e.g. `Versa <security@your-domain>` |
+| `PASSWORD_RESET_APP_URL` | No | Optional `versafutsalapp://reset-password` deep-link destination for installed apps |
+
+Password-reset email is intentionally disabled until `PASSWORD_RESET_WEB_URL` and
+`PASSWORD_RESET_FROM_EMAIL` are set. Configure them in the production environment
+after Versa has a published public URL; the API returns the same generic response
+whether email delivery is configured or an account exists.
 
 ---
 

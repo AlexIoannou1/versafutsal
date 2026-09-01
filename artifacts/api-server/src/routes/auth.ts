@@ -24,7 +24,11 @@ import {
   hashPasswordResetToken,
   verifyPassword,
 } from "../lib/passwords";
-import { sendPasswordResetEmail } from "../lib/password-reset-email";
+import {
+  assertPasswordResetEmailConfiguration,
+  PasswordResetEmailError,
+  sendPasswordResetEmail,
+} from "../lib/password-reset-email";
 
 const router: IRouter = Router();
 const loginRateLimiter = createLoginRateLimiter({
@@ -54,6 +58,21 @@ async function issuePasswordReset(normalizedEmail: string, log: Logger): Promise
 
   if (!user) return;
 
+  // Validate destination and sender before creating a usable token. This avoids
+  // leaving an active reset link behind when deployment email configuration is
+  // incomplete or unsafe.
+  try {
+    assertPasswordResetEmailConfiguration();
+  } catch (error) {
+    const deliveryOutcome =
+      error instanceof PasswordResetEmailError ? error.outcome : "unknown";
+    log.error(
+      { event: "auth.password_reset.email_configuration_failed", userId: user.id, deliveryOutcome },
+      "Password reset email configuration is unavailable",
+    );
+    return;
+  }
+
   const token = createPasswordResetToken();
   const now = new Date();
   await db.transaction(async (tx) => {
@@ -77,14 +96,16 @@ async function issuePasswordReset(normalizedEmail: string, log: Logger): Promise
   });
 
   try {
-    await sendPasswordResetEmail({ email: user.email, name: user.name, token });
+    const delivery = await sendPasswordResetEmail({ email: user.email, name: user.name, token });
     log.info(
-      { event: "auth.password_reset.email_sent", userId: user.id },
+      { event: "auth.password_reset.email_sent", userId: user.id, deliveryTransport: delivery.transport },
       "Password reset email sent",
     );
-  } catch {
+  } catch (error) {
+    const deliveryOutcome =
+      error instanceof PasswordResetEmailError ? error.outcome : "unknown";
     log.error(
-      { event: "auth.password_reset.email_failed", userId: user.id },
+      { event: "auth.password_reset.email_failed", userId: user.id, deliveryOutcome },
       "Password reset email delivery failed",
     );
   }
