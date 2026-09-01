@@ -297,6 +297,7 @@ export default function PlayerProfileScreen() {
         user={user}
         onClose={() => setEditVisible(false)}
         onSaved={handleSaved}
+        onPasswordChanged={handleLogout}
       />
     </View>
   );

@@ -172,6 +172,24 @@ export interface PasswordChangeResponse {
   ok: boolean;
 }
 
+export interface PasswordResetRequest {
+  /** @maxLength 254 */
+  email: string;
+}
+
+export interface PasswordResetRequestResponse {
+  message: string;
+}
+
+export interface PasswordResetConfirmRequest {
+  /**
+   * Single-use password reset token from the email link.
+   * @pattern ^[A-Za-z0-9_-]{40,60}$
+   */
+  token: string;
+  newPassword: NewPassword;
+}
+
 export interface AuthResponse {
   user: UserProfile;
   token: string;

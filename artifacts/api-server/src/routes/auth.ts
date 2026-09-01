@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { passwordResetTokensTable, usersTable } from "@workspace/db/schema";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import type { Logger } from "pino";
 import {
   assessNewPassword,
   normalizePhoneNumber,
@@ -17,13 +18,77 @@ import {
   LOGIN_RATE_LIMIT_MESSAGE,
 } from "../lib/login-rate-limiter";
 import { databaseLoginRateLimitStore } from "../lib/login-rate-limiter-store";
-import { hashNewPassword, verifyPassword } from "../lib/passwords";
+import {
+  createPasswordResetToken,
+  hashNewPassword,
+  hashPasswordResetToken,
+  verifyPassword,
+} from "../lib/passwords";
+import { sendPasswordResetEmail } from "../lib/password-reset-email";
 
 const router: IRouter = Router();
 const loginRateLimiter = createLoginRateLimiter({
   store: databaseLoginRateLimitStore,
   secret: process.env.SESSION_SECRET ?? process.env.JWT_SECRET ?? "",
 });
+const PASSWORD_RESET_EXPIRY_MS = 30 * 60 * 1000;
+const PASSWORD_RESET_REQUEST_MESSAGE =
+  "If an active player account exists for that email, a reset link will be sent shortly.";
+
+async function issuePasswordReset(normalizedEmail: string, log: Logger): Promise<void> {
+  const [user] = await db
+    .select({
+      id: usersTable.id,
+      email: usersTable.email,
+      name: usersTable.name,
+    })
+    .from(usersTable)
+    .where(
+      and(
+        eq(usersTable.email, normalizedEmail),
+        eq(usersTable.role, "PLAYER"),
+        isNull(usersTable.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!user) return;
+
+  const token = createPasswordResetToken();
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    // Serialize issuance for this user so concurrent requests cannot leave
+    // multiple reset links active.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}, 0))`);
+    await tx
+      .update(passwordResetTokensTable)
+      .set({ usedAt: now })
+      .where(
+        and(
+          eq(passwordResetTokensTable.userId, user.id),
+          isNull(passwordResetTokensTable.usedAt),
+        ),
+      );
+    await tx.insert(passwordResetTokensTable).values({
+      tokenHash: hashPasswordResetToken(token),
+      userId: user.id,
+      expiresAt: new Date(now.getTime() + PASSWORD_RESET_EXPIRY_MS),
+    });
+  });
+
+  try {
+    await sendPasswordResetEmail({ email: user.email, name: user.name, token });
+    log.info(
+      { event: "auth.password_reset.email_sent", userId: user.id },
+      "Password reset email sent",
+    );
+  } catch {
+    log.error(
+      { event: "auth.password_reset.email_failed", userId: user.id },
+      "Password reset email delivery failed",
+    );
+  }
+}
 
 function uniqueViolationField(err: unknown): "email" | "phoneNumber" | null {
   const error = err as { code?: string; constraint?: string; cause?: { code?: string; constraint?: string } };
@@ -129,6 +194,7 @@ router.post("/auth/register", async (req, res) => {
       userId: user.id,
       email: user.email,
       role: user.role,
+      sessionVersion: user.sessionVersion,
     });
 
     res.status(201).json({
@@ -211,6 +277,7 @@ router.post("/auth/login", async (req, res) => {
       userId: user.id,
       email: user.email,
       role: user.role,
+      sessionVersion: user.sessionVersion,
     });
 
     res.json({
@@ -230,6 +297,143 @@ router.post("/auth/login", async (req, res) => {
     req.log.error(
       { event: "auth.login.failed", requestId: req.id },
       "Login request failed",
+    );
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /auth/password-reset/request
+router.post("/auth/password-reset/request", async (req, res) => {
+  const genericResponse = () => {
+    res.json({ message: PASSWORD_RESET_REQUEST_MESSAGE });
+  };
+
+  try {
+    const { email } = req.body as { email: string };
+    const normalizedEmail = canonicalizeAccountIdentifier(email);
+    const rateLimit = await loginRateLimiter.check({
+      accountIdentifier: `password-reset:${normalizedEmail}`,
+      clientAddress: `password-reset:${getCanonicalClientAddress(req)}`,
+    });
+    if (!rateLimit.allowed) {
+      const retryAfterSeconds = rateLimit.retryAfterSeconds ?? 1;
+      req.log.warn(
+        {
+          event: "auth.password_reset.rate_limited",
+          requestId: req.id,
+          scopes: rateLimit.blockedScopes,
+          retryAfterSeconds,
+        },
+        "Password reset request rate limit exceeded",
+      );
+      res
+        .set("Retry-After", String(retryAfterSeconds))
+        .status(429)
+        .json({ error: "Too many password reset requests. Please try again later." });
+      return;
+    }
+
+    const log = req.log.child({ requestId: req.id });
+    setImmediate(() => {
+      void issuePasswordReset(normalizedEmail, log).catch(() => {
+        log.error(
+          { event: "auth.password_reset.background_failed" },
+          "Password reset background processing failed",
+        );
+      });
+    });
+    // Respond before the account lookup, token write, and email call so account
+    // existence cannot be inferred from provider or database response timing.
+    genericResponse();
+  } catch (err) {
+    req.log.error(
+      { event: "auth.password_reset.request_failed", requestId: req.id },
+      "Password reset request failed",
+    );
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /auth/password-reset/confirm
+router.post("/auth/password-reset/confirm", async (req, res) => {
+  try {
+    const { token, newPassword } = req.body as {
+      token: string;
+      newPassword: string;
+    };
+    const passwordAssessment = assessNewPassword(newPassword);
+    if (!passwordAssessment.accepted) {
+      res.status(400).json({
+        error: passwordPolicyErrorMessage(passwordAssessment.issue!),
+        code: passwordAssessment.issue,
+        field: "newPassword",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const tokenHash = hashPasswordResetToken(token);
+    const resetUser = await db.transaction(async (tx) => {
+      const [claimedToken] = await tx
+        .update(passwordResetTokensTable)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(passwordResetTokensTable.tokenHash, tokenHash),
+            isNull(passwordResetTokensTable.usedAt),
+            gt(passwordResetTokensTable.expiresAt, now),
+          ),
+        )
+        .returning({ userId: passwordResetTokensTable.userId });
+
+      if (!claimedToken) return null;
+
+      const passwordHash = await hashNewPassword(newPassword);
+      const [user] = await tx
+        .update(usersTable)
+        .set({
+          passwordHash,
+          sessionVersion: sql`${usersTable.sessionVersion} + 1`,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(usersTable.id, claimedToken.userId),
+            eq(usersTable.role, "PLAYER"),
+            isNull(usersTable.deletedAt),
+          ),
+        )
+        .returning({ id: usersTable.id });
+
+      if (!user) return null;
+
+      // A successful reset revokes any other outstanding reset links.
+      await tx
+        .update(passwordResetTokensTable)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(passwordResetTokensTable.userId, user.id),
+            isNull(passwordResetTokensTable.usedAt),
+          ),
+        );
+      return user;
+    });
+
+    if (!resetUser) {
+      res.status(400).json({ error: "This password reset link is invalid or has expired." });
+      return;
+    }
+
+    req.log.info(
+      { event: "auth.password_reset.completed", requestId: req.id, userId: resetUser.id },
+      "Password reset completed",
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(
+      { event: "auth.password_reset.confirm_failed", requestId: req.id },
+      "Password reset confirmation failed",
     );
     res.status(500).json({ error: "Internal server error" });
   }
@@ -397,7 +601,11 @@ router.patch("/auth/password", requireAuth, async (req, res) => {
     const passwordHash = await hashNewPassword(newPassword);
     await db
       .update(usersTable)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({
+        passwordHash,
+        sessionVersion: sql`${usersTable.sessionVersion} + 1`,
+        updatedAt: new Date(),
+      })
       .where(eq(usersTable.id, req.user!.userId));
 
     res.json({ ok: true });

@@ -18,6 +18,7 @@ export interface JwtPayload {
   userId: string;
   email: string;
   role: UserRole;
+  sessionVersion: number;
 }
 
 declare global {
@@ -49,16 +50,25 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  // Verify account is still active (guards against using tokens after soft-delete)
+  if (!Number.isInteger(payload.sessionVersion) || payload.sessionVersion < 0) {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+
+  // Verify the account is active and invalidate tokens issued before a
+  // security-sensitive credential change.
   (async () => {
     const [row] = await db
-      .select({ deletedAt: usersTable.deletedAt })
+      .select({
+        deletedAt: usersTable.deletedAt,
+        sessionVersion: usersTable.sessionVersion,
+      })
       .from(usersTable)
       .where(eq(usersTable.id, payload.userId))
       .limit(1);
 
-    if (!row || row.deletedAt) {
-      res.status(401).json({ error: "This account has been deleted" });
+    if (!row || row.deletedAt || row.sessionVersion !== payload.sessionVersion) {
+      res.status(401).json({ error: "Invalid or expired token" });
       return;
     }
 

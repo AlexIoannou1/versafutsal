@@ -45,11 +45,18 @@ interface Props {
     avatarUrl?: string | null;
     city?: string | null;
   }) => void;
+  onPasswordChanged: () => Promise<void>;
 }
 
 type Tab = "profile" | "password";
 
-export default function EditProfileSheet({ visible, user, onClose, onSaved }: Props) {
+export default function EditProfileSheet({
+  visible,
+  user,
+  onClose,
+  onSaved,
+  onPasswordChanged,
+}: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -143,11 +150,12 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
     setSaving(true);
     try {
       await changePassword(validation.data);
-      Alert.alert("Success", "Password changed successfully.");
       setCurrentPwd("");
       setNewPwd("");
       setConfirmPwd("");
+      Alert.alert("Success", "Password changed. Please sign in again.");
       onClose();
+      await onPasswordChanged();
     } catch (err: unknown) {
       const e = err as { data?: { error?: string }; message?: string } | null;
       const msg = e?.data?.error ?? e?.message ?? "Failed to change password.";

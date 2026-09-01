@@ -214,6 +214,8 @@ const dateQuery = z.union([isoDate, isoDateTime]);
 export const requestSchemas = {
   "POST /auth/register": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password: newPassword, name: plainText(1, 120), role: role.optional(), phoneNumber: accountPhone }) },
   "POST /auth/login": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password: credentialPassword }) },
+  "POST /auth/password-reset/request": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()) }) },
+  "POST /auth/password-reset/confirm": { body: strict({ token: z.string().regex(/^[A-Za-z0-9_-]{40,60}$/), newPassword }) },
   "PATCH /auth/profile": { body: strict({ name: plainText(1, 120).optional(), email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()).optional(), phoneNumber: accountPhone.optional(), city: plainText(1, 120).nullable().optional() }).refine((v) => Object.keys(v).length > 0) },
   "PATCH /auth/password": { body: strict({ currentPassword: credentialPassword, newPassword }) },
   "PATCH /auth/push-token": { body: strict({ pushToken: z.string().min(1).max(512).regex(/^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/) }) },

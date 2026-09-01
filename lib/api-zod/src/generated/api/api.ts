@@ -90,6 +90,47 @@ export const LoginUserResponse = zod.object({
 });
 
 /**
+ * Always returns the same response whether or not a player account matches the email.
+ * @summary Request a password reset link
+ */
+export const requestPasswordResetBodyEmailMax = 254;
+
+export const RequestPasswordResetBody = zod.object({
+  email: zod.string().email().max(requestPasswordResetBodyEmailMax),
+});
+
+export const RequestPasswordResetResponse = zod.object({
+  message: zod.string(),
+});
+
+/**
+ * @summary Set a new password using a reset token
+ */
+export const confirmPasswordResetBodyTokenRegExp = new RegExp(
+  "^[A-Za-z0-9_-]{40,60}$",
+);
+export const confirmPasswordResetBodyNewPasswordMin = 8;
+export const confirmPasswordResetBodyNewPasswordMax = 256;
+
+export const ConfirmPasswordResetBody = zod.object({
+  token: zod
+    .string()
+    .regex(confirmPasswordResetBodyTokenRegExp)
+    .describe("Single-use password reset token from the email link."),
+  newPassword: zod
+    .string()
+    .min(confirmPasswordResetBodyNewPasswordMin)
+    .max(confirmPasswordResetBodyNewPasswordMax)
+    .describe(
+      "New password. Must not contain control characters or match the locally maintained common-password denylist. Twelve or more characters are recommended.",
+    ),
+});
+
+export const ConfirmPasswordResetResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
  * @summary Get current user
  */
 export const GetMeResponse = zod.object({

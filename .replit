@@ -34,6 +34,7 @@ externalPort = 3000
 [userenv]
 
 [userenv.shared]
+PASSWORD_RESET_FROM_EMAIL = "FutsalCY <no-reply@notifications.versafutsal.com>"
 
 [nix]
 channel = "stable-25_05"

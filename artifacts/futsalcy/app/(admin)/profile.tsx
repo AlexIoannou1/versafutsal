@@ -128,6 +128,7 @@ export default function AdminProfileScreen() {
         user={user}
         onClose={() => setEditVisible(false)}
         onSaved={handleSaved}
+        onPasswordChanged={handleLogout}
       />
     </View>
   );

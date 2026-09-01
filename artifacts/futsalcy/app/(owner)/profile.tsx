@@ -181,6 +181,7 @@ export default function OwnerProfileScreen() {
         user={user}
         onClose={() => setEditVisible(false)}
         onSaved={handleSaved}
+        onPasswordChanged={handleLogout}
       />
     </View>
   );

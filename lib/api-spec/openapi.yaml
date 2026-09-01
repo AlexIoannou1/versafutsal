@@ -101,6 +101,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /auth/password-reset/request:
+    post:
+      operationId: requestPasswordReset
+      tags: [auth]
+      summary: Request a password reset link
+      description: Always returns the same response whether or not a player account matches the email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetRequest"
+      responses:
+        "200":
+          description: Generic response that does not reveal whether an account exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordResetRequestResponse"
+        "429":
+          description: Too many reset requests
+          headers:
+            Retry-After:
+              description: Minimum number of seconds to wait before trying again
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /auth/password-reset/confirm:
+    post:
+      operationId: confirmPasswordReset
+      tags: [auth]
+      summary: Set a new password using a reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordResetConfirmRequest"
+      responses:
+        "200":
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordChangeResponse"
+        "400":
+          description: Invalid, expired, or already-used reset token, or invalid password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /auth/me:
     get:
       operationId: getMe
@@ -1861,6 +1918,33 @@ components:
       properties:
         ok:
           type: boolean
+
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+
+    PasswordResetRequestResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    PasswordResetConfirmRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{40,60}$'
+          description: Single-use password reset token from the email link.
+        newPassword:
+          $ref: "#/components/schemas/NewPassword"
 
     AuthResponse:
       type: object

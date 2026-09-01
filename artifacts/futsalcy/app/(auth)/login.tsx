@@ -241,6 +241,18 @@ export default function LoginScreen() {
       color: colors.foreground,
     },
     eyeBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+    forgotBtn: {
+      alignSelf: "flex-end",
+      minHeight: 44,
+      justifyContent: "center",
+      marginTop: -8,
+      marginBottom: 4,
+    },
+    forgotText: {
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.primary,
+    },
     loginBtn: {
       backgroundColor: loading ? colors.muted : colors.primary,
       borderRadius: 12,
@@ -377,6 +389,15 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <TouchableOpacity
+          style={s.forgotBtn}
+          onPress={() => router.push("/(auth)/reset-password")}
+          accessibilityRole="button"
+          testID="forgot-password"
+        >
+          <Text style={s.forgotText}>Forgot password?</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={s.loginBtn}

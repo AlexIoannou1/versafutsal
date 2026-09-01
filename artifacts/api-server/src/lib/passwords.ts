@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 
 export const BCRYPT_COST = 12;
@@ -16,6 +16,14 @@ function bcryptInputForNewPassword(password: string): string {
 
 export async function hashNewPassword(password: string): Promise<string> {
   return bcrypt.hash(bcryptInputForNewPassword(password), BCRYPT_COST);
+}
+
+export function createPasswordResetToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashPasswordResetToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
 /**
