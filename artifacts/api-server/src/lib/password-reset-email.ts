@@ -5,6 +5,7 @@ const RESET_EMAIL_TIMEOUT_MS = 10_000;
 const RESET_WEB_URL_ENV = "PASSWORD_RESET_WEB_URL";
 const RESET_FROM_EMAIL_ENV = "PASSWORD_RESET_FROM_EMAIL";
 const RESET_APP_URL_ENV = "PASSWORD_RESET_APP_URL";
+const REPLIT_DEV_DOMAIN_ENV = "REPLIT_DEV_DOMAIN";
 
 type DeliveryTransport = "resend" | "test_outbox";
 type DeliveryFailure = "configuration" | "timeout" | "provider_error" | "unknown";
@@ -82,7 +83,11 @@ function configurationError(): PasswordResetEmailError {
 }
 
 function getResetWebUrl(token: string): string {
-  const configured = process.env[RESET_WEB_URL_ENV]?.trim();
+  const configured =
+    process.env[RESET_WEB_URL_ENV]?.trim() ??
+    (process.env.NODE_ENV !== "production" && process.env[REPLIT_DEV_DOMAIN_ENV]
+      ? `https://${process.env[REPLIT_DEV_DOMAIN_ENV]}/reset-password`
+      : undefined);
   if (!configured) throw configurationError();
 
   let resetUrl: URL;

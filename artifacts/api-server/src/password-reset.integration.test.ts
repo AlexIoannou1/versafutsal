@@ -66,6 +66,7 @@ async function main(): Promise<void> {
     { passwordResetTokensTable, usersTable },
     { hashPasswordResetToken },
     {
+      assertPasswordResetEmailConfiguration,
       clearPasswordResetEmailOutboxForTests,
       usePasswordResetEmailOutboxForTests,
     },
@@ -76,6 +77,21 @@ async function main(): Promise<void> {
     import("./lib/password-reset-email"),
   ]);
   const outbox = usePasswordResetEmailOutboxForTests() as ResetEmail[];
+  const configuredResetWebUrl = process.env.PASSWORD_RESET_WEB_URL;
+  const configuredDevDomain = process.env.REPLIT_DEV_DOMAIN;
+  delete process.env.PASSWORD_RESET_WEB_URL;
+  process.env.REPLIT_DEV_DOMAIN = "preview.versa.example";
+  assert.doesNotThrow(() => assertPasswordResetEmailConfiguration());
+  if (configuredResetWebUrl) {
+    process.env.PASSWORD_RESET_WEB_URL = configuredResetWebUrl;
+  } else {
+    delete process.env.PASSWORD_RESET_WEB_URL;
+  }
+  if (configuredDevDomain) {
+    process.env.REPLIT_DEV_DOMAIN = configuredDevDomain;
+  } else {
+    delete process.env.REPLIT_DEV_DOMAIN;
+  }
   const { default: app } = await import("./app");
   const server = app.listen(0);
   const address = await new Promise<{ port: number }>((resolve, reject) => {

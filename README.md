@@ -90,10 +90,11 @@ Both venues start in **PENDING** state so the Admin role can demonstrate venue a
 | `PASSWORD_RESET_FROM_EMAIL` | Production | Verified Versa sender for password-recovery email, e.g. `Versa <security@your-domain>` |
 | `PASSWORD_RESET_APP_URL` | No | Optional `versafutsalapp://reset-password` deep-link destination for installed apps |
 
-Password-reset email is intentionally disabled until `PASSWORD_RESET_WEB_URL` and
-`PASSWORD_RESET_FROM_EMAIL` are set. Configure them in the production environment
-after Versa has a published public URL; the API returns the same generic response
-whether email delivery is configured or an account exists.
+In development, password-reset emails use the current Replit app's
+`/reset-password` page when `PASSWORD_RESET_WEB_URL` is not set. In production,
+both `PASSWORD_RESET_WEB_URL` and `PASSWORD_RESET_FROM_EMAIL` are required before
+emails can be delivered; the API returns the same generic response whether email
+delivery is configured or an account exists.
 
 ---
 
