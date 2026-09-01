@@ -5,4 +5,5 @@
 - [Expo web API base URL routing](expo-api-base-url-routing.md) — on web, derive API base URL from window.location.hostname (strip .expo.); never rely on EXPO_PUBLIC_DOMAIN which goes stale.
 - [Expo ImagePicker FormData — web vs native](expo-imagepicker-formdata.md) — the RN { uri, type, name } FormData trick only works on native; on web you must fetch(uri) to get a real Blob then append a File object.
 - [Expo static build port assumption](expo-static-build-port.md) — the static build expects Metro on 8081; concurrent workflows can make its non-interactive port prompt fail.
+- [Expo dependency refreshes](expo-dependency-refreshes.md) — after pnpm replaces native Expo modules, restart Metro so its file watcher does not retain deleted package paths.
 - [Generated Zod API export](generated-zod-api-export.md) — generated Zod output lives in a nested path; exporting its directory can resolve to a stale sibling file.
