@@ -1,24 +1,9 @@
 import { customFetch } from "./custom-fetch";
-
-export interface UpdateProfileRequest {
-  name?: string;
-  email?: string;
-  phoneNumber?: string;
-  city?: string | null;
-}
-
-export interface UpdateProfileResponse {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    phoneNumber?: string | null;
-    avatarUrl?: string | null;
-    city?: string | null;
-    createdAt: string;
-  };
-}
+import type {
+  UpdateProfileRequest,
+  UpdateProfileResponse,
+} from "./generated/api.schemas";
+export type { UpdateProfileRequest, UpdateProfileResponse } from "./generated/api.schemas";
 
 export interface ChangePasswordRequest {
   currentPassword: string;

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, pgEnum, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, pgEnum, uuid, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -20,7 +20,11 @@ export const usersTable = pgTable("users", {
   deletedOriginalEmail: text("deleted_original_email"), // preserved for login-block lookup after anonymisation
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  // NULL is intentionally allowed for legacy accounts; every new public
+  // registration and every supplied profile phone is non-null and canonical.
+  uniqueIndex("users_phone_number_unique").on(table.phoneNumber),
+]);
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,

@@ -11,6 +11,8 @@ export interface HealthStatus {
 
 export interface ApiError {
   error: string;
+  /** Request field associated with a validation or uniqueness error. */
+  field?: string;
 }
 
 export type AuditEntryPreviousValue = { [key: string]: unknown } | null;
@@ -65,11 +67,18 @@ export const DayType = {
   ALL: "ALL",
 } as const;
 
+/**
+ * Canonical E.164 phone number, or null for a legacy account.
+ * @nullable
+ * @pattern ^\+[1-9][0-9]{7,14}$
+ */
+export type PhoneNumberNullable = string | null;
+
 export interface UserProfile {
   id: string;
   email: string;
   name: string;
-  phoneNumber?: string | null;
+  phoneNumber: PhoneNumberNullable | null;
   avatarUrl?: string | null;
   city?: string | null;
   role: UserRole;
@@ -88,6 +97,13 @@ export const RegisterRequestRole = {
   VENUE_OWNER: "VENUE_OWNER",
 } as const;
 
+/**
+ * Phone number in international or local format; the API returns canonical E.164.
+ * @minLength 1
+ * @maxLength 32
+ */
+export type PhoneNumberInput = string;
+
 export interface RegisterRequest {
   /** @maxLength 254 */
   email: string;
@@ -104,10 +120,32 @@ export interface RegisterRequest {
   /** Public registration only allows PLAYER or VENUE_OWNER. ADMIN accounts must be created via seed or a protected admin API.
    */
   role?: RegisterRequestRole;
-  /** Required for VENUE_OWNER registrations so the platform can verify the business before approving venues. Optional for PLAYERs.
-   */
-  phoneNumber?: string | null;
+  /** Required for all public account registrations. */
+  phoneNumber: PhoneNumberInput;
 }
+
+export interface UpdateProfileRequest {
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  name?: string;
+  /** @maxLength 254 */
+  email?: string;
+  phoneNumber?: PhoneNumberInput;
+  /** @maxLength 120 */
+  city?: string | null;
+}
+
+export interface UpdateProfileResponse {
+  user: UserProfile;
+}
+
+/**
+ * Canonical E.164 phone number.
+ * @pattern ^\+[1-9][0-9]{7,14}$
+ */
+export type PhoneNumber = string;
 
 export interface LoginRequest {
   /** @maxLength 254 */
@@ -478,6 +516,7 @@ export interface BookingPlayerSummary {
   id: string;
   name: string;
   email: string;
+  phoneNumber: PhoneNumberNullable | null;
 }
 
 export type BookingWithDetails = BookingRecord & {

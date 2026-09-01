@@ -45,10 +45,10 @@ async function seed() {
   const passwordHash = await bcrypt.hash("Demo1234!", 12);
 
   const userDefs = [
-    { email: "player@futsalcy.com", name: "Alex Petridis", role: "PLAYER" as const, phoneNumber: "+357 99 123456" },
-    { email: "owner@futsalcy.com", name: "Maria Ioannou", role: "VENUE_OWNER" as const, phoneNumber: "+357 96 234567" },
-    { email: "owner2@futsalcy.com", name: "Nikos Stavrou", role: "VENUE_OWNER" as const, phoneNumber: "+357 97 345678" },
-    { email: "admin@futsalcy.com", name: "Platform Admin", role: "ADMIN" as const, phoneNumber: "+357 22 000001" },
+    { email: "player@futsalcy.com", name: "Alex Petridis", role: "PLAYER" as const, phoneNumber: "+35799123456" },
+    { email: "owner@futsalcy.com", name: "Maria Ioannou", role: "VENUE_OWNER" as const, phoneNumber: "+35796234567" },
+    { email: "owner2@futsalcy.com", name: "Nikos Stavrou", role: "VENUE_OWNER" as const, phoneNumber: "+35797345678" },
+    { email: "admin@futsalcy.com", name: "Platform Admin", role: "ADMIN" as const, phoneNumber: "+35722000001" },
   ];
 
   const userIds: Record<string, string> = {};

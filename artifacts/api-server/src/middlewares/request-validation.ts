@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { requestSchemas, uuid } from "@workspace/api-zod";
+import { normalizePhoneNumber, requestSchemas, uuid } from "@workspace/api-zod";
 
 type Location = "body" | "params" | "query";
 type Parser = { safeParse(value: unknown): { success: boolean; data?: any } };
@@ -34,9 +34,43 @@ const compiled = routeTemplates.map((entry) => {
   return { entry, method, names, regex: new RegExp(`^${pattern}$`) };
 });
 
-function invalid(res: Response, location: Location) {
+function invalid(res: Response, location: Location, field?: string) {
   // Deliberately do not disclose fields, payloads, parser details, or Zod errors.
-  res.status(400).json({ error: "Invalid request input", code: `REQUEST_${location.toUpperCase()}_INVALID` });
+  res.status(400).json({
+    error: "Invalid request input",
+    code: `REQUEST_${location.toUpperCase()}_INVALID`,
+    ...(field ? { field } : {}),
+  });
+}
+
+function invalidBodyField(req: Request): string | undefined {
+  const body = req.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return undefined;
+  const input = body as Record<string, unknown>;
+  const pathname = req.path.startsWith("/api/") ? req.path.slice(4) : req.path;
+
+  if (pathname === "/auth/register") {
+    if (typeof input.name !== "string" || !input.name.trim()) return "name";
+    if (typeof input.email !== "string" || !input.email.trim()) return "email";
+    if (typeof input.password !== "string" || !input.password) return "password";
+    if (typeof input.phoneNumber !== "string" || !input.phoneNumber.trim()) return "phoneNumber";
+    try {
+      normalizePhoneNumber(input.phoneNumber);
+    } catch {
+      return "phoneNumber";
+    }
+  }
+
+  if (pathname === "/auth/profile" && input.phoneNumber !== undefined) {
+    try {
+      if (typeof input.phoneNumber !== "string") throw new Error("invalid");
+      normalizePhoneNumber(input.phoneNumber);
+    } catch {
+      return "phoneNumber";
+    }
+  }
+
+  return undefined;
 }
 
 export function requestValidation(req: Request, res: Response, next: NextFunction) {
@@ -72,7 +106,7 @@ export function requestValidation(req: Request, res: Response, next: NextFunctio
   if (!["GET", "HEAD"].includes(req.method)) {
     const bodySchema = schema?.body ?? strictEmpty;
     const parsedBody = bodySchema.safeParse(req.body ?? {});
-    if (!parsedBody.success) return invalid(res, "body");
+    if (!parsedBody.success) return invalid(res, "body", invalidBodyField(req));
     req.body = parsedBody.data;
   }
   return next();

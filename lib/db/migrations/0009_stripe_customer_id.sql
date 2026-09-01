@@ -1,1 +1,1 @@
-ALTER TABLE "users" ADD COLUMN "stripe_customer_id" text;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "stripe_customer_id" text;

@@ -122,6 +122,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /auth/profile:
+    patch:
+      operationId: updateProfile
+      tags: [auth]
+      summary: Update the authenticated user's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateProfileResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Email or phone number already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   # ── Public Venue Discovery ────────────────────────────────────────────────
   /venues:
     get:
@@ -1608,6 +1641,9 @@ components:
       properties:
         error:
           type: string
+        field:
+          type: string
+          description: Request field associated with a validation or uniqueness error.
       required: [error]
 
     AuditEntry:
@@ -1675,8 +1711,7 @@ components:
         name:
           type: string
         phoneNumber:
-          type: string
-          nullable: true
+          $ref: "#/components/schemas/PhoneNumberNullable"
         avatarUrl:
           type: string
           nullable: true
@@ -1688,7 +1723,7 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, email, name, role, createdAt]
+      required: [id, email, name, phoneNumber, role, createdAt]
 
     RegisterRequest:
       type: object
@@ -1712,12 +1747,50 @@ components:
             Public registration only allows PLAYER or VENUE_OWNER.
             ADMIN accounts must be created via seed or a protected admin API.
         phoneNumber:
+          $ref: "#/components/schemas/PhoneNumberInput"
+          description: Required for all public account registrations.
+      required: [email, password, name, phoneNumber]
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phoneNumber:
+          $ref: "#/components/schemas/PhoneNumberInput"
+        city:
           type: string
           nullable: true
-          description: >
-            Required for VENUE_OWNER registrations so the platform can verify
-            the business before approving venues. Optional for PLAYERs.
-      required: [email, password, name]
+          maxLength: 120
+
+    UpdateProfileResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfile"
+      required: [user]
+
+    PhoneNumber:
+      type: string
+      pattern: '^\+[1-9][0-9]{7,14}$'
+      description: Canonical E.164 phone number.
+
+    PhoneNumberInput:
+      type: string
+      minLength: 1
+      maxLength: 32
+      description: Phone number in international or local format; the API returns canonical E.164.
+
+    PhoneNumberNullable:
+      type: [string, "null"]
+      pattern: '^\+[1-9][0-9]{7,14}$'
+      description: Canonical E.164 phone number, or null for a legacy account.
 
     LoginRequest:
       type: object
@@ -2334,7 +2407,9 @@ components:
         email:
           type: string
           format: email
-      required: [id, name, email]
+        phoneNumber:
+          $ref: "#/components/schemas/PhoneNumberNullable"
+      required: [id, name, email, phoneNumber]
 
     BookingWithDetails:
       allOf:

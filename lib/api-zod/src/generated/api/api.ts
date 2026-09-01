@@ -24,6 +24,8 @@ export const registerUserBodyPasswordMax = 256;
 
 export const registerUserBodyNameMax = 120;
 
+export const registerUserBodyPhoneNumberMax = 32;
+
 export const RegisterUserBody = zod.object({
   email: zod.string().email().max(registerUserBodyEmailMax),
   password: zod
@@ -39,10 +41,9 @@ export const RegisterUserBody = zod.object({
     ),
   phoneNumber: zod
     .string()
-    .nullish()
-    .describe(
-      "Required for VENUE_OWNER registrations so the platform can verify the business before approving venues. Optional for PLAYERs.\n",
-    ),
+    .min(1)
+    .max(registerUserBodyPhoneNumberMax)
+    .describe("Required for all public account registrations."),
 });
 
 /**
@@ -61,12 +62,20 @@ export const LoginUserBody = zod.object({
     .max(loginUserBodyPasswordMax),
 });
 
+export const loginUserResponseUserPhoneNumberRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
+
 export const LoginUserResponse = zod.object({
   user: zod.object({
     id: zod.string().uuid(),
     email: zod.string().email(),
     name: zod.string(),
-    phoneNumber: zod.string().nullish(),
+    phoneNumber: zod
+      .string()
+      .regex(loginUserResponseUserPhoneNumberRegExp)
+      .nullable()
+      .describe("Canonical E.164 phone number, or null for a legacy account."),
     avatarUrl: zod.string().nullish(),
     city: zod.string().nullish(),
     role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
@@ -83,6 +92,52 @@ export const GetMeResponse = zod.object({
     userId: zod.string(),
     email: zod.string(),
     role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
+  }),
+});
+
+/**
+ * @summary Update the authenticated user's profile
+ */
+export const updateProfileBodyNameMax = 120;
+
+export const updateProfileBodyEmailMax = 254;
+
+export const updateProfileBodyPhoneNumberMax = 32;
+
+export const updateProfileBodyCityMax = 120;
+
+export const UpdateProfileBody = zod.object({
+  name: zod.string().min(1).max(updateProfileBodyNameMax).optional(),
+  email: zod.string().email().max(updateProfileBodyEmailMax).optional(),
+  phoneNumber: zod
+    .string()
+    .min(1)
+    .max(updateProfileBodyPhoneNumberMax)
+    .optional()
+    .describe(
+      "Phone number in international or local format; the API returns canonical E.164.",
+    ),
+  city: zod.string().max(updateProfileBodyCityMax).nullish(),
+});
+
+export const updateProfileResponseUserPhoneNumberRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
+
+export const UpdateProfileResponse = zod.object({
+  user: zod.object({
+    id: zod.string().uuid(),
+    email: zod.string().email(),
+    name: zod.string(),
+    phoneNumber: zod
+      .string()
+      .regex(updateProfileResponseUserPhoneNumberRegExp)
+      .nullable()
+      .describe("Canonical E.164 phone number, or null for a legacy account."),
+    avatarUrl: zod.string().nullish(),
+    city: zod.string().nullish(),
+    role: zod.enum(["PLAYER", "VENUE_OWNER", "ADMIN"]),
+    createdAt: zod.coerce.date(),
   }),
 });
 
@@ -720,6 +775,9 @@ export const ListPlayerBookingsQueryParams = zod.object({
     .optional(),
 });
 
+export const listPlayerBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
+
 export const ListPlayerBookingsResponse = zod.object({
   bookings: zod.array(
     zod
@@ -761,6 +819,15 @@ export const ListPlayerBookingsResponse = zod.object({
             id: zod.string().uuid(),
             name: zod.string(),
             email: zod.string().email(),
+            phoneNumber: zod
+              .string()
+              .regex(
+                listPlayerBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp,
+              )
+              .nullable()
+              .describe(
+                "Canonical E.164 phone number, or null for a legacy account.",
+              ),
           }),
         }),
       ),
@@ -773,6 +840,9 @@ export const ListPlayerBookingsResponse = zod.object({
 export const GetPlayerBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
+
+export const getPlayerBookingResponseBookingTwoPlayerPhoneNumberRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 
 export const GetPlayerBookingResponse = zod.object({
   booking: zod
@@ -814,6 +884,13 @@ export const GetPlayerBookingResponse = zod.object({
           id: zod.string().uuid(),
           name: zod.string(),
           email: zod.string().email(),
+          phoneNumber: zod
+            .string()
+            .regex(getPlayerBookingResponseBookingTwoPlayerPhoneNumberRegExp)
+            .nullable()
+            .describe(
+              "Canonical E.164 phone number, or null for a legacy account.",
+            ),
         }),
       }),
     ),
@@ -840,6 +917,9 @@ export const ListOwnerBookingsQueryParams = zod.object({
     .optional()
     .describe("Filter by a specific pitch"),
 });
+
+export const listOwnerBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 
 export const ListOwnerBookingsResponse = zod.object({
   bookings: zod.array(
@@ -882,6 +962,15 @@ export const ListOwnerBookingsResponse = zod.object({
             id: zod.string().uuid(),
             name: zod.string(),
             email: zod.string().email(),
+            phoneNumber: zod
+              .string()
+              .regex(
+                listOwnerBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp,
+              )
+              .nullable()
+              .describe(
+                "Canonical E.164 phone number, or null for a legacy account.",
+              ),
           }),
         }),
       ),
@@ -894,6 +983,9 @@ export const ListOwnerBookingsResponse = zod.object({
 export const GetOwnerBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
+
+export const getOwnerBookingResponseBookingOneTwoPlayerPhoneNumberRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 
 export const GetOwnerBookingResponse = zod.object({
   booking: zod
@@ -935,6 +1027,13 @@ export const GetOwnerBookingResponse = zod.object({
           id: zod.string().uuid(),
           name: zod.string(),
           email: zod.string().email(),
+          phoneNumber: zod
+            .string()
+            .regex(getOwnerBookingResponseBookingOneTwoPlayerPhoneNumberRegExp)
+            .nullable()
+            .describe(
+              "Canonical E.164 phone number, or null for a legacy account.",
+            ),
         }),
       }),
     )
@@ -1339,6 +1438,9 @@ export const AdminListBookingsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
 });
 
+export const adminListBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
+
 export const AdminListBookingsResponse = zod.object({
   bookings: zod.array(
     zod
@@ -1380,6 +1482,15 @@ export const AdminListBookingsResponse = zod.object({
             id: zod.string().uuid(),
             name: zod.string(),
             email: zod.string().email(),
+            phoneNumber: zod
+              .string()
+              .regex(
+                adminListBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp,
+              )
+              .nullable()
+              .describe(
+                "Canonical E.164 phone number, or null for a legacy account.",
+              ),
           }),
         }),
       ),
@@ -1392,6 +1503,9 @@ export const AdminListBookingsResponse = zod.object({
 export const AdminGetBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
+
+export const adminGetBookingResponseBookingTwoPlayerPhoneNumberRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 
 export const AdminGetBookingResponse = zod.object({
   booking: zod
@@ -1433,6 +1547,13 @@ export const AdminGetBookingResponse = zod.object({
           id: zod.string().uuid(),
           name: zod.string(),
           email: zod.string().email(),
+          phoneNumber: zod
+            .string()
+            .regex(adminGetBookingResponseBookingTwoPlayerPhoneNumberRegExp)
+            .nullable()
+            .describe(
+              "Canonical E.164 phone number, or null for a legacy account.",
+            ),
         }),
       }),
     ),

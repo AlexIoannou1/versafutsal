@@ -50,6 +50,10 @@ function formatTimeRange(startIso: string, endIso: string) {
   return `${fmt(new Date(startIso))} – ${fmt(new Date(endIso))}`;
 }
 
+function normalizePhone(value: string | null | undefined): string {
+  return value?.replace(/\D/g, "") ?? "";
+}
+
 export default function AdminBookingsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -104,7 +108,7 @@ export default function AdminBookingsScreen() {
   const filtered = useMemo(() => {
     return bookings.filter((b) => {
       const venue = b.venue as { id?: string; name?: string; district?: string } | undefined;
-      const player = b.player as { name?: string; email?: string } | undefined;
+       const player = b.player as { name?: string; email?: string; phoneNumber?: string | null } | undefined;
 
       // Venue chip filter
       if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
@@ -123,7 +127,9 @@ export default function AdminBookingsScreen() {
         const q = selectedPlayerSearch.toLowerCase();
         const matchPlayer =
           player?.name?.toLowerCase().includes(q) ||
-          player?.email?.toLowerCase().includes(q);
+           player?.email?.toLowerCase().includes(q) ||
+           (normalizePhone(selectedPlayerSearch).length > 0 &&
+             normalizePhone(player?.phoneNumber).includes(normalizePhone(selectedPlayerSearch)));
         if (!matchPlayer) return false;
       }
 
@@ -395,14 +401,14 @@ export default function AdminBookingsScreen() {
 
           {/* Player search filter */}
           <View>
-            <Text style={s.filterLabel}>Player Name / Email</Text>
+             <Text style={s.filterLabel}>Player Name / Email / Phone</Text>
             <View style={s.playerSearchRow}>
               <FeatherIcons name="user" size={14} color={colors.mutedForeground} />
               <TextInput
                 style={s.playerSearchText}
                 value={selectedPlayerSearch}
                 onChangeText={setSelectedPlayerSearch}
-                placeholder="Search player…"
+                 placeholder="Search player name, email or phone…"
                 placeholderTextColor={colors.mutedForeground}
                 autoCapitalize="none"
                 autoCorrect={false}

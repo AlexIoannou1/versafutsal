@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import FeatherIcons from "@/components/FeatherIcons";
+import PhoneNumberField from "@/components/PhoneNumberField";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -343,17 +344,12 @@ export default function EditProfileSheet({ visible, user, onClose, onSaved }: Pr
 
                 <View style={s.field}>
                   <Text style={s.label}>Phone Number</Text>
-                  <View style={s.inputRow}>
-                    <TextInput
-                      style={s.input}
-                      value={phoneNumber}
-                      onChangeText={setPhoneNumber}
-                      placeholder="+357 99 000000"
-                      placeholderTextColor={colors.mutedForeground}
-                      keyboardType="phone-pad"
-                      maxLength={32}
-                    />
-                  </View>
+                  <PhoneNumberField
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    accessibilityLabel="Phone number"
+                    testID="profile-phone"
+                  />
                 </View>
 
                 <View style={s.field}>

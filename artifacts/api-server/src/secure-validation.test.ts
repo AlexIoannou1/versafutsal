@@ -4,6 +4,7 @@ import {
   plainText,
   multilineText,
   password,
+  normalizePhoneNumber,
 } from "@workspace/api-zod";
 import { requestParseError } from "./middlewares/request-validation";
 
@@ -23,12 +24,14 @@ const accepted = register.safeParse({
   password: "  secret  ",
   name: greekName,
   role: "PLAYER",
+  phoneNumber: "99123456",
 });
 assert.equal(accepted.success, true);
 if (accepted.success) {
   assert.equal(accepted.data.email, "maria@example.com");
   assert.equal(accepted.data.password, "  secret  ");
   assert.equal(accepted.data.name, greekName.normalize("NFC"));
+  assert.equal(accepted.data.phoneNumber, "+35799123456");
 }
 
 assert.equal(plainText().safeParse("   ").success, false);
@@ -54,6 +57,19 @@ assert.equal(register.safeParse({
   name: "Player",
   unexpected: "reject me",
 }).success, false);
+assert.equal(register.safeParse({
+  email: "player@example.com",
+  password: "secret",
+  name: "Player",
+}).success, false);
+assert.equal(register.safeParse({
+  email: "player@example.com",
+  password: "secret",
+  name: "Player",
+  phoneNumber: "123",
+}).success, false);
+assert.equal(normalizePhoneNumber("+357 99 123456"), "+35799123456");
+assert.equal(normalizePhoneNumber("00357 99 123456"), "+35799123456");
 assert.equal(login.safeParse({ email: "not-an-email", password: "secret" }).success, false);
 assert.equal(venue.safeParse({
   name: "Venue",

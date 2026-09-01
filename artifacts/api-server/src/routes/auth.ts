@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
+import { normalizePhoneNumber } from "@workspace/api-zod";
 import { signToken, requireAuth } from "../middlewares/auth";
 import type { UserRole } from "@workspace/db";
 import {
@@ -20,6 +21,15 @@ const loginRateLimiter = createLoginRateLimiter({
   secret: process.env.SESSION_SECRET ?? process.env.JWT_SECRET ?? "",
 });
 
+function uniqueViolationField(err: unknown): "email" | "phoneNumber" | null {
+  const error = err as { code?: string; constraint?: string; cause?: { code?: string; constraint?: string } };
+  if (error?.code !== "23505" && error?.cause?.code !== "23505") return null;
+  const constraint = error.constraint ?? error.cause?.constraint ?? "";
+  if (constraint.includes("email")) return "email";
+  if (constraint.includes("phone")) return "phoneNumber";
+  return null;
+}
+
 // POST /auth/register
 router.post("/auth/register", async (req, res) => {
   try {
@@ -31,8 +41,9 @@ router.post("/auth/register", async (req, res) => {
       phoneNumber?: string;
     };
 
-    if (!email || !password || !name) {
-      res.status(400).json({ error: "email, password, and name are required" });
+    if (!email || !password || !name || !phoneNumber) {
+      const field = !name ? "name" : !email ? "email" : !password ? "password" : "phoneNumber";
+      res.status(400).json({ error: "Full name, email, password, and phone number are required", field });
       return;
     }
 
@@ -41,21 +52,34 @@ router.post("/auth/register", async (req, res) => {
       return;
     }
 
-    // Venue owners must provide a phone number for identity verification
-    if ((role === "VENUE_OWNER") && !phoneNumber?.trim()) {
-      res.status(400).json({ error: "Phone number is required for venue owner registration" });
+    let canonicalPhone: string;
+    try {
+      canonicalPhone = normalizePhoneNumber(phoneNumber);
+    } catch {
+      res.status(400).json({ error: "Phone number is invalid", field: "phoneNumber" });
       return;
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
     // Check existing user
     const existing = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, email.toLowerCase()))
+      .where(eq(usersTable.email, normalizedEmail))
       .limit(1);
 
     if (existing.length > 0) {
-      res.status(409).json({ error: "Email already registered" });
+      res.status(409).json({ error: "Email already registered", field: "email" });
+      return;
+    }
+
+    const existingPhone = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.phoneNumber, canonicalPhone))
+      .limit(1);
+    if (existingPhone.length > 0) {
+      res.status(409).json({ error: "Phone number already registered", field: "phoneNumber" });
       return;
     }
 
@@ -67,16 +91,30 @@ router.post("/auth/register", async (req, res) => {
     const userRole: UserRole =
       role && ALLOWED_PUBLIC_ROLES.includes(role) ? role : "PLAYER";
 
-    const [user] = await db
-      .insert(usersTable)
-      .values({
-        email: email.toLowerCase(),
-        passwordHash,
-        name,
-        role: userRole,
-        phoneNumber: phoneNumber?.trim() || null,
-      })
-      .returning();
+    let user: typeof usersTable.$inferSelect;
+    try {
+      [user] = await db
+        .insert(usersTable)
+        .values({
+          email: normalizedEmail,
+          passwordHash,
+          name: name.trim(),
+          role: userRole,
+          phoneNumber: canonicalPhone,
+        })
+        .returning();
+    } catch (err) {
+      const field = uniqueViolationField(err);
+      if (field === "email") {
+        res.status(409).json({ error: "Email already registered", field });
+        return;
+      }
+      if (field === "phoneNumber") {
+        res.status(409).json({ error: "Phone number already registered", field });
+        return;
+      }
+      throw err;
+    }
 
     const token = signToken({
       userId: user.id,
@@ -96,7 +134,7 @@ router.post("/auth/register", async (req, res) => {
       token,
     });
   } catch (err) {
-    console.error("Register error:", err);
+    req.log.error({ event: "auth.register.failed", requestId: req.id }, "Registration request failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -235,7 +273,23 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
     };
 
     if (name !== undefined) updates.name = name.trim();
-    if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber.trim() || null;
+    if (phoneNumber !== undefined) {
+      try {
+        updates.phoneNumber = normalizePhoneNumber(phoneNumber);
+      } catch {
+        res.status(400).json({ error: "Phone number is invalid", field: "phoneNumber" });
+        return;
+      }
+      const existingPhone = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.phoneNumber, updates.phoneNumber))
+        .limit(1);
+      if (existingPhone.length > 0 && existingPhone[0].id !== req.user!.userId) {
+        res.status(409).json({ error: "Phone number already in use", field: "phoneNumber" });
+        return;
+      }
+    }
     if (city !== undefined) updates.city = city?.trim() || null;
 
     if (email !== undefined) {
@@ -247,17 +301,31 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
         .where(eq(usersTable.email, trimmed))
         .limit(1);
       if (existing.length > 0 && existing[0].id !== req.user!.userId) {
-        res.status(409).json({ error: "Email already in use" });
+        res.status(409).json({ error: "Email already in use", field: "email" });
         return;
       }
       updates.email = trimmed;
     }
 
-    const [updated] = await db
-      .update(usersTable)
-      .set(updates)
-      .where(eq(usersTable.id, req.user!.userId))
-      .returning();
+    let updated: typeof usersTable.$inferSelect;
+    try {
+      [updated] = await db
+        .update(usersTable)
+        .set(updates)
+        .where(eq(usersTable.id, req.user!.userId))
+        .returning();
+    } catch (err) {
+      const field = uniqueViolationField(err);
+      if (field === "email") {
+        res.status(409).json({ error: "Email already in use", field });
+        return;
+      }
+      if (field === "phoneNumber") {
+        res.status(409).json({ error: "Phone number already in use", field });
+        return;
+      }
+      throw err;
+    }
 
     res.json({
       user: {
@@ -272,7 +340,7 @@ router.patch("/auth/profile", requireAuth, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("PATCH /auth/profile error:", err);
+    req.log.error({ event: "auth.profile_update.failed", requestId: req.id }, "Profile update failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });

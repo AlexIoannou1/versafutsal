@@ -222,7 +222,7 @@ export default function OwnerBookingsScreen() {
   }, [statusFilter, fromParam, toParam]);
 
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings(apiParams);
-  const serverBookings = (data?.bookings ?? []) as Booking[];
+  const serverBookings = (data?.bookings ?? []) as unknown as Booking[];
 
   // Derive unique venues for client-side venue filter
   const venues = useMemo(() => {

@@ -1,1 +1,1 @@
-ALTER TABLE "users" ADD COLUMN "deleted_at" timestamp;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp;

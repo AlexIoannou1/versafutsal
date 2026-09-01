@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "seed": "tsx src/seed.ts",
     "test:security": "tsx src/secure-validation.test.ts",
+    "test:unique-phone": "tsx src/unique-phone.integration.test.ts",
     "test:login-rate-limit": "tsx src/login-rate-limiter.test.ts",
     "test:login-rate-limit:db": "tsx src/login-rate-limiter-db.test.ts"
   },

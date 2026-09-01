@@ -334,7 +334,7 @@ router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res
     const rows = await db
       .select({
         booking: bookingsTable,
-        player: { id: usersTable.id, name: usersTable.name, email: usersTable.email },
+         player: { id: usersTable.id, name: usersTable.name, email: usersTable.email, phoneNumber: usersTable.phoneNumber },
         venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district, address: venuesTable.address },
         pitch: {
           id: pitchesTable.id,
@@ -358,7 +358,7 @@ router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res
         endAt: r.booking.endAt.toISOString(),
         createdAt: r.booking.createdAt.toISOString(),
         updatedAt: r.booking.updatedAt.toISOString(),
-        player: r.player ?? { id: "", name: "Unknown", email: "" },
+         player: r.player ?? { id: "", name: "Unknown", email: "", phoneNumber: null },
         venue: r.venue ?? { id: "", name: "Unknown", district: "", address: "" },
         pitch: r.pitch ?? { id: "", name: "Unknown", type: "OUTDOOR", size: "", slotDurationMinutes: 60 },
       })),
@@ -377,7 +377,7 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
     const [row] = await db
       .select({
         booking: bookingsTable,
-        player: { id: usersTable.id, name: usersTable.name, email: usersTable.email },
+         player: { id: usersTable.id, name: usersTable.name, email: usersTable.email, phoneNumber: usersTable.phoneNumber },
         venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district, address: venuesTable.address },
         pitch: {
           id: pitchesTable.id,
@@ -406,7 +406,7 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
         endAt: row.booking.endAt.toISOString(),
         createdAt: row.booking.createdAt.toISOString(),
         updatedAt: row.booking.updatedAt.toISOString(),
-        player: row.player ?? { id: "", name: "Unknown", email: "" },
+        player: row.player ?? { id: "", name: "Unknown", email: "", phoneNumber: null },
         venue: row.venue ?? { id: "", name: "Unknown", district: "", address: "" },
         pitch: row.pitch ?? { id: "", name: "Unknown", type: "OUTDOOR", size: "", slotDurationMinutes: 60 },
       },

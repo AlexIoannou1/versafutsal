@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
+import PhoneNumberField from "@/components/PhoneNumberField";
 import * as Haptics from "expo-haptics";
 import { registerUser, validateRequestBody, validationMessage } from "@workspace/api-client-react";
 import type { AppMode } from "@/context/AuthContext";
@@ -112,18 +113,13 @@ export default function RegisterScreen() {
       password,
       name: name.trim(),
       role: selectedMode || "PLAYER",
-      phoneNumber: phoneNumber.trim() || undefined,
+      phoneNumber: phoneNumber.trim(),
     };
     const validation = validateRequestBody<typeof payload>("POST", "/api/auth/register", payload);
     if (!validation.success) {
       setError(validationMessage(validation.issues[0]!));
       return;
     }
-    if (isOwner && !phoneNumber.trim()) {
-      setError("Phone number is required for venue owners so we can verify your account.");
-      return;
-    }
-
     setLoading(true);
     try {
       const data = await registerUser(validation.data);
@@ -282,7 +278,7 @@ export default function RegisterScreen() {
         )}
 
         <View style={s.field}>
-          <Text style={s.label}>Full name</Text>
+          <Text style={s.label}>Full name <Text style={s.required}>*</Text></Text>
           <View style={s.inputRow}>
             <TextInput
               style={s.input}
@@ -298,7 +294,7 @@ export default function RegisterScreen() {
         </View>
 
         <View style={s.field}>
-          <Text style={s.label}>Email</Text>
+          <Text style={s.label}>Email <Text style={s.required}>*</Text></Text>
           <View style={s.inputRow}>
             <TextInput
               style={s.input}
@@ -316,30 +312,17 @@ export default function RegisterScreen() {
         </View>
 
         <View style={s.field}>
-          <Text style={s.label}>
-            Phone number{isOwner ? <Text style={s.required}> *</Text> : null}
-          </Text>
-          <View style={s.inputRow}>
-            <TextInput
-              style={s.input}
-              value={phoneNumber}
-              onChangeText={(v) => { setPhoneNumber(v); clearError(); }}
-              placeholder="+357 99 000000"
-              placeholderTextColor={colors.mutedForeground}
-              keyboardType="phone-pad"
-              maxLength={32}
-              testID="register-phone"
-            />
-          </View>
-          {isOwner && (
-            <Text style={s.hint}>
-              Required for venue owners — we'll call to verify your account before approval.
-            </Text>
-          )}
+          <Text style={s.label}>Phone number <Text style={s.required}>*</Text></Text>
+          <PhoneNumberField
+            value={phoneNumber}
+            onChangeText={(v) => { setPhoneNumber(v); clearError(); }}
+            accessibilityLabel="Phone number"
+            testID="register-phone"
+          />
         </View>
 
         <View style={s.field}>
-          <Text style={s.label}>Password</Text>
+          <Text style={s.label}>Password <Text style={s.required}>*</Text></Text>
           <View style={s.inputRow}>
             <TextInput
               style={s.input}

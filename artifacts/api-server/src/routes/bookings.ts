@@ -111,7 +111,7 @@ type BookingRow = {
   booking: typeof bookingsTable.$inferSelect;
   venue: { id: string; name: string; district: string; address: string };
   pitch: { id: string; name: string; type: string; size: string; slotDurationMinutes: number };
-  player: { id: string; name: string; email: string };
+  player: { id: string; name: string; email: string; phoneNumber?: string | null };
 };
 
 function enrichBooking(row: BookingRow) {
@@ -352,7 +352,7 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
     // All availability checks run inside the transaction so a block created
     // between the pre-check and the insert cannot slip through (TOCTOU fix).
     let booking: typeof bookingsTable.$inferSelect;
-    let player: { id: string; name: string; email: string } | undefined;
+    let player: { id: string; name: string; email: string; phoneNumber?: string | null } | undefined;
     try {
       const result = await db.transaction(async (tx) => {
         // Check availability blocks (inside transaction to prevent race conditions)
@@ -434,7 +434,7 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
 
       booking = result;
       [player] = await db
-        .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email })
+        .select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, phoneNumber: usersTable.phoneNumber })
         .from(usersTable)
         .where(eq(usersTable.id, req.user!.userId))
         .limit(1);
@@ -497,7 +497,7 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
           size: pitchRow.size,
           slotDurationMinutes: pitchRow.slotDurationMinutes,
         },
-        player: player ?? { id: req.user!.userId, name: "", email: req.user!.email ?? "" },
+        player: player ?? { id: req.user!.userId, name: "", email: req.user!.email ?? "", phoneNumber: null },
       },
     });
   } catch (err) {
@@ -543,6 +543,7 @@ router.get("/player/bookings", requireAuth, requireRole("PLAYER"), async (req, r
           id: usersTable.id,
           name: usersTable.name,
           email: usersTable.email,
+          phoneNumber: usersTable.phoneNumber,
         },
       })
       .from(bookingsTable)
@@ -586,6 +587,7 @@ router.get<{ id: string }>(
             id: usersTable.id,
             name: usersTable.name,
             email: usersTable.email,
+            phoneNumber: usersTable.phoneNumber,
           },
         })
         .from(bookingsTable)
@@ -1207,6 +1209,7 @@ router.get<{ id: string }>(
             id: usersTable.id,
             name: usersTable.name,
             email: usersTable.email,
+            phoneNumber: usersTable.phoneNumber,
           },
         })
         .from(bookingsTable)
@@ -1495,6 +1498,7 @@ router.put<{ id: string }>(
             id: usersTable.id,
             name: usersTable.name,
             email: usersTable.email,
+            phoneNumber: usersTable.phoneNumber,
           },
         })
         .from(bookingsTable)

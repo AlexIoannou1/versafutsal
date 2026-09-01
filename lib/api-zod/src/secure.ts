@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizePhoneNumber } from "./phone";
 
 /** Server input primitives. Text values are NFC-normalised before application code sees them. */
 const forbiddenText = /<\s*\/?\s*[a-z!]|(?:--|\/\*)|(?:\bunion\b\s+\bselect\b)|(?:\bdrop\b\s+\btable\b)|(?:\bjavascript\s*:)/i;
@@ -37,6 +38,16 @@ export const phone = z
   .transform((value) => nfc(value).trim())
   .pipe(z.string().min(5).max(32))
   .refine((v) => /^\+?[0-9][0-9 ()-]*$/.test(v), "invalid phone");
+export const accountPhone = z
+  .string()
+  .transform((value, ctx) => {
+    try {
+      return normalizePhoneNumber(value);
+    } catch {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "invalid phone" });
+      return z.NEVER;
+    }
+  });
 export const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 export const isoDate = z
   .string()
@@ -70,9 +81,9 @@ const reason = multilineText(1, 1000);
 const dateQuery = z.union([isoDate, isoDateTime]);
 
 export const requestSchemas = {
-  "POST /auth/register": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password, name: plainText(1, 120), role: role.optional(), phoneNumber: phone.optional() }) },
+  "POST /auth/register": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password, name: plainText(1, 120), role: role.optional(), phoneNumber: accountPhone }) },
   "POST /auth/login": { body: strict({ email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()), password }) },
-  "PATCH /auth/profile": { body: strict({ name: plainText(1, 120).optional(), email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()).optional(), phoneNumber: phone.optional(), city: plainText(1, 120).nullable().optional() }).refine((v) => Object.keys(v).length > 0) },
+  "PATCH /auth/profile": { body: strict({ name: plainText(1, 120).optional(), email: z.string().email().max(254).transform((v) => nfc(v).toLowerCase()).optional(), phoneNumber: accountPhone.optional(), city: plainText(1, 120).nullable().optional() }).refine((v) => Object.keys(v).length > 0) },
   "PATCH /auth/password": { body: strict({ currentPassword: password, newPassword: password }) },
   "PATCH /auth/push-token": { body: strict({ pushToken: z.string().min(1).max(512).regex(/^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/) }) },
   "DELETE /auth/push-token": {},

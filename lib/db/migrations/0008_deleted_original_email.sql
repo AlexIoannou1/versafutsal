@@ -1,1 +1,1 @@
-ALTER TABLE "users" ADD COLUMN "deleted_original_email" text;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deleted_original_email" text;
