@@ -46,6 +46,16 @@ export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
 }
 
+/** Resolve a client request path using the configured Expo API base URL. */
+export function getApiUrl(path: string): string {
+  return resolveUrl(applyBaseUrl(path));
+}
+
+/** Get the bearer token used by the shared API client, if one is configured. */
+export async function getAuthToken(): Promise<string | null> {
+  return _authTokenGetter ? await _authTokenGetter() : null;
+}
+
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== "undefined" && input instanceof Request;
 }

@@ -615,22 +615,39 @@ export const SubmitVenueForApprovalResponse = zod.object({
 });
 
 /**
- * @summary Add a photo URL to a venue
+ * @summary Upload a venue photo
  */
-export const AddVenuePhotoParams = zod.object({
+export const UploadVenuePhotoParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
-export const addVenuePhotoBodySortOrderMin = 0;
-export const addVenuePhotoBodySortOrderMax = 100;
+export const UploadVenuePhotoBody = zod.object({
+  photo: zod
+    .string()
+    .describe(
+      "Image file included as the `photo` field in a multipart\/form-data request.",
+    ),
+});
 
-export const AddVenuePhotoBody = zod.object({
-  url: zod.string().url(),
-  sortOrder: zod
-    .number()
-    .min(addVenuePhotoBodySortOrderMin)
-    .max(addVenuePhotoBodySortOrderMax)
-    .optional(),
+/**
+ * @summary Set the ordered venue-photo list
+ */
+export const ReorderVenuePhotosParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const reorderVenuePhotosBodyOrderedIdsMin = 0;
+export const reorderVenuePhotosBodyOrderedIdsMax = 7;
+
+export const ReorderVenuePhotosBody = zod.object({
+  orderedIds: zod
+    .array(zod.string().uuid())
+    .min(reorderVenuePhotosBodyOrderedIdsMin)
+    .max(reorderVenuePhotosBodyOrderedIdsMax),
+});
+
+export const ReorderVenuePhotosResponse = zod.object({
+  success: zod.boolean(),
 });
 
 /**
@@ -639,6 +656,25 @@ export const AddVenuePhotoBody = zod.object({
 export const DeleteVenuePhotoParams = zod.object({
   venueId: zod.coerce.string().uuid(),
   photoId: zod.coerce.string().uuid(),
+});
+
+/**
+ * @summary Get a processed venue photo
+ */
+export const GetVenuePhotoFileParams = zod.object({
+  photoId: zod.coerce.string().uuid(),
+});
+
+export const getVenuePhotoFileQueryPreviewMax = 512;
+
+export const GetVenuePhotoFileQueryParams = zod.object({
+  preview: zod.coerce
+    .string()
+    .max(getVenuePhotoFileQueryPreviewMax)
+    .optional()
+    .describe(
+      "Short-lived signed token used only to show an unapproved venue photo to its owner.",
+    ),
 });
 
 /**

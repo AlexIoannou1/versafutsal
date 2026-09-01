@@ -470,13 +470,21 @@ export interface UpdatePitchRequest {
   slotDurationMinutes?: number;
 }
 
-export interface AddVenuePhotoRequest {
-  url: string;
+export interface VenuePhotoUpload {
+  /** Image file included as the `photo` field in a multipart/form-data request. */
+  photo: string;
+}
+
+export interface VenuePhotoOrder {
   /**
-   * @minimum 0
-   * @maximum 100
+   * @minItems 0
+   * @maxItems 7
    */
-  sortOrder?: number;
+  orderedIds: string[];
+}
+
+export interface VenuePhotoOrderResult {
+  success: boolean;
 }
 
 export interface SetOpeningHoursRequest {
@@ -755,8 +763,16 @@ export type SubmitVenueForApproval200 = {
   venue: VenueRecord;
 };
 
-export type AddVenuePhoto201 = {
+export type UploadVenuePhoto201 = {
   photo: VenuePhoto;
+};
+
+export type GetVenuePhotoFileParams = {
+  /**
+   * Short-lived signed token used only to show an unapproved venue photo to its owner.
+   * @maxLength 512
+   */
+  preview?: string;
 };
 
 export type CreatePitch201 = {

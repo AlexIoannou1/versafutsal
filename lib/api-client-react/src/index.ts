@@ -5,9 +5,21 @@ export {
   adminDisableVenue as disableVenue,
   useAdminDisableVenue as useDisableVenue,
 } from "./generated/api";
-export { uploadVenuePhoto, reorderVenuePhotos } from "./venue-photos-api";
-export type { VenuePhoto, UploadVenuePhotoResponse } from "./venue-photos-api";
-export { setBaseUrl, setAuthTokenGetter } from "./custom-fetch";
+export {
+  uploadVenuePhotoWithProgress,
+  reorderVenuePhotosWithResult,
+} from "./venue-photos-api";
+export type {
+  VenuePhoto,
+  UploadVenuePhotoResponse,
+  UploadProgressCallback,
+} from "./venue-photos-api";
+export {
+  setBaseUrl,
+  setAuthTokenGetter,
+  getApiUrl,
+  getAuthToken,
+} from "./custom-fetch";
 export type { AuthTokenGetter } from "./custom-fetch";
 export { validateRequestBody, validationMessage } from "./validation";
 export {

@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Response } from "express";
 import multer from "multer";
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { db } from "@workspace/db";
 import {
@@ -14,7 +14,7 @@ import {
   availabilityBlocksTable,
   bookingsTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, inArray, sql, gt, or, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, sql, gt, or, isNull, asc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import {
   assertSupportedImageSignature,
@@ -22,6 +22,12 @@ import {
   validateImageUploadFilename,
   VENUE_IMAGE_POLICY,
 } from "../lib/image-upload-validation";
+import {
+  isVenuePhotoStorageKey,
+  readVenuePhoto,
+  removeVenuePhoto,
+  saveVenuePhoto,
+} from "../lib/venue-photo-storage";
 
 const router: IRouter = Router();
 
@@ -62,38 +68,113 @@ function applyPhotoUpload(req: any, res: any): Promise<boolean> {
   });
 }
 
-// ─── Filesystem photo storage helpers ────────────────────────────────────────
-//
-// Photos are stored in <cwd>/uploads/venue-photos/<venueId>/<uuid>.webp and
-// served via express.static mounted at /api/uploads (see app.ts).
-// The DB stores the relative key: "venue-photos/<venueId>/<uuid>.webp"
-//
+// ─── Object-storage photo helpers ───────────────────────────────────────────
 
-const PHOTO_KEY_PREFIX = "venue-photos/";
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
-const VENUE_PHOTOS_DIR = path.join(UPLOADS_DIR, "venue-photos");
+const PHOTO_KEY_PREFIX = "uploads/venue-photos/";
+const LEGACY_VENUE_PHOTO_PREFIX = "venue-photos/";
+
+function getLegacyVenuePhotoPath(rawUrl: string): string | null {
+  let candidate = rawUrl;
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
+    try {
+      const legacyUrl = new URL(rawUrl);
+      if (!legacyUrl.pathname.startsWith("/api/uploads/venue-photos/")) return null;
+      candidate = legacyUrl.pathname.slice("/api/uploads/".length);
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const normalized = path.posix.normalize(decodeURIComponent(candidate));
+    return normalized.startsWith(LEGACY_VENUE_PHOTO_PREFIX) ? normalized : null;
+  } catch {
+    return null;
+  }
+}
+
+function getVenuePhotoEndpoint(photoId: string): string {
+  const domain =
+    process.env.REPLIT_DOMAINS?.split(",").map((value) => value.trim()).find(Boolean) ??
+    process.env.REPLIT_DEV_DOMAIN;
+  const apiDomain = domain?.replace(".expo.", ".");
+  return apiDomain
+    ? `https://${apiDomain}/api/venue-photos/${photoId}`
+    : `/api/venue-photos/${photoId}`;
+}
+
+function legacyVenuePhotoContentType(filePath: string): string {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".webp":
+      return "image/webp";
+    default:
+      return "application/octet-stream";
+  }
+}
 
 /** Construct the public HTTPS URL for a stored photo key. */
-function resolvePhotoUrl(key: string): string {
-  // Already a full external URL (legacy or external) — return unchanged
-  if (key.startsWith("http://") || key.startsWith("https://")) return key;
-  // Local filesystem key → construct via REPLIT_DEV_DOMAIN
-  const domain = process.env.REPLIT_DEV_DOMAIN;
-  if (!domain) return key;
-  return `https://${domain}/api/uploads/${key}`;
+function resolvePhotoUrl(photo: { id: string; url: string }): string {
+  if (isVenuePhotoStorageKey(photo.url) || getLegacyVenuePhotoPath(photo.url)) {
+    return getVenuePhotoEndpoint(photo.id);
+  }
+  return photo.url;
 }
 
-async function signPhotoUrl(url: string): Promise<string> {
-  return resolvePhotoUrl(url);
+function createOwnerPreviewToken(photoId: string, ownerId: string): string {
+  const expiresAt = Date.now() + 15 * 60 * 1000;
+  const payload = Buffer.from(JSON.stringify({ photoId, ownerId, expiresAt })).toString("base64url");
+  const secret = process.env.JWT_SECRET ?? process.env.SESSION_SECRET;
+  if (!secret) throw new Error("Photo preview signing is not configured");
+  const signature = createHmac("sha256", secret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
 }
 
-async function signPhotoList<T extends { url: string }>(photos: T[]): Promise<T[]> {
-  return photos.map((p) => ({ ...p, url: resolvePhotoUrl(p.url) }));
+function hasValidOwnerPreviewToken(token: unknown, photoId: string, ownerId: string): boolean {
+  if (typeof token !== "string") return false;
+  const [payload, signature] = token.split(".");
+  const secret = process.env.JWT_SECRET ?? process.env.SESSION_SECRET;
+  if (!payload || !signature || !secret) return false;
+  const expected = createHmac("sha256", secret).update(payload).digest("base64url");
+  const provided = Buffer.from(signature);
+  const expectedBytes = Buffer.from(expected);
+  if (provided.length !== expectedBytes.length || !timingSafeEqual(provided, expectedBytes)) return false;
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      photoId?: string;
+      ownerId?: string;
+      expiresAt?: number;
+    };
+    return decoded.photoId === photoId && decoded.ownerId === ownerId && decoded.expiresAt! > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+async function signPhotoUrl(photo: { id: string; url: string }, ownerId?: string): Promise<string> {
+  const url = resolvePhotoUrl(photo);
+  if (ownerId && (isVenuePhotoStorageKey(photo.url) || getLegacyVenuePhotoPath(photo.url))) {
+    return `${url}?preview=${encodeURIComponent(createOwnerPreviewToken(photo.id, ownerId))}`;
+  }
+  return url;
+}
+
+async function signPhotoList<T extends { id: string; url: string }>(
+  photos: T[],
+  ownerId?: string,
+): Promise<T[]> {
+  return Promise.all(
+    photos.map(async (photo) => ({ ...photo, url: await signPhotoUrl(photo, ownerId) })),
+  );
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getVenueWithDetails(venueId: string) {
+async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) {
   const [venue] = await db
     .select()
     .from(venuesTable)
@@ -103,7 +184,11 @@ async function getVenueWithDetails(venueId: string) {
   if (!venue) return null;
 
   const [photos, pitches, hours] = await Promise.all([
-    db.select().from(venuePhotosTable).where(eq(venuePhotosTable.venueId, venueId)),
+    db
+      .select()
+      .from(venuePhotosTable)
+      .where(eq(venuePhotosTable.venueId, venueId))
+      .orderBy(asc(venuePhotosTable.sortOrder), asc(venuePhotosTable.createdAt)),
     db.select().from(pitchesTable).where(eq(pitchesTable.venueId, venueId)),
     db.select().from(openingHoursTable).where(eq(openingHoursTable.venueId, venueId)),
   ]);
@@ -132,7 +217,7 @@ async function getVenueWithDetails(venueId: string) {
       })),
   }));
 
-  const signedPhotos = await signPhotoList(photos);
+  const signedPhotos = await signPhotoList(photos, ownerPreviewForId);
   return { ...venue, photos: signedPhotos, pitches: pitchesWithPricing, openingHours: hours };
 }
 
@@ -254,7 +339,11 @@ router.get("/venues", async (req, res) => {
     const signedVenues = await Promise.all(
       venues.map(async (v) => ({
         ...v,
-        coverPhoto: v.coverPhoto ? await signPhotoUrl(v.coverPhoto) : null,
+        coverPhoto: v.coverPhoto
+          ? await signPhotoUrl(
+              (photosGroupMap.get(v.id) ?? []).find((photo) => photo.url === v.coverPhoto)!,
+            )
+          : null,
         photos: await signPhotoList(v.photos),
       })),
     );
@@ -282,6 +371,49 @@ router.get<{ id: string }>("/venues/:id", async (req, res) => {
   } catch (err) {
     console.error("GET /venues/:id error:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /venue-photos/:photoId — stream a processed venue photo from private object storage.
+// Object keys are never exposed to clients; the opaque photo ID is the public read handle.
+router.get<{ photoId: string }>("/venue-photos/:photoId", async (req, res): Promise<void> => {
+  try {
+    const [record] = await db
+      .select({ photo: venuePhotosTable, venue: venuesTable })
+      .from(venuePhotosTable)
+      .innerJoin(venuesTable, eq(venuesTable.id, venuePhotosTable.venueId))
+      .where(eq(venuePhotosTable.id, req.params.photoId))
+      .limit(1);
+
+    const isOwnerPreview =
+      record &&
+      hasValidOwnerPreviewToken(req.query.preview, record.photo.id, record.venue.ownerId);
+    const legacyPhotoPath = record ? getLegacyVenuePhotoPath(record.photo.url) : null;
+    if (
+      !record ||
+      (!isVenuePhotoStorageKey(record.photo.url) && !legacyPhotoPath) ||
+      (record.venue.status !== "APPROVED" && !isOwnerPreview)
+    ) {
+      res.status(404).json({ error: "Photo not found" });
+      return;
+    }
+
+    const image = isVenuePhotoStorageKey(record.photo.url)
+      ? await readVenuePhoto(record.photo.url)
+      : await readFile(path.join(process.cwd(), "uploads", legacyPhotoPath!));
+    res.set({
+      "Content-Type": isVenuePhotoStorageKey(record.photo.url)
+        ? "image/webp"
+        : legacyVenuePhotoContentType(legacyPhotoPath!),
+      "Cache-Control": isOwnerPreview
+        ? "private, no-store"
+        : "public, max-age=31536000, immutable",
+      "Content-Length": String(image.length),
+    });
+    res.send(image);
+  } catch (error) {
+    req.log.warn({ err: error, photoId: req.params.photoId }, "Unable to read venue photo");
+    res.status(404).json({ error: "Photo not found" });
   }
 });
 
@@ -320,7 +452,12 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
         const rawCover = photoMap.get(v.id) ?? null;
         return {
           ...v,
-          coverPhoto: rawCover ? await signPhotoUrl(rawCover) : null,
+          coverPhoto: rawCover
+            ? await signPhotoUrl(
+                photos.find((photo) => photo.venueId === v.id && photo.url === rawCover)!,
+                req.user!.userId,
+              )
+            : null,
           pitchCount: pitchCountMap.get(v.id) ?? 0,
         };
       }),
@@ -335,7 +472,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
 // GET /owner/venues/:id — owner venue detail
 router.get<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
-    const venue = await getVenueWithDetails(req.params.id);
+    const venue = await getVenueWithDetails(req.params.id, req.user!.userId);
     if (!venue) {
       res.status(404).json({ error: "Venue not found" });
       return;
@@ -568,23 +705,13 @@ router.post<{ id: string }>(
         return;
       }
 
-      const currentPhotos = await db
-        .select({ id: venuePhotosTable.id })
-        .from(venuePhotosTable)
-        .where(eq(venuePhotosTable.venueId, req.params.id));
-
-      if (currentPhotos.length >= 7) {
-        res.status(400).json({ error: "Maximum of 7 photos per venue" });
-        return;
-      }
-
       // Verify signatures before decode, then strip EXIF, auto-orient, and re-encode as WebP.
       let processed: Buffer;
       try {
         assertSupportedImageSignature(req.file.buffer, VENUE_IMAGE_POLICY);
         processed = await reencodeImageAsWebp(req.file.buffer);
       } catch (imageError) {
-        console.warn("Rejected venue image upload:", imageError);
+        req.log.warn({ err: imageError }, "Rejected venue image upload");
         res.status(400).json({
           error: imageError instanceof Error ? imageError.message : "Invalid image file",
         });
@@ -592,30 +719,53 @@ router.post<{ id: string }>(
       }
 
       const uuid = randomUUID();
-      // Use the persisted venue ID, never any client file metadata or filename,
-      // when constructing the storage path.
       const photoKey = `${PHOTO_KEY_PREFIX}${existing.id}/${uuid}.webp`;
-      const venueDir = path.join(VENUE_PHOTOS_DIR, existing.id);
-      const filePath = path.join(venueDir, `${uuid}.webp`);
+      let didStoreObject = false;
 
       try {
-        fs.mkdirSync(venueDir, { recursive: true });
-        await fs.promises.writeFile(filePath, processed);
-      } catch (writeErr) {
-        console.error("Filesystem write error:", writeErr);
+        const photo = await db.transaction(async (tx) => {
+          // Serializes upload counts per venue so concurrent uploads cannot pass the 7-photo limit.
+          await tx.execute(sql`SELECT id FROM venues WHERE id = ${existing.id} FOR UPDATE`);
+          const currentPhotos = await tx
+            .select({ id: venuePhotosTable.id, sortOrder: venuePhotosTable.sortOrder })
+            .from(venuePhotosTable)
+            .where(eq(venuePhotosTable.venueId, existing.id));
+
+          if (currentPhotos.length >= 7) {
+            throw new Error("VENUE_PHOTO_LIMIT_REACHED");
+          }
+
+          await saveVenuePhoto(photoKey, processed);
+          didStoreObject = true;
+          const [created] = await tx
+            .insert(venuePhotosTable)
+            .values({
+              venueId: existing.id,
+              url: photoKey,
+              sortOrder: Math.max(-1, ...currentPhotos.map((photo) => photo.sortOrder)) + 1,
+            })
+            .returning();
+          return created;
+        });
+
+        res.status(201).json({ photo: { ...photo, url: resolvePhotoUrl(photo) } });
+      } catch (storageError) {
+        if (storageError instanceof Error && storageError.message === "VENUE_PHOTO_LIMIT_REACHED") {
+          res.status(400).json({ error: "Maximum of 7 photos per venue" });
+          return;
+        }
+        if (didStoreObject) {
+          try {
+            await removeVenuePhoto(photoKey);
+          } catch (cleanupError) {
+            req.log.error({ err: cleanupError, photoKey }, "Unable to clean up failed venue photo upload");
+          }
+        }
+        req.log.error({ err: storageError }, "Unable to store venue photo");
         res.status(500).json({ error: "Failed to save image" });
-        return;
       }
-
-      const [photo] = await db
-        .insert(venuePhotosTable)
-        .values({ venueId: existing.id, url: photoKey, sortOrder: currentPhotos.length })
-        .returning();
-
-      const photoUrl = resolvePhotoUrl(photoKey);
-      res.status(201).json({ photo: { ...photo, url: photoUrl } });
     } catch (err) {
-      console.error("POST /owner/venues/:id/photos/upload error:", err);
+      req.log.error({ err }, "POST /owner/venues/:id/photos/upload failed");
       res.status(500).json({ error: "Internal server error" });
     }
   },
@@ -651,23 +801,32 @@ router.delete<{ venueId: string; photoId: string }>(
         )
         .limit(1);
 
-      await db
-        .delete(venuePhotosTable)
-        .where(
-          and(
-            eq(venuePhotosTable.id, req.params.photoId),
-            eq(venuePhotosTable.venueId, req.params.venueId),
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(venuePhotosTable)
+          .where(
+            and(
+              eq(venuePhotosTable.id, req.params.photoId),
+              eq(venuePhotosTable.venueId, req.params.venueId),
+            ),
+          );
+        const remainingPhotos = await tx
+          .select({ id: venuePhotosTable.id })
+          .from(venuePhotosTable)
+          .where(eq(venuePhotosTable.venueId, req.params.venueId))
+          .orderBy(asc(venuePhotosTable.sortOrder), asc(venuePhotosTable.createdAt));
+        await Promise.all(
+          remainingPhotos.map((photo, index) =>
+            tx.update(venuePhotosTable).set({ sortOrder: index }).where(eq(venuePhotosTable.id, photo.id)),
           ),
         );
+      });
 
-      // Clean up filesystem file if this is a locally stored photo
-      if (photoRecord?.url.startsWith(PHOTO_KEY_PREFIX)) {
+      if (photoRecord && isVenuePhotoStorageKey(photoRecord.url)) {
         try {
-          const filePath = path.join(UPLOADS_DIR, photoRecord.url);
-          await fs.promises.unlink(filePath);
-        } catch (e) {
-          // Non-fatal — file may already be gone
-          console.warn("Failed to delete photo file from filesystem:", e);
+          await removeVenuePhoto(photoRecord.url);
+        } catch (error) {
+          req.log.warn({ err: error, photoId: photoRecord.id }, "Unable to remove venue photo object");
         }
       }
 
@@ -704,23 +863,39 @@ router.put<{ id: string }>(
         return;
       }
 
-      await Promise.all(
-        orderedIds.map((photoId, idx) =>
-          db
-            .update(venuePhotosTable)
-            .set({ sortOrder: idx })
-            .where(
-              and(
-                eq(venuePhotosTable.id, photoId),
-                eq(venuePhotosTable.venueId, req.params.id),
+      const venuePhotos = await db
+        .select({ id: venuePhotosTable.id })
+        .from(venuePhotosTable)
+        .where(eq(venuePhotosTable.venueId, req.params.id));
+      const knownIds = new Set(venuePhotos.map((photo) => photo.id));
+      const isCompleteOrder =
+        orderedIds.length === venuePhotos.length &&
+        new Set(orderedIds).size === orderedIds.length &&
+        orderedIds.every((photoId) => knownIds.has(photoId));
+      if (!isCompleteOrder) {
+        res.status(400).json({ error: "orderedIds must contain every venue photo exactly once" });
+        return;
+      }
+
+      await db.transaction(async (tx) => {
+        await Promise.all(
+          orderedIds.map((photoId, idx) =>
+            tx
+              .update(venuePhotosTable)
+              .set({ sortOrder: idx })
+              .where(
+                and(
+                  eq(venuePhotosTable.id, photoId),
+                  eq(venuePhotosTable.venueId, req.params.id),
+                ),
               ),
-            ),
-        ),
-      );
+          ),
+        );
+      });
 
       res.json({ success: true });
     } catch (err) {
-      console.error("PUT /owner/venues/:id/photos/reorder error:", err);
+      req.log.error({ err }, "PUT /owner/venues/:id/photos/reorder failed");
       res.status(500).json({ error: "Internal server error" });
     }
   },

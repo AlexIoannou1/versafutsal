@@ -39,14 +39,14 @@ for (const [buffer, mimetype, originalname] of [
   assert.equal((await sharp(output).metadata()).format, "webp");
 }
 
-assert.equal(
-  validateImageUploadFilename({ originalname: "venue.gif" }, VENUE_IMAGE_POLICY),
-  null,
+assert.match(
+  validateImageUploadFilename({ originalname: "venue.gif" }, VENUE_IMAGE_POLICY) ?? "",
+  /Only JPEG, PNG, WebP image files are allowed/,
 );
-assert.doesNotThrow(() =>
-  assertSupportedImageSignature(gif, VENUE_IMAGE_POLICY),
+assert.throws(
+  () => assertSupportedImageSignature(gif, VENUE_IMAGE_POLICY),
+  (error: unknown) => error instanceof ImageUploadError && error.code === "INVALID_SIGNATURE",
 );
-assert.equal((await sharp(await reencodeImageAsWebp(gif)).metadata()).format, "webp");
 
 assert.match(
   validateImageUploadFilename({ originalname: "avatar.php" }, AVATAR_IMAGE_POLICY) ?? "",

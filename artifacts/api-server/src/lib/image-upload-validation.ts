@@ -35,7 +35,7 @@ export const AVATAR_IMAGE_POLICY: ImageUploadPolicy = {
 };
 
 export const VENUE_IMAGE_POLICY: ImageUploadPolicy = {
-  allowedTypes: ["jpeg", "png", "webp", "gif"],
+  allowedTypes: ["jpeg", "png", "webp"],
   maxFileSizeBytes: 5 * 1024 * 1024,
 };
 

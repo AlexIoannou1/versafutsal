@@ -1,4 +1,4 @@
-import React, { useState, useMemo, type ComponentProps } from "react";
+import React, { useState, useMemo, useEffect, type ComponentProps } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -381,6 +382,7 @@ export default function PlayerVenueDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoWidth, setPhotoWidth] = useState(Dimensions.get("window").width);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -391,10 +393,15 @@ export default function PlayerVenueDetailScreen() {
 
   const { data, isLoading, error } = useGetVenue(id!);
   const venue: VenueDetail | undefined = data?.venue;
+  const photoCount = Array.isArray(venue?.photos) ? venue.photos.length : 0;
 
   const { data: favouriteIdsData } = useFavouriteIds();
   const isFavourited = (favouriteIdsData?.venueIds ?? []).includes(id!);
   const toggleFavourite = useToggleFavourite();
+
+  useEffect(() => {
+    if (photoIndex >= photoCount) setPhotoIndex(0);
+  }, [photoIndex, photoCount]);
 
   function handleBookPitch(pitchId: string, pitchName: string, slotMins: number) {
     router.push(
@@ -584,7 +591,8 @@ export default function PlayerVenueDetailScreen() {
     isClosed: boolean;
   }>) ?? [];
   const amenities = (venue.amenities as string[]) ?? [];
-  const currentPhoto = photos[photoIndex];
+  const safePhotoIndex = Math.max(0, Math.min(photoIndex, photos.length - 1));
+  const currentPhoto = photos[safePhotoIndex];
 
   const mapQuery = encodeURIComponent(
     String(venue.name) + " " + String(venue.address) + " " + String(venue.district) + " Cyprus",
@@ -594,24 +602,30 @@ export default function PlayerVenueDetailScreen() {
   return (
     <View style={s.container}>
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-        <View style={s.photoSection}>
+        <View
+          style={s.photoSection}
+          onLayout={(event) => setPhotoWidth(event.nativeEvent.layout.width)}
+        >
           {currentPhoto ? (
             <ScrollView
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              directionalLockEnabled
+              scrollEventThrottle={16}
               onMomentumScrollEnd={(e) => {
                 const idx = Math.round(
                   e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width,
                 );
-                setPhotoIndex(idx);
+                setPhotoIndex(Math.max(0, Math.min(idx, photos.length - 1)));
               }}
             >
               {photos.map((p) => (
                 <Image
                   key={p.id}
                   source={{ uri: p.url }}
-                  style={s.photoImage}
+                  style={[s.photoImage, { width: photoWidth }]}
                   resizeMode="cover"
                 />
               ))}
@@ -630,7 +644,7 @@ export default function PlayerVenueDetailScreen() {
                     s.dot,
                     {
                       backgroundColor:
-                        i === photoIndex ? colors.primaryForeground : "rgba(255,255,255,0.5)",
+                        i === safePhotoIndex ? colors.primaryForeground : "rgba(255,255,255,0.5)",
                     },
                   ]}
                 />

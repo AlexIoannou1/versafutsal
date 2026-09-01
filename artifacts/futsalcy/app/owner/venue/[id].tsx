@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import {
   View,
@@ -13,6 +13,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Image,
+  PanResponder,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
@@ -27,8 +28,8 @@ import {
   getListOwnerVenuesQueryKey,
   submitVenueForApproval,
   deleteVenuePhoto,
-  uploadVenuePhoto,
-  reorderVenuePhotos,
+  uploadVenuePhotoWithProgress,
+  reorderVenuePhotosWithResult,
   createPitch,
   deletePitch,
   setOpeningHours,
@@ -94,6 +95,7 @@ type HourEntry = {
 };
 
 type Photo = { id: string; url: string; sortOrder: number };
+type UploadProgress = { id: string; label: string; progress: number | null };
 
 type VenueDetail = {
   id: string;
@@ -133,8 +135,11 @@ export default function OwnerVenueDetailScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   // ─── Photo state ──────────────────────────────────────────────────────────
-  const [photoUploading, setPhotoUploading] = useState<string | null>(null);
+  const [uploadProgresses, setUploadProgresses] = useState<UploadProgress[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoOrder, setPhotoOrder] = useState<string[] | null>(null);
+  const [draggingPhotoId, setDraggingPhotoId] = useState<string | null>(null);
+  const [photoDragOffset, setPhotoDragOffset] = useState(0);
 
   // ─── New pitch modal state ────────────────────────────────────────────────
   const [pitchModalVisible, setPitchModalVisible] = useState(false);
@@ -266,6 +271,18 @@ export default function OwnerVenueDetailScreen() {
     queryClient.invalidateQueries({ queryKey: getListOwnerVenuesQueryKey() });
   };
 
+  const orderedPhotos = useMemo(() => {
+    const serverPhotos = [...(venue?.photos ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (!photoOrder) return serverPhotos;
+
+    const byId = new Map(serverPhotos.map((photo) => [photo.id, photo]));
+    const savedOrder = photoOrder
+      .map((photoId) => byId.get(photoId))
+      .filter((photo): photo is Photo => Boolean(photo));
+    const knownOrder = new Set(savedOrder.map((photo) => photo.id));
+    return [...savedOrder, ...serverPhotos.filter((photo) => !knownOrder.has(photo.id))];
+  }, [venue?.photos, photoOrder]);
+
   // ─── Submit for approval ──────────────────────────────────────────────────
   const handleSubmit = () => {
     Alert.alert(
@@ -302,12 +319,17 @@ export default function OwnerVenueDetailScreen() {
   };
 
   // ─── Photos ───────────────────────────────────────────────────────────────
-  const handlePickAndUploadPhoto = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const handlePickAndUploadPhoto = async (source: "library" | "camera") => {
+    const permission =
+      source === "camera"
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert(
         "Permission needed",
-        "Please allow access to your photo library to upload venue photos.",
+        source === "camera"
+          ? "Please allow access to your camera to take a venue photo."
+          : "Please allow access to your photo library to upload venue photos.",
       );
       return;
     }
@@ -315,27 +337,55 @@ export default function OwnerVenueDetailScreen() {
     const remaining = 7 - (venue?.photos?.length ?? 0);
     if (remaining <= 0) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-      allowsEditing: false,
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
-      quality: 0.9,
-    });
+    const result =
+      source === "camera"
+        ? await ImagePicker.launchCameraAsync({
+            mediaTypes: "images",
+            allowsEditing: false,
+            quality: 0.9,
+          })
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: "images",
+            allowsEditing: false,
+            allowsMultipleSelection: true,
+            selectionLimit: remaining,
+            quality: 0.9,
+          });
 
     if (result.canceled || result.assets.length === 0) return;
 
     setPhotoError(null);
 
+    const maxFileSize = 5 * 1024 * 1024;
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    const rejectedAsset = result.assets.find(
+      (asset) =>
+        (asset.mimeType != null && !allowedTypes.includes(asset.mimeType)) ||
+        (asset.fileSize != null && asset.fileSize > maxFileSize),
+    );
+    if (rejectedAsset) {
+      setPhotoError(
+        rejectedAsset.fileSize != null && rejectedAsset.fileSize > maxFileSize
+          ? "Image file must be 5 MB or smaller."
+          : "Choose a JPEG, PNG, or WebP image.",
+      );
+      return;
+    }
+
     const assets = result.assets;
+    const uploadIds = assets.map((asset, index) => `${asset.assetId ?? "photo"}-${Date.now()}-${index}`);
+    setUploadProgresses(
+      assets.map((asset, index) => ({
+        id: uploadIds[index]!,
+        label: asset.fileName ?? `Photo ${index + 1}`,
+        progress: 0,
+      })),
+    );
     let failed = 0;
     let lastError = "";
 
     for (let i = 0; i < assets.length; i++) {
       const asset = assets[i];
-      const label =
-        assets.length > 1 ? `Uploading ${i + 1} of ${assets.length}…` : "Uploading…";
-      setPhotoUploading(label);
 
       try {
         let fileArg: File | { uri: string; type: string; name: string };
@@ -346,6 +396,12 @@ export default function OwnerVenueDetailScreen() {
           const resp = await fetch(asset.uri);
           const blob = await resp.blob();
           const mimeType = asset.mimeType ?? blob.type ?? "image/jpeg";
+          if (!allowedTypes.includes(mimeType)) {
+            throw new Error("Choose a JPEG, PNG, or WebP image.");
+          }
+          if (blob.size > maxFileSize) {
+            throw new Error("Image file must be 5 MB or smaller.");
+          }
           const ext = mimeType.split("/")[1] ?? "jpg";
           fileArg = new File([blob], `photo.${ext}`, { type: mimeType });
         } else {
@@ -355,7 +411,13 @@ export default function OwnerVenueDetailScreen() {
           fileArg = { uri, type: mimeType, name: `photo.${ext}` };
         }
 
-        await uploadVenuePhoto(id!, fileArg);
+        await uploadVenuePhotoWithProgress(id!, fileArg, (progress) => {
+          setUploadProgresses((current) =>
+            current.map((upload) =>
+              upload.id === uploadIds[i] ? { ...upload, progress } : upload,
+            ),
+          );
+        });
         invalidate();
       } catch (err: unknown) {
         failed++;
@@ -364,7 +426,7 @@ export default function OwnerVenueDetailScreen() {
       }
     }
 
-    setPhotoUploading(null);
+    setUploadProgresses([]);
     if (failed > 0) {
       setPhotoError(
         assets.length > 1
@@ -383,6 +445,7 @@ export default function OwnerVenueDetailScreen() {
         onPress: async () => {
           try {
             await deleteVenuePhoto(id!, photoId);
+            setPhotoOrder((current) => current?.filter((id) => id !== photoId) ?? null);
             invalidate();
           } catch {
             Alert.alert("Error", "Failed to remove photo.");
@@ -392,22 +455,36 @@ export default function OwnerVenueDetailScreen() {
     ]);
   };
 
-  const handleMovePhoto = async (photoId: string, direction: -1 | 1) => {
-    if (!venue) return;
-    const sorted = [...venue.photos].sort((a, b) => a.sortOrder - b.sortOrder);
-    const idx = sorted.findIndex((p) => p.id === photoId);
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= sorted.length) return;
+  const movePhotoToIndex = async (photoId: string, newIdx: number) => {
+    const idx = orderedPhotos.findIndex((photo) => photo.id === photoId);
+    if (idx < 0 || newIdx < 0 || newIdx >= orderedPhotos.length) return;
 
-    const newOrder = sorted.map((p) => p.id);
-    [newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx]!, newOrder[idx]!];
+    const newOrder = orderedPhotos.map((photo) => photo.id);
+    const [movedPhoto] = newOrder.splice(idx, 1);
+    newOrder.splice(newIdx, 0, movedPhoto!);
+    setPhotoOrder(newOrder);
 
     try {
-      await reorderVenuePhotos(id!, newOrder);
+      await reorderVenuePhotosWithResult(id!, newOrder);
       invalidate();
     } catch {
+      setPhotoOrder(null);
       Alert.alert("Error", "Failed to reorder photos.");
     }
+  };
+
+  const handleDropPhoto = (photoId: string, offsetY: number) => {
+    const idx = orderedPhotos.findIndex((photo) => photo.id === photoId);
+    const moveBy = Math.round(offsetY / 88);
+    void movePhotoToIndex(photoId, idx + moveBy);
+  };
+
+  const showPhotoSourcePicker = () => {
+    Alert.alert("Add Venue Photo", "Choose a source", [
+      { text: "Camera", onPress: () => void handlePickAndUploadPhoto("camera") },
+      { text: "Photo Library", onPress: () => void handlePickAndUploadPhoto("library") },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   // ─── Pitches ──────────────────────────────────────────────────────────────
@@ -623,6 +700,12 @@ export default function OwnerVenueDetailScreen() {
       borderWidth: 1,
       borderColor: colors.border,
     },
+    reorderArrowBtn: {
+      padding: 3,
+      borderRadius: 6,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     coverBadge: {
       flex: 1,
       backgroundColor: colors.primary + "20",
@@ -654,6 +737,19 @@ export default function OwnerVenueDetailScreen() {
       fontSize: 13,
       fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground,
+      flex: 1,
+    },
+    uploadProgressTrack: {
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: colors.border,
+      overflow: "hidden",
+      marginTop: 6,
+    },
+    uploadProgressFill: {
+      height: "100%",
+      borderRadius: 999,
+      backgroundColor: colors.primary,
     },
     photoErrorText: {
       fontSize: 13,
@@ -843,6 +939,28 @@ export default function OwnerVenueDetailScreen() {
 
   const statusColor = STATUS_COLORS[venue.status] ?? colors.mutedForeground;
   const canSubmit = venue.status !== "APPROVED";
+  const createPhotoPanResponder = (photoId: string) =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+        Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        setDraggingPhotoId(photoId);
+        setPhotoDragOffset(0);
+      },
+      onPanResponderMove: (_event, gesture) => setPhotoDragOffset(gesture.dy),
+      onPanResponderRelease: (_event, gesture) => {
+        setDraggingPhotoId(null);
+        setPhotoDragOffset(0);
+        void handleDropPhoto(photoId, gesture.dy);
+      },
+      onPanResponderTerminate: () => {
+        setDraggingPhotoId(null);
+        setPhotoDragOffset(0);
+      },
+    });
 
   return (
     <View style={s.container}>
@@ -946,10 +1064,21 @@ export default function OwnerVenueDetailScreen() {
             Photos ({venue.photos.length}/7)
           </Text>
 
-          {[...venue.photos]
-            .sort((a, b) => a.sortOrder - b.sortOrder)
-            .map((photo, idx, arr) => (
-              <View key={photo.id} style={s.photoListRow}>
+          {orderedPhotos.map((photo, idx) => {
+            const panResponder = createPhotoPanResponder(photo.id);
+            const isDragging = draggingPhotoId === photo.id;
+            return (
+              <View
+                key={photo.id}
+                style={[
+                  s.photoListRow,
+                  isDragging && {
+                    opacity: 0.85,
+                    zIndex: 1,
+                    transform: [{ translateY: photoDragOffset }],
+                  },
+                ]}
+              >
                 <Image
                   source={{ uri: photo.url }}
                   style={s.photoThumb}
@@ -957,20 +1086,27 @@ export default function OwnerVenueDetailScreen() {
                 />
                 <View style={s.photoReorderCol}>
                   <TouchableOpacity
+                    style={[s.reorderArrowBtn, idx === 0 && { opacity: 0.35 }]}
+                    onPress={() => void movePhotoToIndex(photo.id, idx - 1)}
                     disabled={idx === 0}
-                    onPress={() => handleMovePhoto(photo.id, -1)}
-                    style={[s.reorderBtn, idx === 0 && { opacity: 0.25 }]}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                    accessibilityLabel={`Move photo ${idx + 1} up`}
                   >
-                    <FeatherIcons name="chevron-up" size={16} color={colors.foreground} />
+                    <FeatherIcons name="chevron-up" size={16} color={colors.mutedForeground} />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    disabled={idx === arr.length - 1}
-                    onPress={() => handleMovePhoto(photo.id, 1)}
-                    style={[s.reorderBtn, idx === arr.length - 1 && { opacity: 0.25 }]}
-                    hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                  <View
+                    {...panResponder.panHandlers}
+                    style={s.reorderBtn}
+                    accessibilityLabel={`Drag photo ${idx + 1} to reorder`}
                   >
-                    <FeatherIcons name="chevron-down" size={16} color={colors.foreground} />
+                    <FeatherIcons name="menu" size={18} color={colors.mutedForeground} />
+                  </View>
+                  <TouchableOpacity
+                    style={[s.reorderArrowBtn, idx === orderedPhotos.length - 1 && { opacity: 0.35 }]}
+                    onPress={() => void movePhotoToIndex(photo.id, idx + 1)}
+                    disabled={idx === orderedPhotos.length - 1}
+                    accessibilityLabel={`Move photo ${idx + 1} down`}
+                  >
+                    <FeatherIcons name="chevron-down" size={16} color={colors.mutedForeground} />
                   </TouchableOpacity>
                 </View>
                 {idx === 0 && (
@@ -986,21 +1122,38 @@ export default function OwnerVenueDetailScreen() {
                   <FeatherIcons name="trash-2" size={16} color={colors.destructive} />
                 </TouchableOpacity>
               </View>
-            ))}
+            );
+          })}
 
-          {photoUploading ? (
-            <View style={s.uploadProgressRow}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={s.uploadProgressText}>{photoUploading}</Text>
-            </View>
-          ) : null}
+          {uploadProgresses.map((upload) => {
+            const percent = upload.progress == null ? null : Math.round(upload.progress * 100);
+            return (
+              <View key={upload.id} style={s.uploadProgressRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={s.uploadProgressText} numberOfLines={1}>
+                    Uploading {upload.label}
+                  </Text>
+                  <Text style={s.uploadProgressText}>{percent == null ? "…" : `${percent}%`}</Text>
+                </View>
+                <View style={s.uploadProgressTrack}>
+                  <View
+                    style={[
+                      s.uploadProgressFill,
+                      { width: percent == null ? "12%" : `${Math.max(3, percent)}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+            );
+          })}
 
           {photoError ? (
             <Text style={s.photoErrorText}>{photoError}</Text>
           ) : null}
 
-          {venue.photos.length < 7 && !photoUploading ? (
-            <TouchableOpacity style={s.addBtn} onPress={handlePickAndUploadPhoto}>
+          {venue.photos.length < 7 && uploadProgresses.length === 0 ? (
+            <TouchableOpacity style={s.addBtn} onPress={showPhotoSourcePicker} testID="venue-add-photo">
               <FeatherIcons name="camera" size={16} color={colors.primary} />
               <Text style={s.addBtnText}>
                 Add Photo{venue.photos.length > 0 ? ` (${7 - venue.photos.length} remaining)` : "s"}

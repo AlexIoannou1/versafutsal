@@ -477,11 +477,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
-  /owner/venues/{id}/photos:
+  /owner/venues/{id}/photos/upload:
     post:
-      operationId: addVenuePhoto
+      operationId: uploadVenuePhoto
       tags: [venues]
-      summary: Add a photo URL to a venue
+      summary: Upload a venue photo
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/VenuePhotoUpload"
+      responses:
+        "201":
+          description: Photo added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  photo:
+                    $ref: "#/components/schemas/VenuePhoto"
+                required: [photo]
+
+  /owner/venues/{id}/photos/reorder:
+    put:
+      operationId: reorderVenuePhotos
+      tags: [venues]
+      summary: Set the ordered venue-photo list
       security:
         - bearerAuth: []
       parameters:
@@ -496,18 +528,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AddVenuePhotoRequest"
+              $ref: "#/components/schemas/VenuePhotoOrder"
       responses:
-        "201":
-          description: Photo added
+        "200":
+          description: Photo order saved
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  photo:
-                    $ref: "#/components/schemas/VenuePhoto"
-                required: [photo]
+                $ref: "#/components/schemas/VenuePhotoOrderResult"
 
   /owner/venues/{venueId}/photos/{photoId}:
     delete:
@@ -532,6 +560,40 @@ paths:
       responses:
         "204":
           description: Photo deleted
+
+  /venue-photos/{photoId}:
+    get:
+      operationId: getVenuePhotoFile
+      tags: [venues]
+      summary: Get a processed venue photo
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: preview
+          in: query
+          required: false
+          description: Short-lived signed token used only to show an unapproved venue photo to its owner.
+          schema:
+            type: string
+            maxLength: 512
+      responses:
+        "200":
+          description: WebP venue image
+          content:
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Photo not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
 
   /owner/venues/{id}/pitches:
     post:
@@ -2409,17 +2471,32 @@ components:
           minimum: 15
           maximum: 240
 
-    AddVenuePhotoRequest:
+    VenuePhotoUpload:
       type: object
       properties:
-        url:
+        photo:
           type: string
-          format: uri
-        sortOrder:
-          type: integer
-          minimum: 0
-          maximum: 100
-      required: [url]
+          description: Image file included as the `photo` field in a multipart/form-data request.
+      required: [photo]
+
+    VenuePhotoOrder:
+      type: object
+      properties:
+        orderedIds:
+          type: array
+          minItems: 0
+          maxItems: 7
+          items:
+            type: string
+            format: uuid
+      required: [orderedIds]
+
+    VenuePhotoOrderResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required: [success]
 
     SetOpeningHoursRequest:
       type: object

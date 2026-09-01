@@ -61,8 +61,11 @@ function VenueCardCarousel({ photos, onPress }: VenueCardCarouselProps) {
   const colors = useColors();
   const [activeIndex, setActiveIndex] = useState(0);
   const [cardWidth, setCardWidth] = useState(Dimensions.get("window").width - 32);
-  // Track whether the user has started dragging so we don't fire onPress after a swipe
-  const isDragging = useRef(false);
+  // A small grace period after horizontal movement prevents a swipe release
+  // from also activating the image's card-navigation press.
+  const hasSwiped = useRef(false);
+  const swipeStartX = useRef(0);
+  const swipeStartY = useRef(0);
 
   const cs = StyleSheet.create({
     wrapper: {
@@ -106,34 +109,44 @@ function VenueCardCarousel({ photos, onPress }: VenueCardCarouselProps) {
     <View
       style={cs.wrapper}
       onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}
+      onTouchStart={(event) => {
+        swipeStartX.current = event.nativeEvent.pageX;
+        swipeStartY.current = event.nativeEvent.pageY;
+        hasSwiped.current = false;
+      }}
+      onTouchMove={(event) => {
+        if (
+          Math.abs(event.nativeEvent.pageX - swipeStartX.current) > 8 ||
+          Math.abs(event.nativeEvent.pageY - swipeStartY.current) > 8
+        ) {
+          hasSwiped.current = true;
+        }
+      }}
+      onTouchEnd={() => {
+        if (!hasSwiped.current) onPress?.();
+      }}
     >
       <ScrollView
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
-        onScrollBeginDrag={() => { isDragging.current = true; }}
+        directionalLockEnabled
         onMomentumScrollEnd={(e) => {
           const idx = Math.round(
             e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width,
           );
           setActiveIndex(Math.max(0, Math.min(idx, photos.length - 1)));
-          isDragging.current = false;
         }}
         style={cs.scrollView}
       >
         {photos.map((photo) => (
-          <TouchableOpacity
+          <Image
             key={photo.id}
-            activeOpacity={1}
-            onPress={() => { if (!isDragging.current) onPress?.(); }}
-          >
-            <Image
-              source={{ uri: photo.url }}
-              style={{ width: cardWidth, height: 140 }}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
+            source={{ uri: photo.url }}
+            style={{ width: cardWidth, height: 140 }}
+            resizeMode="cover"
+          />
         ))}
       </ScrollView>
       {photos.length > 1 && (

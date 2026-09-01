@@ -17,8 +17,6 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  AddVenuePhoto201,
-  AddVenuePhotoRequest,
   AdminDisableVenue200,
   AdminDisableVenueBody,
   AdminGetBooking200,
@@ -56,6 +54,7 @@ import type {
   GetPitchAvailabilityParams,
   GetPlayerBooking200,
   GetVenue200,
+  GetVenuePhotoFileParams,
   HealthStatus,
   ListOwnerBookings200,
   ListOwnerBookingsParams,
@@ -90,7 +89,11 @@ import type {
   UpdateProfileResponse,
   UpdateVenue200,
   UpdateVenueRequest,
+  UploadVenuePhoto201,
   VenueFeeOverrideRequest,
+  VenuePhotoOrder,
+  VenuePhotoOrderResult,
+  VenuePhotoUpload,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1447,43 +1450,45 @@ export const useSubmitVenueForApproval = <
 };
 
 /**
- * @summary Add a photo URL to a venue
+ * @summary Upload a venue photo
  */
-export const getAddVenuePhotoUrl = (id: string) => {
-  return `/api/owner/venues/${id}/photos`;
+export const getUploadVenuePhotoUrl = (id: string) => {
+  return `/api/owner/venues/${id}/photos/upload`;
 };
 
-export const addVenuePhoto = async (
+export const uploadVenuePhoto = async (
   id: string,
-  addVenuePhotoRequest: AddVenuePhotoRequest,
+  venuePhotoUpload: VenuePhotoUpload,
   options?: RequestInit,
-): Promise<AddVenuePhoto201> => {
-  return customFetch<AddVenuePhoto201>(getAddVenuePhotoUrl(id), {
+): Promise<UploadVenuePhoto201> => {
+  const formData = new FormData();
+  formData.append(`photo`, venuePhotoUpload.photo);
+
+  return customFetch<UploadVenuePhoto201>(getUploadVenuePhotoUrl(id), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    body: JSON.stringify(addVenuePhotoRequest),
+    body: formData,
   });
 };
 
-export const getAddVenuePhotoMutationOptions = <
+export const getUploadVenuePhotoMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof addVenuePhoto>>,
+    Awaited<ReturnType<typeof uploadVenuePhoto>>,
     TError,
-    { id: string; data: BodyType<AddVenuePhotoRequest> },
+    { id: string; data: BodyType<VenuePhotoUpload> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof addVenuePhoto>>,
+  Awaited<ReturnType<typeof uploadVenuePhoto>>,
   TError,
-  { id: string; data: BodyType<AddVenuePhotoRequest> },
+  { id: string; data: BodyType<VenuePhotoUpload> },
   TContext
 > => {
-  const mutationKey = ["addVenuePhoto"];
+  const mutationKey = ["uploadVenuePhoto"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation &&
       "mutationKey" in options.mutation &&
@@ -1493,44 +1498,131 @@ export const getAddVenuePhotoMutationOptions = <
     : { mutation: { mutationKey }, request: undefined };
 
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof addVenuePhoto>>,
-    { id: string; data: BodyType<AddVenuePhotoRequest> }
+    Awaited<ReturnType<typeof uploadVenuePhoto>>,
+    { id: string; data: BodyType<VenuePhotoUpload> }
   > = (props) => {
     const { id, data } = props ?? {};
 
-    return addVenuePhoto(id, data, requestOptions);
+    return uploadVenuePhoto(id, data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
 };
 
-export type AddVenuePhotoMutationResult = NonNullable<
-  Awaited<ReturnType<typeof addVenuePhoto>>
+export type UploadVenuePhotoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadVenuePhoto>>
 >;
-export type AddVenuePhotoMutationBody = BodyType<AddVenuePhotoRequest>;
-export type AddVenuePhotoMutationError = ErrorType<unknown>;
+export type UploadVenuePhotoMutationBody = BodyType<VenuePhotoUpload>;
+export type UploadVenuePhotoMutationError = ErrorType<unknown>;
 
 /**
- * @summary Add a photo URL to a venue
+ * @summary Upload a venue photo
  */
-export const useAddVenuePhoto = <
+export const useUploadVenuePhoto = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof addVenuePhoto>>,
+    Awaited<ReturnType<typeof uploadVenuePhoto>>,
     TError,
-    { id: string; data: BodyType<AddVenuePhotoRequest> },
+    { id: string; data: BodyType<VenuePhotoUpload> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
-  Awaited<ReturnType<typeof addVenuePhoto>>,
+  Awaited<ReturnType<typeof uploadVenuePhoto>>,
   TError,
-  { id: string; data: BodyType<AddVenuePhotoRequest> },
+  { id: string; data: BodyType<VenuePhotoUpload> },
   TContext
 > => {
-  return useMutation(getAddVenuePhotoMutationOptions(options));
+  return useMutation(getUploadVenuePhotoMutationOptions(options));
+};
+
+/**
+ * @summary Set the ordered venue-photo list
+ */
+export const getReorderVenuePhotosUrl = (id: string) => {
+  return `/api/owner/venues/${id}/photos/reorder`;
+};
+
+export const reorderVenuePhotos = async (
+  id: string,
+  venuePhotoOrder: VenuePhotoOrder,
+  options?: RequestInit,
+): Promise<VenuePhotoOrderResult> => {
+  return customFetch<VenuePhotoOrderResult>(getReorderVenuePhotosUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(venuePhotoOrder),
+  });
+};
+
+export const getReorderVenuePhotosMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderVenuePhotos>>,
+    TError,
+    { id: string; data: BodyType<VenuePhotoOrder> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof reorderVenuePhotos>>,
+  TError,
+  { id: string; data: BodyType<VenuePhotoOrder> },
+  TContext
+> => {
+  const mutationKey = ["reorderVenuePhotos"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof reorderVenuePhotos>>,
+    { id: string; data: BodyType<VenuePhotoOrder> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return reorderVenuePhotos(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReorderVenuePhotosMutationResult = NonNullable<
+  Awaited<ReturnType<typeof reorderVenuePhotos>>
+>;
+export type ReorderVenuePhotosMutationBody = BodyType<VenuePhotoOrder>;
+export type ReorderVenuePhotosMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Set the ordered venue-photo list
+ */
+export const useReorderVenuePhotos = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof reorderVenuePhotos>>,
+    TError,
+    { id: string; data: BodyType<VenuePhotoOrder> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof reorderVenuePhotos>>,
+  TError,
+  { id: string; data: BodyType<VenuePhotoOrder> },
+  TContext
+> => {
+  return useMutation(getReorderVenuePhotosMutationOptions(options));
 };
 
 /**
@@ -1617,6 +1709,120 @@ export const useDeleteVenuePhoto = <
 > => {
   return useMutation(getDeleteVenuePhotoMutationOptions(options));
 };
+
+/**
+ * @summary Get a processed venue photo
+ */
+export const getGetVenuePhotoFileUrl = (
+  photoId: string,
+  params?: GetVenuePhotoFileParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/venue-photos/${photoId}?${stringifiedParams}`
+    : `/api/venue-photos/${photoId}`;
+};
+
+export const getVenuePhotoFile = async (
+  photoId: string,
+  params?: GetVenuePhotoFileParams,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetVenuePhotoFileUrl(photoId, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVenuePhotoFileQueryKey = (
+  photoId: string,
+  params?: GetVenuePhotoFileParams,
+) => {
+  return [`/api/venue-photos/${photoId}`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetVenuePhotoFileQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVenuePhotoFile>>,
+  TError = ErrorType<ApiError>,
+>(
+  photoId: string,
+  params?: GetVenuePhotoFileParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVenuePhotoFile>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetVenuePhotoFileQueryKey(photoId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getVenuePhotoFile>>
+  > = ({ signal }) =>
+    getVenuePhotoFile(photoId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!photoId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVenuePhotoFile>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVenuePhotoFileQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVenuePhotoFile>>
+>;
+export type GetVenuePhotoFileQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get a processed venue photo
+ */
+
+export function useGetVenuePhotoFile<
+  TData = Awaited<ReturnType<typeof getVenuePhotoFile>>,
+  TError = ErrorType<ApiError>,
+>(
+  photoId: string,
+  params?: GetVenuePhotoFileParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVenuePhotoFile>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVenuePhotoFileQueryOptions(
+    photoId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Add a pitch to a venue
