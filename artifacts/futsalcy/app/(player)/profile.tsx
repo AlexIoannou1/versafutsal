@@ -19,14 +19,27 @@ import * as ImagePicker from "expo-image-picker";
 import EditProfileSheet from "@/components/EditProfileSheet";
 import { uploadAvatar } from "@workspace/api-client-react";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 8 * 1024 * 1024; // Must match the avatar API limit.
 
+const SUPPORTED_AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function getUploadErrorMessage(error: unknown): string {
+  const apiMessage = (error as { data?: { error?: string } })?.data?.error;
+  if (apiMessage) return apiMessage;
+
+  const fallback =
+    error instanceof Error ? error.message : "Could not upload the image. Please try again.";
+
+  return fallback.replace(/^HTTP\s+\d{3}(?:\s+[^:]*)?\s*:\s*/i, "") || fallback;
+}
 export default function PlayerProfileScreen() {
   const colors = useColors();
   const { user, logout, updateUser } = useAuth();
   const router = useRouter();
   const [editVisible, setEditVisible] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const uploading = uploadState === "preparing" || uploadState === "uploading";
 
   const handleLogout = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -45,8 +58,13 @@ export default function PlayerProfileScreen() {
   };
 
   const handleAvatarPress = useCallback(async () => {
+    setUploadError(null);
+    setUploadState("preparing");
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
+      setUploadState("error");
+      setUploadError("Photo library permission is needed to choose a profile photo.");
       Alert.alert(
         "Permission required",
         "Please allow access to your photo library to update your profile picture.",
@@ -61,34 +79,45 @@ export default function PlayerProfileScreen() {
       quality: 0.8,
     });
 
-    if (result.canceled || !result.assets[0]) return;
+    if (result.canceled || !result.assets[0]) {
+      setUploadState("idle");
+      return;
+    }
 
     const asset = result.assets[0];
     const mimeType = asset.mimeType ?? "image/jpeg";
 
-    if (mimeType !== "image/jpeg" && mimeType !== "image/png") {
-      Alert.alert("Unsupported format", "Please choose a JPG or PNG image.");
+    if (!SUPPORTED_AVATAR_TYPES.includes(mimeType)) {
+      const message = "Please choose a JPEG, PNG, or WebP image.";
+      setUploadState("error");
+      setUploadError(message);
+      Alert.alert("Unsupported format", message);
       return;
     }
 
     if (asset.fileSize != null && asset.fileSize > MAX_FILE_SIZE) {
+      const message = "Please choose an image smaller than 8 MB.";
+      setUploadState("error");
+      setUploadError(message);
       Alert.alert(
         "File too large",
-        "Please choose an image smaller than 5 MB.",
+        message,
       );
       return;
     }
 
-    setUploading(true);
+    setUploadState("uploading");
     try {
       const { avatarUrl } = await uploadAvatar(asset.uri, mimeType);
       await updateUser({ avatarUrl });
+      setUploadState("success");
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Could not upload the image. Please try again.";
+      const message = getUploadErrorMessage(err);
+      setUploadState("error");
+      setUploadError(message);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Upload failed", message);
-    } finally {
-      setUploading(false);
     }
   }, [updateUser]);
 
@@ -138,6 +167,20 @@ export default function PlayerProfileScreen() {
       fontSize: 11,
       fontFamily: "PlusJakartaSans_600SemiBold",
       marginTop: 4,
+    },
+    avatarStatus: {
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_500Medium",
+      color: colors.mutedForeground,
+      textAlign: "center",
+      marginBottom: 18,
+      paddingHorizontal: 8,
+    },
+    avatarStatusSuccess: {
+      color: colors.success,
+    },
+    avatarStatusError: {
+      color: colors.destructive,
     },
     name: {
       fontSize: 22,
@@ -237,7 +280,10 @@ export default function PlayerProfileScreen() {
           style={s.avatarWrapper}
           onPress={handleAvatarPress}
           disabled={uploading}
-          accessibilityLabel="Change profile photo"
+          accessibilityLabel="Choose and crop profile photo"
+          accessibilityHint="Opens your photo library and lets you crop the image to a square"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: uploading, busy: uploading }}
         >
           {user?.avatarUrl ? (
             <Image source={{ uri: user.avatarUrl }} style={s.avatarImage} contentFit="cover" />
@@ -253,13 +299,31 @@ export default function PlayerProfileScreen() {
           {uploading && (
             <View style={[s.uploadOverlay, { borderRadius: 44 }]}>
               <ActivityIndicator color="#fff" />
-              <Text style={s.uploadingLabel}>Uploading…</Text>
+              <Text style={s.uploadingLabel}>
+                {uploadState === "preparing" ? "Preparing…" : "Uploading…"}
+              </Text>
             </View>
           )}
           <View style={s.avatarBadge}>
             <FeatherIcons name="camera" size={13} color="#fff" />
           </View>
         </TouchableOpacity>
+        <Text
+          style={[
+            s.avatarStatus,
+            uploadState === "success" && s.avatarStatusSuccess,
+            uploadState === "error" && s.avatarStatusError,
+          ]}
+          accessibilityLiveRegion="polite"
+        >
+          {uploadState === "preparing"
+            ? "Opening photo library…"
+            : uploadState === "uploading"
+              ? "Uploading your cropped photo…"
+              : uploadState === "success"
+                ? "Profile photo updated."
+                : uploadError ?? "Tap the photo to choose and crop a square profile picture."}
+        </Text>
 
         <Text style={s.name}>{user?.name}</Text>
         <Text style={s.email}>{user?.email}</Text>
@@ -302,3 +366,5 @@ export default function PlayerProfileScreen() {
     </View>
   );
 }
+
+type UploadState = "idle" | "preparing" | "uploading" | "success" | "error";

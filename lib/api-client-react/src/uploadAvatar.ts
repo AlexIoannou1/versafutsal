@@ -6,7 +6,7 @@ export async function uploadAvatar(
   mimeType: string,
 ): Promise<UploadAvatarResponse> {
   const formData = new FormData();
-  const filename = imageUri.split("/").pop() ?? "avatar.jpg";
+  const filename = getAvatarUploadFilename(mimeType);
   const response = await fetch(imageUri);
   const blob = await response.blob();
   const file = new File([blob], filename, { type: mimeType });
@@ -15,4 +15,15 @@ export async function uploadAvatar(
     method: "POST",
     body: formData,
   });
+}
+
+function getAvatarUploadFilename(mimeType: string): string {
+  switch (mimeType) {
+    case "image/png":
+      return "avatar.png";
+    case "image/webp":
+      return "avatar.webp";
+    default:
+      return "avatar.jpg";
+  }
 }

@@ -2,11 +2,16 @@ import fs from "fs";
 import path from "path";
 import { Router } from "express";
 import multer from "multer";
-import sharp from "sharp";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import {
+  assertSupportedImageSignature,
+  AVATAR_IMAGE_POLICY,
+  reencodeImageAsWebp,
+  validateImageUploadFilename,
+} from "../lib/image-upload-validation";
 
 const router = Router();
 
@@ -15,11 +20,11 @@ const AVATARS_DIR = path.join(UPLOADS_DIR, "avatars");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 }, // 8 MB server-side guard
+  limits: { fileSize: AVATAR_IMAGE_POLICY.maxFileSizeBytes },
   fileFilter(_req, file, cb) {
-    const allowed = ["image/jpeg", "image/png", "image/webp", "application/octet-stream"];
-    if (!allowed.includes(file.mimetype)) {
-      cb(new Error("Only JPG and PNG files are allowed"));
+    const validationError = validateImageUploadFilename(file, AVATAR_IMAGE_POLICY);
+    if (validationError) {
+      cb(new Error(validationError));
       return;
     }
     cb(null, true);
@@ -30,7 +35,11 @@ function applyUpload(req: any, res: any): Promise<boolean> {
   return new Promise((resolve) => {
     upload.single("avatar")(req, res, (err: unknown) => {
       if (err instanceof multer.MulterError) {
-        res.status(400).json({ error: err.message });
+        const error =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "Image file must be 8 MB or smaller"
+            : err.message;
+        res.status(400).json({ error });
         resolve(false);
       } else if (err) {
         res.status(400).json({ error: (err as Error).message ?? "Upload failed" });
@@ -68,14 +77,13 @@ router.post(
 
       let processed: Buffer;
       try {
-        processed = await sharp(req.file.buffer)
-          .rotate()
-          .resize(400, 400, { fit: "cover" })
-          .toFormat("webp", { quality: 85 })
-          .toBuffer();
-      } catch (sharpErr) {
-        console.error("Sharp processing error:", sharpErr);
-        res.status(400).json({ error: "Invalid image file" });
+        assertSupportedImageSignature(req.file.buffer, AVATAR_IMAGE_POLICY);
+        processed = await reencodeImageAsWebp(req.file.buffer, { width: 400, height: 400 });
+      } catch (imageError) {
+        console.warn("Rejected avatar image upload:", imageError);
+        res.status(400).json({
+          error: imageError instanceof Error ? imageError.message : "Invalid image file",
+        });
         return;
       }
 

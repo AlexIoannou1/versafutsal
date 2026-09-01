@@ -1,6 +1,5 @@
 import { Router, type IRouter, type Response } from "express";
 import multer from "multer";
-import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,6 +16,12 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, inArray, sql, gt, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import {
+  assertSupportedImageSignature,
+  reencodeImageAsWebp,
+  validateImageUploadFilename,
+  VENUE_IMAGE_POLICY,
+} from "../lib/image-upload-validation";
 
 const router: IRouter = Router();
 
@@ -24,13 +29,11 @@ const router: IRouter = Router();
 
 const photoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  limits: { fileSize: VENUE_IMAGE_POLICY.maxFileSizeBytes },
   fileFilter(_req, file, cb) {
-    // Accept common image MIME types plus application/octet-stream (sent by some
-    // Android builds of expo-image-picker). Sharp will reject truly invalid files.
-    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/octet-stream"];
-    if (!allowed.includes(file.mimetype)) {
-      cb(new Error("Only JPEG, PNG, and WebP images are allowed"));
+    const validationError = validateImageUploadFilename(file, VENUE_IMAGE_POLICY);
+    if (validationError) {
+      cb(new Error(validationError));
       return;
     }
     cb(null, true);
@@ -43,7 +46,11 @@ function applyPhotoUpload(req: any, res: any): Promise<boolean> {
   return new Promise((resolve) => {
     photoUpload.single("photo")(req, res, (err: unknown) => {
       if (err instanceof multer.MulterError) {
-        res.status(400).json({ error: err.message });
+        const error =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "Image file must be 5 MB or smaller"
+            : err.message;
+        res.status(400).json({ error });
         resolve(false);
       } else if (err) {
         res.status(400).json({ error: (err as Error).message ?? "Upload failed" });
@@ -571,23 +578,24 @@ router.post<{ id: string }>(
         return;
       }
 
-      // Strip EXIF, auto-orient, re-encode as WebP
-      // sharp auto-detects format from buffer magic bytes, so application/octet-stream is fine
+      // Verify signatures before decode, then strip EXIF, auto-orient, and re-encode as WebP.
       let processed: Buffer;
       try {
-        processed = await sharp(req.file.buffer)
-          .rotate()
-          .toFormat("webp", { quality: 85 })
-          .toBuffer();
-      } catch (sharpErr) {
-        console.error("Sharp processing error:", sharpErr);
-        res.status(400).json({ error: "Invalid image file" });
+        assertSupportedImageSignature(req.file.buffer, VENUE_IMAGE_POLICY);
+        processed = await reencodeImageAsWebp(req.file.buffer);
+      } catch (imageError) {
+        console.warn("Rejected venue image upload:", imageError);
+        res.status(400).json({
+          error: imageError instanceof Error ? imageError.message : "Invalid image file",
+        });
         return;
       }
 
       const uuid = randomUUID();
-      const photoKey = `${PHOTO_KEY_PREFIX}${req.params.id}/${uuid}.webp`;
-      const venueDir = path.join(VENUE_PHOTOS_DIR, req.params.id);
+      // Use the persisted venue ID, never any client file metadata or filename,
+      // when constructing the storage path.
+      const photoKey = `${PHOTO_KEY_PREFIX}${existing.id}/${uuid}.webp`;
+      const venueDir = path.join(VENUE_PHOTOS_DIR, existing.id);
       const filePath = path.join(venueDir, `${uuid}.webp`);
 
       try {
@@ -601,7 +609,7 @@ router.post<{ id: string }>(
 
       const [photo] = await db
         .insert(venuePhotosTable)
-        .values({ venueId: req.params.id, url: photoKey, sortOrder: currentPhotos.length })
+        .values({ venueId: existing.id, url: photoKey, sortOrder: currentPhotos.length })
         .returning();
 
       const photoUrl = resolvePhotoUrl(photoKey);
