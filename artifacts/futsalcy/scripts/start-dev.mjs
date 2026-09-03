@@ -38,6 +38,39 @@ function printSecureExpoQr() {
   qrcode.generate(secureExpoUrl, { small: true });
 }
 
+function forwardExpoOutput(stream, destination) {
+  let pending = "";
+  let hidingDefaultQrDetails = false;
+
+  const forwardLine = (line) => {
+    // Expo CLI advertises the configured HTTPS proxy as `exp://`, which maps
+    // to plain HTTP in Expo Go. Replit's public packager route accepts TLS
+    // only, so hide that QR and its link details; the verified `exps://` QR is
+    // printed by this launcher once Metro is ready.
+    if (/[█▀▄]/u.test(line)) return;
+    if (line.includes("Metro waiting on")) {
+      hidingDefaultQrDetails = true;
+      return;
+    }
+    if (hidingDefaultQrDetails) {
+      if (!line.includes("Web is waiting on")) return;
+      hidingDefaultQrDetails = false;
+    }
+    destination.write(`${line}\n`);
+  };
+
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk) => {
+    pending += chunk;
+    const lines = pending.split(/\r?\n/);
+    pending = lines.pop() ?? "";
+    lines.forEach(forwardLine);
+  });
+  stream.on("end", () => {
+    if (pending) forwardLine(pending);
+  });
+}
+
 writeFileSync(
   ".env.local",
   `EXPO_PUBLIC_DOMAIN=${replDomain}\nEXPO_PUBLIC_REPL_ID=${replId}\n`
@@ -49,13 +82,15 @@ const expo = spawn(
   "pnpm",
   ["exec", "expo", "start", "--host", "lan", "--port", String(PORT)],
   {
-    stdio: "inherit",
+    stdio: ["inherit", "pipe", "pipe"],
     env: {
       ...process.env,
       EXPO_PACKAGER_PROXY_URL: publicBaseUrl,
     },
   }
 );
+forwardExpoOutput(expo.stdout, process.stdout);
+forwardExpoOutput(expo.stderr, process.stderr);
 expo.on("exit", (code) => process.exit(code ?? 0));
 expo.on("error", (error) => {
   process.stderr.write(`[dev] Expo failed to start: ${error.message}\n`);

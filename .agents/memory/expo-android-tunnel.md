@@ -17,6 +17,10 @@ HTTP. Print and scan an `exps://<REPLIT_DEV_DOMAIN>:3000` QR instead so Expo
 Go stays on TLS. Both the Expo manifest and platform bundles are served by the Replit HTTPS router, so no
 ngrok, Serveo, or localtunnel process is needed.
 
+Keep Metro interactive for hot reload, but filter only the child CLI's default
+QR output. Do not use CI mode to suppress the built-in QR: CI disables Metro
+reloads.
+
 ## Why third-party tunnels are unsafe here
 
 Metro can be healthy locally while a third-party tunnel URL returns HTTP 502.
