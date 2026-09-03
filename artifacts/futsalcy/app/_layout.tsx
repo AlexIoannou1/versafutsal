@@ -21,6 +21,7 @@ import { Platform } from "react-native";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { MotionProvider, useMotion } from "@/context/MotionContext";
 import { useColors } from "@/hooks/useColors";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { setBaseUrl } from "@workspace/api-client-react";
@@ -48,6 +49,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const colors = useColors();
+  const { reduceMotion } = useMotion();
   usePushNotifications();
   return (
     <Stack
@@ -56,6 +58,8 @@ function RootLayoutNav() {
         headerStyle: { backgroundColor: colors.background },
         headerTintColor: colors.foreground,
         headerTitleStyle: { fontFamily: "PlusJakartaSans_600SemiBold" },
+        animation: reduceMotion ? "none" : "slide_from_right",
+        animationDuration: reduceMotion ? 0 : 220,
       }}
     >
       <Stack.Screen name="index" />
@@ -73,7 +77,13 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="owner/venue-new"
-        options={{ headerShown: true, title: "New Venue", presentation: "modal" }}
+        options={{
+          headerShown: true,
+          title: "New Venue",
+          presentation: "modal",
+          animation: reduceMotion ? "none" : "slide_from_bottom",
+          animationDuration: reduceMotion ? 0 : 240,
+        }}
       />
       <Stack.Screen
         name="owner/venue/[id]"
@@ -136,17 +146,19 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <ErrorBoundary>
-          <QueryClientProvider client={queryClient}>
-            <AuthProvider>
-              <GestureHandlerRootView>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </AuthProvider>
-          </QueryClientProvider>
-        </ErrorBoundary>
+          <MotionProvider>
+            <ErrorBoundary>
+              <QueryClientProvider client={queryClient}>
+                <AuthProvider>
+                  <GestureHandlerRootView>
+                    <KeyboardProvider>
+                      <RootLayoutNav />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </AuthProvider>
+              </QueryClientProvider>
+            </ErrorBoundary>
+          </MotionProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

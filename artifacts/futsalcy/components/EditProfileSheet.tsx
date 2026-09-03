@@ -17,6 +17,8 @@ import PhoneNumberField from "@/components/PhoneNumberField";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { MotionPressable } from "@/components/Motion";
+import { useMotion } from "@/context/MotionContext";
 import {
   updateProfile,
   changePassword,
@@ -58,6 +60,7 @@ export default function EditProfileSheet({
   onPasswordChanged,
 }: Props) {
   const colors = useColors();
+  const { reduceMotion } = useMotion();
   const insets = useSafeAreaInsets();
 
   const [tab, setTab] = useState<Tab>("profile");
@@ -293,7 +296,7 @@ export default function EditProfileSheet({
   });
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType={reduceMotion ? "none" : "slide"} onRequestClose={onClose}>
       <KeyboardAvoidingView
         style={s.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -302,24 +305,24 @@ export default function EditProfileSheet({
           <View style={s.handle} />
           <View style={s.header}>
             <Text style={s.title}>Edit Profile</Text>
-            <TouchableOpacity onPress={onClose}>
+            <MotionPressable onPress={onClose} accessibilityLabel="Close edit profile">
               <FeatherIcons name="x" size={22} color={colors.mutedForeground} />
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
 
           <View style={s.tabRow}>
-            <TouchableOpacity
+            <MotionPressable
               style={[s.tabBtn, tab === "profile" && s.tabBtnActive]}
               onPress={() => setTab("profile")}
             >
               <Text style={[s.tabText, tab === "profile" && s.tabTextActive]}>Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </MotionPressable>
+            <MotionPressable
               style={[s.tabBtn, tab === "password" && s.tabBtnActive]}
               onPress={() => setTab("password")}
             >
               <Text style={[s.tabText, tab === "password" && s.tabTextActive]}>Password</Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
 
           <ScrollView style={s.body} keyboardShouldPersistTaps="handled">
@@ -506,7 +509,7 @@ export default function EditProfileSheet({
             )}
           </ScrollView>
 
-          <TouchableOpacity
+          <MotionPressable
             style={[s.saveBtn, saving && s.saveBtnDisabled]}
             onPress={tab === "profile" ? handleSaveProfile : handleChangePassword}
             disabled={saving}
@@ -518,7 +521,7 @@ export default function EditProfileSheet({
                 {tab === "profile" ? "Save Changes" : "Change Password"}
               </Text>
             )}
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
       </KeyboardAvoidingView>
     </Modal>

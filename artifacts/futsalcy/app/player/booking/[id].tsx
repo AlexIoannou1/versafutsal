@@ -15,6 +15,8 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { FadeIn } from "@/components/Motion";
+import { useMotion } from "@/context/MotionContext";
 import {
   useGetPlayerBooking,
   useCancelBooking,
@@ -93,6 +95,7 @@ function canCancelBooking(booking: {
 
 export default function PlayerBookingDetailScreen() {
   const colors = useColors();
+  const { reduceMotion } = useMotion();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -369,7 +372,7 @@ export default function PlayerBookingDetailScreen() {
       <Stack.Screen options={{ title: "Booking", headerBackTitle: "Back" }} />
 
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}>
-        <View style={s.successBanner}>
+        <FadeIn style={s.successBanner}>
           <View style={[s.successIcon, { backgroundColor: statusColor + "20" }]}>
             <FeatherIcons
               name={
@@ -383,7 +386,7 @@ export default function PlayerBookingDetailScreen() {
           </View>
           <Text style={s.successTitle}>{STATUS_TITLES[booking.status] ?? "Booking"}</Text>
           <Text style={s.bookingId}>#{booking.id.slice(0, 8).toUpperCase()}</Text>
-        </View>
+        </FadeIn>
 
         <View style={s.statusWrap}>
           <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
@@ -520,7 +523,7 @@ export default function PlayerBookingDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={showCancelModal} animationType="slide" transparent>
+      <Modal visible={showCancelModal} animationType={reduceMotion ? "none" : "slide"} transparent>
         <View style={s.modalOverlay}>
           <View style={s.modalSheet}>
             <Text style={s.modalTitle}>Cancel Booking</Text>

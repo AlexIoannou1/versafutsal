@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AntDesign } from "@expo/vector-icons";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { MotionPressable } from "@/components/Motion";
 import {
   useGetVenue,
   type VenueDetail,
@@ -658,18 +659,21 @@ export default function PlayerVenueDetailScreen() {
             <View style={s.venueTitleFlex}>
               <Text style={s.venueName}>{String(venue.name)}</Text>
             </View>
-            <TouchableOpacity
+            <MotionPressable
               style={s.heartBtn}
               onPress={() => toggleFavourite.mutate({ venueId: id!, isFavourited })}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel={isFavourited ? "Remove from favourites" : "Add to favourites"}
+              accessibilityRole="button"
+              success={isFavourited}
+              pressScale={0.9}
             >
               {isFavourited ? (
                 <AntDesign name="heart" size={24} color={colors.destructive} />
               ) : (
                 <FeatherIcons name="heart" size={24} color={colors.mutedForeground} />
               )}
-            </TouchableOpacity>
+            </MotionPressable>
           </View>
           <View style={s.metaRow}>
             <FeatherIcons name="map-pin" size={14} color={colors.mutedForeground} />

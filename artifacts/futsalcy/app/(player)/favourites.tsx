@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AntDesign } from "@expo/vector-icons";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { MotionPressable } from "@/components/Motion";
 import {
   useListFavourites,
   useToggleFavourite,
@@ -179,7 +180,7 @@ export default function FavouritesScreen() {
   });
 
   const renderItem = ({ item }: { item: FavouriteVenueSummary }) => (
-    <TouchableOpacity
+    <MotionPressable
       style={s.card}
       onPress={() => router.push(`/player/venue/${item.id}`)}
       activeOpacity={0.85}
@@ -198,16 +199,18 @@ export default function FavouritesScreen() {
           <Text style={s.cardName} numberOfLines={1}>
             {item.name}
           </Text>
-          <TouchableOpacity
+          <MotionPressable
             style={s.heartBtn}
             onPress={() =>
               toggle.mutate({ venueId: item.id, isFavourited: true })
             }
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Remove from favourites"
+            accessibilityRole="button"
+            pressScale={0.9}
           >
             <AntDesign name="heart" size={20} color={colors.destructive} />
-          </TouchableOpacity>
+          </MotionPressable>
         </View>
 
         <View style={s.cardMeta}>
@@ -258,7 +261,7 @@ export default function FavouritesScreen() {
           </View>
         </View>
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 
   return (
@@ -288,6 +291,9 @@ export default function FavouritesScreen() {
         <FlatList
           data={venues}
           keyExtractor={(item) => item.id}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
           contentContainerStyle={s.list}
           renderItem={renderItem}
           refreshControl={

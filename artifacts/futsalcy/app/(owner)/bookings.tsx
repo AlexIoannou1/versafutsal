@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Animated,
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { MotionPressable, SkeletonBlock } from "@/components/Motion";
 import { useListOwnerBookings } from "@workspace/api-client-react";
 import type { BookingStatus } from "@workspace/api-client-react";
 
@@ -62,25 +62,9 @@ function formatTimeRange(startIso: string, endIso: string) {
 // ─── Skeleton Loader ──────────────────────────────────────────────────────────
 
 function SkeletonCard({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const opacity = React.useRef(new Animated.Value(0.4)).current;
-
-  React.useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
-      ]),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [opacity]);
-
-  const bg = colors.mutedForeground + "30";
-
   return (
-    <Animated.View
+    <View
       style={{
-        opacity,
         backgroundColor: colors.card,
         borderRadius: 12,
         padding: 14,
@@ -91,18 +75,18 @@ function SkeletonCard({ colors }: { colors: ReturnType<typeof useColors> }) {
       }}
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <View style={{ height: 14, width: "45%", borderRadius: 6, backgroundColor: bg }} />
-        <View style={{ height: 20, width: 70, borderRadius: 6, backgroundColor: bg }} />
+        <SkeletonBlock style={{ height: 14, width: "45%", borderRadius: 6 }} />
+        <SkeletonBlock style={{ height: 20, width: 70, borderRadius: 6 }} />
       </View>
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <View style={{ height: 12, width: 12, borderRadius: 4, backgroundColor: bg }} />
-        <View style={{ height: 12, width: "55%", borderRadius: 6, backgroundColor: bg }} />
+        <SkeletonBlock style={{ height: 12, width: 12, borderRadius: 4 }} />
+        <SkeletonBlock style={{ height: 12, width: "55%", borderRadius: 6 }} />
       </View>
       <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <View style={{ height: 12, width: 12, borderRadius: 4, backgroundColor: bg }} />
-        <View style={{ height: 12, width: "65%", borderRadius: 6, backgroundColor: bg }} />
+        <SkeletonBlock style={{ height: 12, width: 12, borderRadius: 4 }} />
+        <SkeletonBlock style={{ height: 12, width: "65%", borderRadius: 6 }} />
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -148,7 +132,7 @@ function BookingCard({
   const displayName = isManual ? guestName : (player?.name ?? player?.email ?? "Player");
 
   return (
-    <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.7}>
+    <MotionPressable style={s.card} onPress={onPress} accessibilityRole="button" accessibilityLabel={`View booking for ${displayName}`}>
       <View style={s.cardHeader}>
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, marginRight: 8, minWidth: 0 }}>
           <Text style={s.playerName} numberOfLines={1}>{displayName}</Text>
@@ -176,7 +160,7 @@ function BookingCard({
           {formatDateShort(item.startAt)} · {formatTimeRange(item.startAt, item.endAt)}
         </Text>
       </View>
-    </TouchableOpacity>
+    </MotionPressable>
   );
 }
 
@@ -565,6 +549,9 @@ export default function OwnerBookingsScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={7}
         renderItem={({ item }) => (
           <BookingCard
             item={item}

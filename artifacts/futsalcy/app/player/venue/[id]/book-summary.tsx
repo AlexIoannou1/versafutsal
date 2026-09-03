@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useQueryClient } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
+import { MotionPressable } from "@/components/Motion";
 import {
   useGetVenue,
   useCreateBooking,
@@ -560,7 +561,7 @@ function BookSummaryInner() {
           <View style={s.selectorCard}>
             <Text style={s.selectorLabel}>Payment Option</Text>
             <View style={s.selectorRow}>
-              <TouchableOpacity
+              <MotionPressable
                 style={[s.selectorBtn, paymentType === "FULL" && s.selectorBtnActive]}
                 onPress={() => setPaymentType("FULL")}
                 activeOpacity={0.8}
@@ -570,8 +571,8 @@ function BookSummaryInner() {
                   Pay in Full
                 </Text>
                 <Text style={s.selectorBtnSub}>€{subtotal.toFixed(2)}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </MotionPressable>
+              <MotionPressable
                 style={[s.selectorBtn, paymentType === "DEPOSIT" && s.selectorBtnActive]}
                 onPress={() => setPaymentType("DEPOSIT")}
                 activeOpacity={0.8}
@@ -586,7 +587,7 @@ function BookSummaryInner() {
                     ? ` (${pricingRule.depositAmount}%)`
                     : ""}
                 </Text>
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
         )}
@@ -630,19 +631,19 @@ function BookSummaryInner() {
 
       {/* CTA */}
       <View style={s.bottomBar}>
-        {checkoutError && <Text style={s.errorText}>{checkoutError}</Text>}
+        {checkoutError && <Text accessibilityLiveRegion="polite" style={s.errorText}>{checkoutError}</Text>}
         {isSlotConflict ? (
-          <TouchableOpacity
+          <MotionPressable
             style={s.primaryBtn}
             onPress={() => router.back()}
             activeOpacity={0.85}
           >
             <FeatherIcons name="refresh-cw" size={18} color={colors.primaryForeground} />
             <Text style={s.primaryBtnText}>Choose Another Slot</Text>
-          </TouchableOpacity>
+          </MotionPressable>
         ) : (
           <>
-            <TouchableOpacity
+            <MotionPressable
               style={[s.primaryBtn, isProcessing && s.primaryBtnDisabled]}
               onPress={handlePayNow}
               disabled={isProcessing}
@@ -659,15 +660,15 @@ function BookSummaryInner() {
                   </Text>
                 </>
               )}
-            </TouchableOpacity>
-            <TouchableOpacity
+            </MotionPressable>
+            <MotionPressable
               style={s.secondaryBtn}
               onPress={() => router.back()}
               activeOpacity={0.8}
               disabled={isProcessing}
             >
               <Text style={s.secondaryBtnText}>Back to Slots</Text>
-            </TouchableOpacity>
+            </MotionPressable>
           </>
         )}
       </View>

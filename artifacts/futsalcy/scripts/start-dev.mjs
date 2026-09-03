@@ -10,6 +10,7 @@
 import { spawn } from "child_process";
 import http from "http";
 import { writeFileSync } from "fs";
+import { createRequire } from "module";
 
 const PORT = parseInt(process.env.PORT || "20728");
 const replDomain = process.env.REPLIT_DEV_DOMAIN || "";
@@ -18,9 +19,23 @@ const replId = process.env.REPL_ID || "";
 // Keep the port explicit so Expo Go does not fall back to Replit's default
 // HTTPS router, which may target a different service.
 const publicBaseUrl = replDomain ? `https://${replDomain}:3000` : "";
+// Replit's public router is TLS-only. `exp://` maps to plain HTTP in Expo Go,
+// while `exps://` maps to HTTPS, so the QR must use the secure scheme.
+const secureExpoUrl = replDomain ? `exps://${replDomain}:3000` : "";
 
 if (!publicBaseUrl) {
   throw new Error("REPLIT_DEV_DOMAIN is required to start the Expo packager");
+}
+
+function printSecureExpoQr() {
+  // qrcode-terminal is already bundled with the direct Expo CLI dependency.
+  // Resolve it from Expo rather than adding another application dependency.
+  const localRequire = createRequire(import.meta.url);
+  const expoRequire = createRequire(localRequire.resolve("@expo/cli/package.json"));
+  const qrcode = expoRequire("qrcode-terminal");
+  process.stdout.write(`\n› Secure Expo Go link: ${secureExpoUrl}\n`);
+  process.stdout.write("› Scan this HTTPS QR code with Expo Go (Android or iOS):\n");
+  qrcode.generate(secureExpoUrl, { small: true });
 }
 
 writeFileSync(
@@ -69,7 +84,13 @@ async function prewarm() {
   for (;;) {
     try {
       const r = await get(`http://localhost:${PORT}/status`);
-      if (r.status === 200) break;
+      if (r.status === 200) {
+        // Expo CLI always labels its own QR as `exp://`, even when its
+        // manifest uses an HTTPS proxy. Only print the safe equivalent once
+        // Metro can answer a device request.
+        printSecureExpoQr();
+        break;
+      }
     } catch {}
     await new Promise((r) => setTimeout(r, 3000));
   }

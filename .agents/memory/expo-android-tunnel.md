@@ -12,8 +12,9 @@ Expo CLI with:
 EXPO_PACKAGER_PROXY_URL=https://<REPLIT_DEV_DOMAIN>:3000
 ```
 
-Expo then prints an `exp://<REPLIT_DEV_DOMAIN>:3000` URL. Both the Expo
-manifest and platform bundles are served by the Replit HTTPS router, so no
+Expo's built-in QR can still display `exp://`, which Expo Go treats as plain
+HTTP. Print and scan an `exps://<REPLIT_DEV_DOMAIN>:3000` QR instead so Expo
+Go stays on TLS. Both the Expo manifest and platform bundles are served by the Replit HTTPS router, so no
 ngrok, Serveo, or localtunnel process is needed.
 
 ## Why third-party tunnels are unsafe here

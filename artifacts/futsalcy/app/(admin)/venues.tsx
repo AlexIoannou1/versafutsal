@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import {
   rejectVenue,
 } from "@workspace/api-client-react";
 import AdminVenueDetailScreen from "@/components/admin/AdminVenueDetailScreen";
+import { FadeIn, MotionPressable, SuccessFeedback } from "@/components/Motion";
+import { useMotion } from "@/context/MotionContext";
 
 type TabKey = "PENDING" | "APPROVED" | "REJECTED" | "DISABLED";
 
@@ -55,6 +57,7 @@ type VenueItem = {
 
 export default function AdminVenuesScreen() {
   const colors = useColors();
+  const { reduceMotion } = useMotion();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("PENDING");
@@ -64,12 +67,19 @@ export default function AdminVenuesScreen() {
   const [approveModalVisible, setApproveModalVisible] = useState(false);
   const [approveTarget, setApproveTarget] = useState<{ id: string; name: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [approvalMessage, setApprovalMessage] = useState<string | null>(null);
   const [detailVenueId, setDetailVenueId] = useState<string | null>(null);
 
   const { data, isLoading, refetch, isRefetching } = useAdminListVenues({
     status: activeTab,
   });
   const venues: VenueItem[] = (data?.venues as VenueItem[] | undefined) ?? [];
+
+  useEffect(() => {
+    if (!approvalMessage) return;
+    const timer = setTimeout(() => setApprovalMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [approvalMessage]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getAdminListVenuesQueryKey() });
@@ -88,6 +98,7 @@ export default function AdminVenuesScreen() {
     try {
       await approveVenue(id);
       invalidate();
+      setApprovalMessage(`${approveTarget.name} is now visible to players.`);
     } catch {
       Alert.alert("Error", "Failed to approve venue. Please try again.");
     } finally {
@@ -324,7 +335,7 @@ export default function AdminVenuesScreen() {
           {TABS.map((tab) => {
             const active = activeTab === tab.key;
             return (
-              <TouchableOpacity
+              <MotionPressable
                 key={tab.key}
                 style={[
                   s.tabBtn,
@@ -343,16 +354,16 @@ export default function AdminVenuesScreen() {
                 >
                   {tab.label}
                 </Text>
-              </TouchableOpacity>
+              </MotionPressable>
             );
           })}
         </View>
       </View>
 
       {isLoading ? (
-        <View style={s.center}>
+        <FadeIn style={s.center}>
           <ActivityIndicator color={colors.primary} />
-        </View>
+        </FadeIn>
       ) : venues.length === 0 ? (
         <View style={s.center}>
           <View style={s.emptyIcon}>
@@ -367,6 +378,9 @@ export default function AdminVenuesScreen() {
         <FlatList
           data={venues}
           keyExtractor={(item) => item.id}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
           contentContainerStyle={s.list}
           refreshControl={
             <RefreshControl
@@ -380,7 +394,7 @@ export default function AdminVenuesScreen() {
             const isActioning = actionLoading === item.id;
 
             return (
-              <TouchableOpacity
+              <MotionPressable
                 style={s.card}
                 activeOpacity={0.85}
                 onPress={() => setDetailVenueId(item.id)}
@@ -434,7 +448,7 @@ export default function AdminVenuesScreen() {
 
                 {item.status === "PENDING" && (
                   <View style={s.actions}>
-                    <TouchableOpacity
+                    <MotionPressable
                       style={[s.approveBtn, isActioning && { opacity: 0.5 }]}
                       onPress={() => handleApprove(item.id, item.name)}
                       disabled={isActioning}
@@ -447,18 +461,18 @@ export default function AdminVenuesScreen() {
                           <Text style={s.approveBtnText}>Approve</Text>
                         </>
                       )}
-                    </TouchableOpacity>
-                    <TouchableOpacity
+                    </MotionPressable>
+                    <MotionPressable
                       style={[s.rejectBtn, isActioning && { opacity: 0.5 }]}
                       onPress={() => openRejectModal(item.id)}
                       disabled={isActioning}
                     >
                       <FeatherIcons name="x" size={16} color={colors.destructive} />
                       <Text style={s.rejectBtnText}>Reject</Text>
-                    </TouchableOpacity>
+                    </MotionPressable>
                   </View>
                 )}
-              </TouchableOpacity>
+              </MotionPressable>
             );
           }}
         />
@@ -467,7 +481,7 @@ export default function AdminVenuesScreen() {
       <Modal
         visible={approveModalVisible}
         transparent
-        animationType="fade"
+        animationType={reduceMotion ? "none" : "fade"}
         onRequestClose={() => setApproveModalVisible(false)}
       >
         <View style={s.modalOverlay}>
@@ -477,19 +491,19 @@ export default function AdminVenuesScreen() {
               Approve &quot;{approveTarget?.name}&quot;? The venue will become visible to players.
             </Text>
             <View style={s.modalActions}>
-              <TouchableOpacity
+              <MotionPressable
                 style={s.cancelBtn}
                 onPress={() => setApproveModalVisible(false)}
               >
                 <Text style={s.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </MotionPressable>
+              <MotionPressable
                 style={[s.approveBtn, { flex: 1 }]}
                 onPress={confirmApprove}
               >
                 <FeatherIcons name="check" size={16} color={colors.primaryForeground} />
                 <Text style={s.approveBtnText}>Approve</Text>
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
         </View>
@@ -498,7 +512,7 @@ export default function AdminVenuesScreen() {
       <Modal
         visible={rejectModalVisible}
         transparent
-        animationType="slide"
+        animationType={reduceMotion ? "none" : "slide"}
         onRequestClose={() => setRejectModalVisible(false)}
       >
         <KeyboardAvoidingView
@@ -519,15 +533,15 @@ export default function AdminVenuesScreen() {
               maxLength={500}
             />
             <View style={s.modalActions}>
-              <TouchableOpacity
+              <MotionPressable
                 style={s.cancelBtn}
                 onPress={() => setRejectModalVisible(false)}
               >
                 <Text style={s.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.confirmRejectBtn} onPress={handleReject}>
+              </MotionPressable>
+              <MotionPressable style={s.confirmRejectBtn} onPress={handleReject}>
                 <Text style={s.confirmRejectText}>Confirm Reject</Text>
-              </TouchableOpacity>
+              </MotionPressable>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -539,6 +553,11 @@ export default function AdminVenuesScreen() {
           visible={!!detailVenueId}
           onClose={() => setDetailVenueId(null)}
         />
+      )}
+      {approvalMessage && (
+        <View style={{ position: "absolute", left: 20, right: 20, bottom: insets.bottom + 20 }}>
+          <SuccessFeedback message={approvalMessage} />
+        </View>
       )}
     </View>
   );
