@@ -19,3 +19,17 @@ mtime_ms = 1788435830601
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:55954ffe-e66f-485d-859a-0d4d1971ba5f/336f6c7d-79e4-41b7-9429-c7936758a138/6f2d8adf-aa17-41ae-aa82-056471cdb722"
 storage_version_token = "1788435831765217"
 content_type = "image/svg+xml"
+
+[[outputs]]
+id = "3MGAy-cI04JLgS2aDTiFy"
+uri = "file://artifacts/futsalcy/generated/current-expo-go-tunnel-qr.svg"
+type = "image"
+title = "Current Expo Go Tunnel QR — FutsalCY"
+description = "Scan this current QR in Expo Go. It uses a verified HTTP tunnel, not the HTTPS-only Replit workspace router."
+logical_id = "20828b4c-e321-48af-9066-aeed08325d4d"
+content_hash = "sha256:05e2a77686f8eefb5967ab85aa50241177682dd06e4cbb7f73903264c46f8fd4"
+size = 24126
+mtime_ms = 1788436389136
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:55954ffe-e66f-485d-859a-0d4d1971ba5f/20828b4c-e321-48af-9066-aeed08325d4d/15b9d588-79c7-4e82-a9f4-d7f311266cba"
+storage_version_token = "1788436390896692"
+content_type = "image/svg+xml"

@@ -3,23 +3,24 @@ name: Expo physical-device packager routing
 description: How Expo Go on physical Android and iOS devices reaches Metro running on Replit
 ---
 
-## The stable route
+## The compatible route
 
-The Expo artifact maps its local Metro port to external HTTPS port 3000. Use
-Replit's dedicated Expo device domain when starting Expo CLI:
+Expo Go requests `exp://` development URLs over HTTP. Replit's normal and
+dedicated Expo development routers are HTTPS-only, so they return 400 to that
+request even while their HTTPS manifests and bundles are healthy.
 
-```text
-EXPO_PACKAGER_PROXY_URL=https://<REPLIT_EXPO_DEV_DOMAIN>:3000
-```
+Use a Cloudflare quick tunnel to Metro for development. Its public HTTP URL can
+be passed to Expo CLI as `EXPO_PACKAGER_PROXY_URL`; Expo then prints a standard
+`exp://<random>.trycloudflare.com` QR that Expo Go can load.
 
-Expo's built-in QR can still display `exp://`, which Expo Go treats as plain
-HTTP. Print and scan an `exps://<REPLIT_EXPO_DEV_DOMAIN>:3000` QR instead so Expo
-Go stays on TLS. Both the Expo manifest and platform bundles are served by the Replit HTTPS router, so no
-ngrok, Serveo, or localtunnel process is needed.
+**Why:** `exps://` QR codes and Replit's HTTPS endpoints still caused Android
+Expo Go to report “Packager is not running at http://…”. Expo's official ngrok
+tunnel also failed upstream with remote connection errors in this workspace.
 
-Keep Metro interactive for hot reload, but filter only the child CLI's default
-QR output. Do not use CI mode to suppress the built-in QR: CI disables Metro
-reloads.
+**How to apply:** start the quick tunnel before Expo, wait for its generated
+URL, then start Expo with that HTTP proxy URL. The URL changes on every
+restart, so scan only the current workflow QR. Quick tunnels are for
+development, not production.
 
 ## Why third-party tunnels are unsafe here
 

@@ -101,6 +101,7 @@ PASSWORD_RESET_FROM_EMAIL = "Versa <no-reply@notifications.versafutsal.com>"
 
 [nix]
 channel = "stable-25_05"
+packages = ["cloudflared"]
 
 [objectStorage]
 defaultBucketID = "replit-objstore-56030778-5932-40fa-af4a-55e391629d37"

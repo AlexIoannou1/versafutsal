@@ -2,101 +2,98 @@
 /**
  * Dev launcher for Expo Go on physical Android and iOS devices.
  *
- * Replit's Expo device router exposes Metro at its dedicated HTTPS domain.
- * EXPO_PACKAGER_PROXY_URL tells Expo CLI to put that public URL in the
- * manifest and QR code. This avoids third-party tunnels, which can expire
- * or return 502s while Metro is still healthy.
+ * Expo Go requests `exp://` packagers over HTTP. Replit's development router
+ * is HTTPS-only, so use a short-lived Cloudflare development tunnel to supply
+ * Expo Go with a compatible public HTTP address.
  */
 import { spawn } from "child_process";
 import http from "http";
 import { writeFileSync } from "fs";
-import { createRequire } from "module";
 
 const PORT = parseInt(process.env.PORT || "20728");
 const replDomain = process.env.REPLIT_DEV_DOMAIN || "";
-const expoDomain = process.env.REPLIT_EXPO_DEV_DOMAIN || replDomain;
 const replId = process.env.REPL_ID || "";
-// The artifact service maps local Metro PORT (20728) to external HTTPS 3000.
-// Keep the port explicit so Expo Go does not fall back to Replit's default
-// HTTPS router, which may target a different service.
-const publicBaseUrl = expoDomain ? `https://${expoDomain}:3000` : "";
-// Replit's public router is TLS-only. `exp://` maps to plain HTTP in Expo Go,
-// while `exps://` maps to HTTPS, so the QR must use the secure scheme.
-const secureExpoUrl = expoDomain ? `exps://${expoDomain}:3000` : "";
-
-if (!publicBaseUrl) {
-  throw new Error(
-    "REPLIT_EXPO_DEV_DOMAIN or REPLIT_DEV_DOMAIN is required to start the Expo packager"
-  );
-}
-
-function printSecureExpoQr() {
-  // qrcode-terminal is already bundled with the direct Expo CLI dependency.
-  // Resolve it from Expo rather than adding another application dependency.
-  const localRequire = createRequire(import.meta.url);
-  const expoRequire = createRequire(localRequire.resolve("@expo/cli/package.json"));
-  const qrcode = expoRequire("qrcode-terminal");
-  process.stdout.write(`\n› Secure Expo Go link: ${secureExpoUrl}\n`);
-  process.stdout.write("› Scan this HTTPS QR code with Expo Go (Android or iOS):\n");
-  qrcode.generate(secureExpoUrl, { small: true });
-}
-
-function forwardExpoOutput(stream, destination) {
-  let pending = "";
-  let hidingDefaultQrDetails = false;
-
-  const forwardLine = (line) => {
-    // Expo CLI advertises the configured HTTPS proxy as `exp://`, which maps
-    // to plain HTTP in Expo Go. Replit's public packager route accepts TLS
-    // only, so hide that QR and its link details; the verified `exps://` QR is
-    // printed by this launcher once Metro is ready.
-    if (/[█▀▄]/u.test(line)) return;
-    if (line.includes("Metro waiting on")) {
-      hidingDefaultQrDetails = true;
-      return;
-    }
-    if (hidingDefaultQrDetails) {
-      if (!line.includes("Web is waiting on")) return;
-      hidingDefaultQrDetails = false;
-    }
-    destination.write(`${line}\n`);
-  };
-
-  stream.setEncoding("utf8");
-  stream.on("data", (chunk) => {
-    pending += chunk;
-    const lines = pending.split(/\r?\n/);
-    pending = lines.pop() ?? "";
-    lines.forEach(forwardLine);
-  });
-  stream.on("end", () => {
-    if (pending) forwardLine(pending);
-  });
-}
 
 writeFileSync(
   ".env.local",
   `EXPO_PUBLIC_DOMAIN=${replDomain}\nEXPO_PUBLIC_REPL_ID=${replId}\n`
 );
 
-// Use the public artifact URL for Expo's manifest, QR code, bundles, assets,
-// and native log transport. No ngrok/Serveo process is required.
-const expo = spawn(
-  "pnpm",
-  ["exec", "expo", "start", "--host", "lan", "--port", String(PORT)],
-  {
-    stdio: ["inherit", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      EXPO_PACKAGER_PROXY_URL: publicBaseUrl,
-    },
-  }
-);
-forwardExpoOutput(expo.stdout, process.stdout);
-forwardExpoOutput(expo.stderr, process.stderr);
-expo.on("exit", (code) => process.exit(code ?? 0));
-expo.on("error", (error) => {
-  process.stderr.write(`[dev] Expo failed to start: ${error.message}\n`);
+function startTunnel() {
+  return new Promise((resolve, reject) => {
+    const cloudflared = spawn(
+      "cloudflared",
+      ["tunnel", "--url", `http://127.0.0.1:${PORT}`, "--no-autoupdate"],
+      { stdio: ["ignore", "pipe", "pipe"] }
+    );
+    let output = "";
+    let connected = false;
+    const timeout = setTimeout(() => {
+      cloudflared.kill("SIGTERM");
+      reject(new Error("Cloudflare tunnel did not provide a public URL within 45 seconds"));
+    }, 45_000);
+
+    const capture = (chunk) => {
+      const text = chunk.toString();
+      output += text;
+      process.stdout.write(`[tunnel] ${text}`);
+      const match = output.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
+      if (match && !connected) {
+        connected = true;
+        clearTimeout(timeout);
+        resolve({ cloudflared, publicUrl: match[0] });
+      }
+    };
+
+    cloudflared.stdout.on("data", capture);
+    cloudflared.stderr.on("data", capture);
+    cloudflared.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(new Error(`Cloudflare tunnel failed to start: ${error.message}`));
+    });
+    cloudflared.on("exit", (code) => {
+      if (!connected) {
+        clearTimeout(timeout);
+        reject(new Error(`Cloudflare tunnel exited before connecting (code ${code ?? "unknown"})`));
+      }
+    });
+  });
+}
+
+async function startExpo() {
+  const { cloudflared, publicUrl } = await startTunnel();
+  // Cloudflare serves this quick-tunnel URL over HTTP, which makes Expo CLI's
+  // standard `exp://` QR usable by Expo Go.
+  const expo = spawn(
+    "pnpm",
+    ["exec", "expo", "start", "--host", "lan", "--port", String(PORT)],
+    {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        EXPO_PACKAGER_PROXY_URL: publicUrl.replace(/^https:/, "http:"),
+      },
+    }
+  );
+  expo.on("exit", (code) => {
+    cloudflared.kill("SIGTERM");
+    process.exit(code ?? 0);
+  });
+  expo.on("error", (error) => {
+    cloudflared.kill("SIGTERM");
+    process.stderr.write(`[dev] Expo failed to start: ${error.message}\n`);
+    process.exit(1);
+  });
+  cloudflared.on("exit", (code) => {
+    if (!expo.killed && code !== 0) {
+      process.stderr.write("[dev] Cloudflare tunnel closed; restarting Expo is required.\n");
+      expo.kill("SIGTERM");
+    }
+  });
+}
+
+startExpo().catch((error) => {
+  process.stderr.write(`[dev] ${error.message}\n`);
   process.exit(1);
 });
 
@@ -123,10 +120,6 @@ async function prewarm() {
     try {
       const r = await get(`http://localhost:${PORT}/status`);
       if (r.status === 200) {
-        // Expo CLI always labels its own QR as `exp://`, even when its
-        // manifest uses an HTTPS proxy. Only print the safe equivalent once
-        // Metro can answer a device request.
-        printSecureExpoQr();
         break;
       }
     } catch {}
