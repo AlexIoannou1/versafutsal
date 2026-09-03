@@ -2,7 +2,7 @@
 /**
  * Dev launcher for Expo Go on physical Android and iOS devices.
  *
- * Replit's artifact router exposes Metro at the artifact's HTTPS domain.
+ * Replit's Expo device router exposes Metro at its dedicated HTTPS domain.
  * EXPO_PACKAGER_PROXY_URL tells Expo CLI to put that public URL in the
  * manifest and QR code. This avoids third-party tunnels, which can expire
  * or return 502s while Metro is still healthy.
@@ -14,17 +14,20 @@ import { createRequire } from "module";
 
 const PORT = parseInt(process.env.PORT || "20728");
 const replDomain = process.env.REPLIT_DEV_DOMAIN || "";
+const expoDomain = process.env.REPLIT_EXPO_DEV_DOMAIN || replDomain;
 const replId = process.env.REPL_ID || "";
 // The artifact service maps local Metro PORT (20728) to external HTTPS 3000.
 // Keep the port explicit so Expo Go does not fall back to Replit's default
 // HTTPS router, which may target a different service.
-const publicBaseUrl = replDomain ? `https://${replDomain}:3000` : "";
+const publicBaseUrl = expoDomain ? `https://${expoDomain}:3000` : "";
 // Replit's public router is TLS-only. `exp://` maps to plain HTTP in Expo Go,
 // while `exps://` maps to HTTPS, so the QR must use the secure scheme.
-const secureExpoUrl = replDomain ? `exps://${replDomain}:3000` : "";
+const secureExpoUrl = expoDomain ? `exps://${expoDomain}:3000` : "";
 
 if (!publicBaseUrl) {
-  throw new Error("REPLIT_DEV_DOMAIN is required to start the Expo packager");
+  throw new Error(
+    "REPLIT_EXPO_DEV_DOMAIN or REPLIT_DEV_DOMAIN is required to start the Expo packager"
+  );
 }
 
 function printSecureExpoQr() {
