@@ -35,7 +35,13 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json({ limit: "100kb", strict: true }));
+app.use(express.json({
+  limit: "100kb",
+  strict: true,
+  verify(req, _res, buffer) {
+    (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+  },
+}));
 app.use(express.urlencoded({ extended: false, limit: "32kb", parameterLimit: 50 }));
 app.use(requestValidation);
 

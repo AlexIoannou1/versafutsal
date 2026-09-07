@@ -9,3 +9,4 @@
 - [Generated Zod API export](generated-zod-api-export.md) — generated Zod output lives in a nested path; exporting its directory can resolve to a stale sibling file.
 - [App Storage bucket verification](app-storage-bucket-verification.md) — provisioning can report ready while a selected bucket lacks runtime access; verify a real object lifecycle after changing buckets.
 - [pnpm audit major overrides](pnpm-audit-major-overrides.md) — audit-generated minimum ranges can cross majors; pin a patched version within framework compatibility.
+- [Recurring checkout recovery](recurring-checkout-recovery.md) — never issue a new subscription checkout until pending provider state is reconciled; webhook delay can outlive session expiry.

@@ -162,6 +162,14 @@ export default function OwnerProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.menuRow, s.menuRowBorder]}
+            onPress={() => router.push("/(owner)/plans")}
+          >
+            <FeatherIcons name="credit-card" size={20} color={colors.primary} />
+            <Text style={s.menuRowText}>Plans</Text>
+            <FeatherIcons name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.menuRow, s.menuRowBorder]}
             onPress={() => router.push("/owner/settings")}
           >
             <FeatherIcons name="settings" size={20} color={colors.primary} />

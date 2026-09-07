@@ -78,6 +78,7 @@ function NativeTabLayout() {
         <Icon sf={{ default: "chart.bar.xaxis", selected: "chart.bar.xaxis" }} />
         <Label>Stats</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="plans" hidden />
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -151,6 +152,13 @@ function ClassicTabLayout() {
         options={{
           title: "Stats",
           tabBarIcon: ({ color }) => <FeatherIcons name="trending-up" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="plans"
+        options={{
+          title: "Plans",
+          href: null,
         }}
       />
       <Tabs.Screen

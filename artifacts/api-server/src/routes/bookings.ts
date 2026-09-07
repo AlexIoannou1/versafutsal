@@ -15,6 +15,7 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, lt, gt, inArray, desc, ne, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { requireOwnerCapability } from "../lib/entitlements";
 import { paymentProvider } from "../lib/payment-provider";
 import { logBookingAuditFireAndForget, logBookingAudit } from "../lib/audit";
 
@@ -618,7 +619,7 @@ router.get<{ id: string }>(
 // ─── Owner Manual Booking ─────────────────────────────────────────────────────
 
 // POST /owner/bookings/manual — create a walk-in / phone booking (no payment)
-router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), requireOwnerCapability("MANUAL_BOOKING"), async (req, res) => {
   try {
     const { pitchId, startAt, guestName, guestPhone } = req.body as {
       pitchId?: string;

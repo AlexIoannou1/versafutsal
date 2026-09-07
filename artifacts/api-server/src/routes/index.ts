@@ -11,6 +11,7 @@ import playerAvatarRouter from "./player-avatar";
 import ownerAccountRouter from "./owner-account";
 import ownerNotificationsRouter from "./owner-notifications";
 import playerNotificationsRouter from "./player-notifications";
+import subscriptionsRouter from "./subscriptions";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(playerAvatarRouter);
 router.use(ownerAccountRouter);
 router.use(ownerNotificationsRouter);
 router.use(playerNotificationsRouter);
+router.use(subscriptionsRouter);
 
 export default router;

@@ -31,8 +31,10 @@ import type {
   ApiError,
   ApproveVenue200,
   AuthResponse,
+  BillingUrl,
   CancelBookingRequest,
   CancelBookingResponse,
+  CancelOwnerSubscription200,
   CheckoutFeeResponse,
   CheckoutRequest,
   CheckoutResponse,
@@ -49,6 +51,7 @@ import type {
   GetCheckoutFeeParams,
   GetOwnerBooking200,
   GetOwnerBookingAudit200,
+  GetOwnerSubscription200,
   GetOwnerVenue200,
   GetPitchAvailability200,
   GetPitchAvailabilityParams,
@@ -58,6 +61,8 @@ import type {
   HealthStatus,
   ListOwnerBookings200,
   ListOwnerBookingsParams,
+  ListOwnerSubscriptions200,
+  ListOwnerSubscriptionsParams,
   ListOwnerVenues200,
   ListPlayerBookings200,
   ListPlayerBookingsParams,
@@ -65,11 +70,14 @@ import type {
   ListVenuesParams,
   LoginRequest,
   MeResponse,
+  OwnerSubscriptionAdminDetail,
   PasswordChangeRequest,
   PasswordChangeResponse,
   PasswordResetConfirmRequest,
   PasswordResetRequest,
   PasswordResetRequestResponse,
+  ReceiveStripeSubscriptionWebhook200,
+  ReceiveStripeSubscriptionWebhookBody,
   RegisterPushToken200,
   RegisterPushTokenRequest,
   RegisterRequest,
@@ -77,10 +85,13 @@ import type {
   RejectVenueRequest,
   SetOpeningHours200,
   SetOpeningHoursRequest,
+  SetOwnerSubscriptionOverride200,
   SetPricingRules200,
   SetPricingRulesRequest,
   SetVenueFeeOverride200,
   SubmitVenueForApproval200,
+  SubscriptionCheckoutInput,
+  SubscriptionOverrideInput,
   UpdateAdminSettings200,
   UpdateAdminSettingsRequest,
   UpdatePitch200,
@@ -4724,4 +4735,666 @@ export const useSetVenueFeeOverride = <
   TContext
 > => {
   return useMutation(getSetVenueFeeOverrideMutationOptions(options));
+};
+
+export const getGetOwnerSubscriptionUrl = () => {
+  return `/api/owner/subscription`;
+};
+
+export const getOwnerSubscription = async (
+  options?: RequestInit,
+): Promise<GetOwnerSubscription200> => {
+  return customFetch<GetOwnerSubscription200>(getGetOwnerSubscriptionUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOwnerSubscriptionQueryKey = () => {
+  return [`/api/owner/subscription`] as const;
+};
+
+export const getGetOwnerSubscriptionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerSubscription>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerSubscription>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOwnerSubscriptionQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOwnerSubscription>>
+  > = ({ signal }) => getOwnerSubscription({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerSubscription>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerSubscriptionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerSubscription>>
+>;
+export type GetOwnerSubscriptionQueryError = ErrorType<unknown>;
+
+export function useGetOwnerSubscription<
+  TData = Awaited<ReturnType<typeof getOwnerSubscription>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerSubscription>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerSubscriptionQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getCreateOwnerSubscriptionCheckoutUrl = () => {
+  return `/api/owner/subscription/checkout`;
+};
+
+export const createOwnerSubscriptionCheckout = async (
+  subscriptionCheckoutInput: SubscriptionCheckoutInput,
+  options?: RequestInit,
+): Promise<BillingUrl> => {
+  return customFetch<BillingUrl>(getCreateOwnerSubscriptionCheckoutUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(subscriptionCheckoutInput),
+  });
+};
+
+export const getCreateOwnerSubscriptionCheckoutMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOwnerSubscriptionCheckout>>,
+    TError,
+    { data: BodyType<SubscriptionCheckoutInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createOwnerSubscriptionCheckout>>,
+  TError,
+  { data: BodyType<SubscriptionCheckoutInput> },
+  TContext
+> => {
+  const mutationKey = ["createOwnerSubscriptionCheckout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createOwnerSubscriptionCheckout>>,
+    { data: BodyType<SubscriptionCheckoutInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createOwnerSubscriptionCheckout(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateOwnerSubscriptionCheckoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createOwnerSubscriptionCheckout>>
+>;
+export type CreateOwnerSubscriptionCheckoutMutationBody =
+  BodyType<SubscriptionCheckoutInput>;
+export type CreateOwnerSubscriptionCheckoutMutationError = ErrorType<ApiError>;
+
+export const useCreateOwnerSubscriptionCheckout = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOwnerSubscriptionCheckout>>,
+    TError,
+    { data: BodyType<SubscriptionCheckoutInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createOwnerSubscriptionCheckout>>,
+  TError,
+  { data: BodyType<SubscriptionCheckoutInput> },
+  TContext
+> => {
+  return useMutation(
+    getCreateOwnerSubscriptionCheckoutMutationOptions(options),
+  );
+};
+
+export const getCreateOwnerBillingPortalUrl = () => {
+  return `/api/owner/subscription/portal`;
+};
+
+export const createOwnerBillingPortal = async (
+  options?: RequestInit,
+): Promise<BillingUrl> => {
+  return customFetch<BillingUrl>(getCreateOwnerBillingPortalUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCreateOwnerBillingPortalMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOwnerBillingPortal>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createOwnerBillingPortal>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["createOwnerBillingPortal"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createOwnerBillingPortal>>,
+    void
+  > = () => {
+    return createOwnerBillingPortal(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateOwnerBillingPortalMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createOwnerBillingPortal>>
+>;
+
+export type CreateOwnerBillingPortalMutationError = ErrorType<unknown>;
+
+export const useCreateOwnerBillingPortal = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOwnerBillingPortal>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createOwnerBillingPortal>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCreateOwnerBillingPortalMutationOptions(options));
+};
+
+export const getCancelOwnerSubscriptionUrl = () => {
+  return `/api/owner/subscription/cancel`;
+};
+
+export const cancelOwnerSubscription = async (
+  options?: RequestInit,
+): Promise<CancelOwnerSubscription200> => {
+  return customFetch<CancelOwnerSubscription200>(
+    getCancelOwnerSubscriptionUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getCancelOwnerSubscriptionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelOwnerSubscription>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelOwnerSubscription>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["cancelOwnerSubscription"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelOwnerSubscription>>,
+    void
+  > = () => {
+    return cancelOwnerSubscription(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelOwnerSubscriptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelOwnerSubscription>>
+>;
+
+export type CancelOwnerSubscriptionMutationError = ErrorType<unknown>;
+
+export const useCancelOwnerSubscription = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelOwnerSubscription>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelOwnerSubscription>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCancelOwnerSubscriptionMutationOptions(options));
+};
+
+export const getListOwnerSubscriptionsUrl = (
+  params?: ListOwnerSubscriptionsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/subscriptions/owners?${stringifiedParams}`
+    : `/api/admin/subscriptions/owners`;
+};
+
+export const listOwnerSubscriptions = async (
+  params?: ListOwnerSubscriptionsParams,
+  options?: RequestInit,
+): Promise<ListOwnerSubscriptions200> => {
+  return customFetch<ListOwnerSubscriptions200>(
+    getListOwnerSubscriptionsUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListOwnerSubscriptionsQueryKey = (
+  params?: ListOwnerSubscriptionsParams,
+) => {
+  return [
+    `/api/admin/subscriptions/owners`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListOwnerSubscriptionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOwnerSubscriptions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOwnerSubscriptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOwnerSubscriptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListOwnerSubscriptionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOwnerSubscriptions>>
+  > = ({ signal }) =>
+    listOwnerSubscriptions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOwnerSubscriptions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOwnerSubscriptionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOwnerSubscriptions>>
+>;
+export type ListOwnerSubscriptionsQueryError = ErrorType<unknown>;
+
+export function useListOwnerSubscriptions<
+  TData = Awaited<ReturnType<typeof listOwnerSubscriptions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListOwnerSubscriptionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listOwnerSubscriptions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOwnerSubscriptionsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetOwnerSubscriptionAdminUrl = (ownerId: string) => {
+  return `/api/admin/subscriptions/owners/${ownerId}`;
+};
+
+export const getOwnerSubscriptionAdmin = async (
+  ownerId: string,
+  options?: RequestInit,
+): Promise<OwnerSubscriptionAdminDetail> => {
+  return customFetch<OwnerSubscriptionAdminDetail>(
+    getGetOwnerSubscriptionAdminUrl(ownerId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetOwnerSubscriptionAdminQueryKey = (ownerId: string) => {
+  return [`/api/admin/subscriptions/owners/${ownerId}`] as const;
+};
+
+export const getGetOwnerSubscriptionAdminQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>,
+  TError = ErrorType<unknown>,
+>(
+  ownerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetOwnerSubscriptionAdminQueryKey(ownerId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>
+  > = ({ signal }) =>
+    getOwnerSubscriptionAdmin(ownerId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!ownerId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerSubscriptionAdminQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>
+>;
+export type GetOwnerSubscriptionAdminQueryError = ErrorType<unknown>;
+
+export function useGetOwnerSubscriptionAdmin<
+  TData = Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>,
+  TError = ErrorType<unknown>,
+>(
+  ownerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerSubscriptionAdmin>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerSubscriptionAdminQueryOptions(
+    ownerId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getSetOwnerSubscriptionOverrideUrl = (ownerId: string) => {
+  return `/api/admin/subscriptions/owners/${ownerId}/override`;
+};
+
+export const setOwnerSubscriptionOverride = async (
+  ownerId: string,
+  subscriptionOverrideInput: SubscriptionOverrideInput,
+  options?: RequestInit,
+): Promise<SetOwnerSubscriptionOverride200> => {
+  return customFetch<SetOwnerSubscriptionOverride200>(
+    getSetOwnerSubscriptionOverrideUrl(ownerId),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(subscriptionOverrideInput),
+    },
+  );
+};
+
+export const getSetOwnerSubscriptionOverrideMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setOwnerSubscriptionOverride>>,
+    TError,
+    { ownerId: string; data: BodyType<SubscriptionOverrideInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setOwnerSubscriptionOverride>>,
+  TError,
+  { ownerId: string; data: BodyType<SubscriptionOverrideInput> },
+  TContext
+> => {
+  const mutationKey = ["setOwnerSubscriptionOverride"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setOwnerSubscriptionOverride>>,
+    { ownerId: string; data: BodyType<SubscriptionOverrideInput> }
+  > = (props) => {
+    const { ownerId, data } = props ?? {};
+
+    return setOwnerSubscriptionOverride(ownerId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetOwnerSubscriptionOverrideMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setOwnerSubscriptionOverride>>
+>;
+export type SetOwnerSubscriptionOverrideMutationBody =
+  BodyType<SubscriptionOverrideInput>;
+export type SetOwnerSubscriptionOverrideMutationError = ErrorType<unknown>;
+
+export const useSetOwnerSubscriptionOverride = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setOwnerSubscriptionOverride>>,
+    TError,
+    { ownerId: string; data: BodyType<SubscriptionOverrideInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setOwnerSubscriptionOverride>>,
+  TError,
+  { ownerId: string; data: BodyType<SubscriptionOverrideInput> },
+  TContext
+> => {
+  return useMutation(getSetOwnerSubscriptionOverrideMutationOptions(options));
+};
+
+export const getReceiveStripeSubscriptionWebhookUrl = () => {
+  return `/api/webhooks/stripe/subscriptions`;
+};
+
+export const receiveStripeSubscriptionWebhook = async (
+  receiveStripeSubscriptionWebhookBody: ReceiveStripeSubscriptionWebhookBody,
+  options?: RequestInit,
+): Promise<ReceiveStripeSubscriptionWebhook200> => {
+  return customFetch<ReceiveStripeSubscriptionWebhook200>(
+    getReceiveStripeSubscriptionWebhookUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(receiveStripeSubscriptionWebhookBody),
+    },
+  );
+};
+
+export const getReceiveStripeSubscriptionWebhookMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveStripeSubscriptionWebhook>>,
+    TError,
+    { data: BodyType<ReceiveStripeSubscriptionWebhookBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof receiveStripeSubscriptionWebhook>>,
+  TError,
+  { data: BodyType<ReceiveStripeSubscriptionWebhookBody> },
+  TContext
+> => {
+  const mutationKey = ["receiveStripeSubscriptionWebhook"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof receiveStripeSubscriptionWebhook>>,
+    { data: BodyType<ReceiveStripeSubscriptionWebhookBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return receiveStripeSubscriptionWebhook(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReceiveStripeSubscriptionWebhookMutationResult = NonNullable<
+  Awaited<ReturnType<typeof receiveStripeSubscriptionWebhook>>
+>;
+export type ReceiveStripeSubscriptionWebhookMutationBody =
+  BodyType<ReceiveStripeSubscriptionWebhookBody>;
+export type ReceiveStripeSubscriptionWebhookMutationError = ErrorType<ApiError>;
+
+export const useReceiveStripeSubscriptionWebhook = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof receiveStripeSubscriptionWebhook>>,
+    TError,
+    { data: BodyType<ReceiveStripeSubscriptionWebhookBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof receiveStripeSubscriptionWebhook>>,
+  TError,
+  { data: BodyType<ReceiveStripeSubscriptionWebhookBody> },
+  TContext
+> => {
+  return useMutation(
+    getReceiveStripeSubscriptionWebhookMutationOptions(options),
+  );
 };

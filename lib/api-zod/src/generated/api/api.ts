@@ -1944,3 +1944,199 @@ export const SetVenueFeeOverrideResponse = zod.object({
     updatedAt: zod.coerce.date(),
   }),
 });
+
+export const GetOwnerSubscriptionResponse = zod.object({
+  subscription: zod.object({
+    plan: zod.enum(["FREE", "PRO", "ELITE"]),
+    effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+    status: zod.enum([
+      "NONE",
+      "INCOMPLETE",
+      "ACTIVE",
+      "PAST_DUE",
+      "UNPAID",
+      "CANCELED",
+      "PAUSED",
+    ]),
+    currentPeriodStart: zod.coerce.date().nullable(),
+    currentPeriodEnd: zod.coerce.date().nullable(),
+    cancelAtPeriodEnd: zod.boolean(),
+    overridePlan: zod.enum(["FREE", "PRO", "ELITE"]).nullable(),
+    overrideReason: zod.string().nullable(),
+    overrideStartsAt: zod.coerce.date().nullable(),
+    overrideEndsAt: zod.coerce.date().nullable(),
+    capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+    billingConfigured: zod.boolean(),
+  }),
+});
+
+export const CreateOwnerSubscriptionCheckoutBody = zod.object({
+  plan: zod.enum(["PRO", "ELITE"]),
+});
+
+export const CreateOwnerBillingPortalResponse = zod.object({
+  url: zod.string().url(),
+});
+
+export const CancelOwnerSubscriptionResponse = zod.object({
+  subscription: zod.object({
+    plan: zod.enum(["FREE", "PRO", "ELITE"]),
+    effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+    status: zod.enum([
+      "NONE",
+      "INCOMPLETE",
+      "ACTIVE",
+      "PAST_DUE",
+      "UNPAID",
+      "CANCELED",
+      "PAUSED",
+    ]),
+    currentPeriodStart: zod.coerce.date().nullable(),
+    currentPeriodEnd: zod.coerce.date().nullable(),
+    cancelAtPeriodEnd: zod.boolean(),
+    overridePlan: zod.enum(["FREE", "PRO", "ELITE"]).nullable(),
+    overrideReason: zod.string().nullable(),
+    overrideStartsAt: zod.coerce.date().nullable(),
+    overrideEndsAt: zod.coerce.date().nullable(),
+    capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+    billingConfigured: zod.boolean(),
+  }),
+});
+
+export const ListOwnerSubscriptionsQueryParams = zod.object({
+  plan: zod.enum(["FREE", "PRO", "ELITE"]).optional(),
+});
+
+export const ListOwnerSubscriptionsResponse = zod.object({
+  owners: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      name: zod.string(),
+      email: zod.string().email(),
+      createdAt: zod.coerce.date(),
+      subscription: zod.object({
+        plan: zod.enum(["FREE", "PRO", "ELITE"]),
+        effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+        status: zod.enum([
+          "NONE",
+          "INCOMPLETE",
+          "ACTIVE",
+          "PAST_DUE",
+          "UNPAID",
+          "CANCELED",
+          "PAUSED",
+        ]),
+        currentPeriodStart: zod.coerce.date().nullable(),
+        currentPeriodEnd: zod.coerce.date().nullable(),
+        cancelAtPeriodEnd: zod.boolean(),
+        overridePlan: zod.enum(["FREE", "PRO", "ELITE"]).nullable(),
+        overrideReason: zod.string().nullable(),
+        overrideStartsAt: zod.coerce.date().nullable(),
+        overrideEndsAt: zod.coerce.date().nullable(),
+        capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+        billingConfigured: zod.boolean(),
+      }),
+    }),
+  ),
+});
+
+export const GetOwnerSubscriptionAdminParams = zod.object({
+  ownerId: zod.coerce.string().uuid(),
+});
+
+export const GetOwnerSubscriptionAdminResponse = zod.object({
+  owner: zod.object({
+    id: zod.string().uuid(),
+    name: zod.string(),
+    email: zod.string().email(),
+    createdAt: zod.coerce.date(),
+    subscription: zod.object({
+      plan: zod.enum(["FREE", "PRO", "ELITE"]),
+      effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+      status: zod.enum([
+        "NONE",
+        "INCOMPLETE",
+        "ACTIVE",
+        "PAST_DUE",
+        "UNPAID",
+        "CANCELED",
+        "PAUSED",
+      ]),
+      currentPeriodStart: zod.coerce.date().nullable(),
+      currentPeriodEnd: zod.coerce.date().nullable(),
+      cancelAtPeriodEnd: zod.boolean(),
+      overridePlan: zod.enum(["FREE", "PRO", "ELITE"]).nullable(),
+      overrideReason: zod.string().nullable(),
+      overrideStartsAt: zod.coerce.date().nullable(),
+      overrideEndsAt: zod.coerce.date().nullable(),
+      capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+      billingConfigured: zod.boolean(),
+    }),
+  }),
+  events: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      ownerId: zod.string().uuid().nullable(),
+      actorUserId: zod.string().uuid().nullable(),
+      providerEventId: zod.string().nullable(),
+      eventType: zod.string(),
+      previousValue: zod.record(zod.string(), zod.unknown()).nullish(),
+      newValue: zod.record(zod.string(), zod.unknown()).nullish(),
+      reason: zod.string().nullish(),
+      metadata: zod.record(zod.string(), zod.unknown()),
+      occurredAt: zod.coerce.date(),
+      processedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+export const SetOwnerSubscriptionOverrideParams = zod.object({
+  ownerId: zod.coerce.string().uuid(),
+});
+
+export const setOwnerSubscriptionOverrideBodyReasonMax = 1000;
+
+export const SetOwnerSubscriptionOverrideBody = zod.object({
+  plan: zod.enum(["FREE", "PRO", "ELITE"]).nullable(),
+  reason: zod.string().min(1).max(setOwnerSubscriptionOverrideBodyReasonMax),
+  startsAt: zod.coerce.date().nullish(),
+  endsAt: zod.coerce.date().nullish(),
+});
+
+export const SetOwnerSubscriptionOverrideResponse = zod.object({
+  subscription: zod.object({
+    plan: zod.enum(["FREE", "PRO", "ELITE"]),
+    effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+    status: zod.enum([
+      "NONE",
+      "INCOMPLETE",
+      "ACTIVE",
+      "PAST_DUE",
+      "UNPAID",
+      "CANCELED",
+      "PAUSED",
+    ]),
+    currentPeriodStart: zod.coerce.date().nullable(),
+    currentPeriodEnd: zod.coerce.date().nullable(),
+    cancelAtPeriodEnd: zod.boolean(),
+    overridePlan: zod.enum(["FREE", "PRO", "ELITE"]).nullable(),
+    overrideReason: zod.string().nullable(),
+    overrideStartsAt: zod.coerce.date().nullable(),
+    overrideEndsAt: zod.coerce.date().nullable(),
+    capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+    billingConfigured: zod.boolean(),
+  }),
+});
+
+export const ReceiveStripeSubscriptionWebhookHeader = zod.object({
+  "stripe-signature": zod.string(),
+});
+
+export const ReceiveStripeSubscriptionWebhookBody = zod.record(
+  zod.string(),
+  zod.unknown(),
+);
+
+export const ReceiveStripeSubscriptionWebhookResponse = zod.object({
+  received: zod.boolean(),
+});

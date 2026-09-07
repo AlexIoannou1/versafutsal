@@ -18,6 +18,8 @@ tags:
     description: Booking and availability operations
   - name: admin
     description: Admin operations
+  - name: subscriptions
+    description: Owner plan, entitlement, and recurring billing operations
 paths:
   /healthz:
     get:
@@ -1773,6 +1775,195 @@ paths:
                     $ref: "#/components/schemas/AdminSettingsRecord"
                 required: [settings]
 
+  # ── Owner subscriptions ───────────────────────────────────────────────────
+  /owner/subscription:
+    get:
+      operationId: getOwnerSubscription
+      tags: [subscriptions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current server-authoritative owner subscription
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription:
+                    $ref: "#/components/schemas/OwnerSubscription"
+                required: [subscription]
+
+  /owner/subscription/checkout:
+    post:
+      operationId: createOwnerSubscriptionCheckout
+      tags: [subscriptions]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionCheckoutInput"
+      responses:
+        "201":
+          description: Recurring checkout created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingUrl"
+        "503":
+          description: Recurring billing is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /owner/subscription/portal:
+    post:
+      operationId: createOwnerBillingPortal
+      tags: [subscriptions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Billing portal created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingUrl"
+
+  /owner/subscription/cancel:
+    post:
+      operationId: cancelOwnerSubscription
+      tags: [subscriptions]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cancellation scheduled for period end
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription:
+                    $ref: "#/components/schemas/OwnerSubscription"
+                required: [subscription]
+
+  /admin/subscriptions/owners:
+    get:
+      operationId: listOwnerSubscriptions
+      tags: [admin, subscriptions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: plan
+          in: query
+          schema:
+            $ref: "#/components/schemas/SubscriptionPlan"
+      responses:
+        "200":
+          description: Venue owners with effective plans
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  owners:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OwnerSubscriptionSummary"
+                required: [owners]
+
+  /admin/subscriptions/owners/{ownerId}:
+    get:
+      operationId: getOwnerSubscriptionAdmin
+      tags: [admin, subscriptions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ownerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Owner subscription and audit history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerSubscriptionAdminDetail"
+
+  /admin/subscriptions/owners/{ownerId}/override:
+    put:
+      operationId: setOwnerSubscriptionOverride
+      tags: [admin, subscriptions]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ownerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionOverrideInput"
+      responses:
+        "200":
+          description: Override updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscription:
+                    $ref: "#/components/schemas/OwnerSubscription"
+                required: [subscription]
+
+  /webhooks/stripe/subscriptions:
+    post:
+      operationId: receiveStripeSubscriptionWebhook
+      tags: [subscriptions]
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Event accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                required: [received]
+        "400":
+          description: Signature verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1781,6 +1972,166 @@ components:
       bearerFormat: JWT
 
   schemas:
+    SubscriptionPlan:
+      type: string
+      enum: [FREE, PRO, ELITE]
+
+    SubscriptionStatus:
+      type: string
+      enum: [NONE, INCOMPLETE, ACTIVE, PAST_DUE, UNPAID, CANCELED, PAUSED]
+
+    OwnerSubscription:
+      type: object
+      properties:
+        plan:
+          $ref: "#/components/schemas/SubscriptionPlan"
+        effectivePlan:
+          $ref: "#/components/schemas/SubscriptionPlan"
+        status:
+          $ref: "#/components/schemas/SubscriptionStatus"
+        currentPeriodStart:
+          type: string
+          format: date-time
+          nullable: true
+        currentPeriodEnd:
+          type: string
+          format: date-time
+          nullable: true
+        cancelAtPeriodEnd:
+          type: boolean
+        overridePlan:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/SubscriptionPlan"
+        overrideReason:
+          type: string
+          nullable: true
+        overrideStartsAt:
+          type: string
+          format: date-time
+          nullable: true
+        overrideEndsAt:
+          type: string
+          format: date-time
+          nullable: true
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [MANUAL_BOOKING]
+        billingConfigured:
+          type: boolean
+      required: [plan, effectivePlan, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, overridePlan, overrideReason, overrideStartsAt, overrideEndsAt, capabilities, billingConfigured]
+
+    SubscriptionCheckoutInput:
+      type: object
+      properties:
+        plan:
+          type: string
+          enum: [PRO, ELITE]
+      required: [plan]
+      additionalProperties: false
+
+    BillingUrl:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+      required: [url]
+
+    OwnerSubscriptionSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+        subscription:
+          $ref: "#/components/schemas/OwnerSubscription"
+      required: [id, name, email, createdAt, subscription]
+
+    SubscriptionEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerId:
+          type: string
+          format: uuid
+          nullable: true
+        actorUserId:
+          type: string
+          format: uuid
+          nullable: true
+        providerEventId:
+          type: string
+          nullable: true
+        eventType:
+          type: string
+        previousValue:
+          type: object
+          nullable: true
+          additionalProperties: true
+        newValue:
+          type: object
+          nullable: true
+          additionalProperties: true
+        reason:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        occurredAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
+      required: [id, ownerId, actorUserId, providerEventId, eventType, metadata, occurredAt, processedAt]
+
+    OwnerSubscriptionAdminDetail:
+      type: object
+      properties:
+        owner:
+          $ref: "#/components/schemas/OwnerSubscriptionSummary"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubscriptionEvent"
+      required: [owner, events]
+
+    SubscriptionOverrideInput:
+      type: object
+      properties:
+        plan:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/SubscriptionPlan"
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [plan, reason]
+      additionalProperties: false
+
     HealthStatus:
       type: object
       properties:

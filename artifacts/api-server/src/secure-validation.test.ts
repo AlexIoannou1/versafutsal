@@ -21,12 +21,18 @@ const login = requestSchemas["POST /auth/login"].body;
 const changePassword = requestSchemas["PATCH /auth/password"].body;
 const venue = requestSchemas["POST /owner/venues"].body;
 const listVenues = requestSchemas["GET /venues"].query;
+const subscriptionCheckout = requestSchemas["POST /owner/subscription/checkout"].body;
+const subscriptionFilter = requestSchemas["GET /admin/subscriptions/owners"].query;
+const subscriptionOverride = requestSchemas["PUT /admin/subscriptions/owners/:ownerId/override"].body;
 
 assert(register);
 assert(login);
 assert(changePassword);
 assert(venue);
 assert(listVenues);
+assert(subscriptionCheckout);
+assert(subscriptionFilter);
+assert(subscriptionOverride);
 
 const greekName = "Μαρία Καφέ́"; // includes a combining accent
 const accepted = register.safeParse({
@@ -133,6 +139,26 @@ assert.equal(requestSchemas["GET /venues/:id"].params?.safeParse({ id: "not-a-uu
 assert.equal(requestSchemas["GET /venues/:id"].params?.safeParse({
   id: "2a6f4f1e-8f8b-4d93-9d1a-1b9d62a3c1e2",
 }).success, true);
+assert.equal(subscriptionCheckout.safeParse({ plan: "PRO" }).success, true);
+assert.equal(subscriptionCheckout.safeParse({ plan: "FREE" }).success, false);
+assert.equal(subscriptionCheckout.safeParse({ plan: "ELITE", coupon: "not-supported" }).success, false);
+assert.equal(subscriptionFilter?.safeParse({ plan: "FREE" }).success, true);
+assert.equal(subscriptionFilter?.safeParse({ plan: "ENTERPRISE" }).success, false);
+assert.equal(subscriptionOverride.safeParse({
+  plan: "ELITE",
+  reason: "Promotional access approved",
+  startsAt: "2026-09-07T00:00:00.000Z",
+  endsAt: "2026-10-07T23:59:59.999Z",
+}).success, true);
+assert.equal(subscriptionOverride.safeParse({
+  plan: "PRO",
+  reason: "",
+}).success, false);
+assert.equal(subscriptionOverride.safeParse({
+  plan: "ELITE",
+  reason: "No extra fields",
+  unexpected: true,
+}).success, false);
 
 let parserResponse: { statusCode?: number; body?: unknown } = {};
 const parserRes = {

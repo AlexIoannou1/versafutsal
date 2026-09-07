@@ -5,6 +5,110 @@
  * Versa API specification
  * OpenAPI spec version: 0.1.0
  */
+export type SubscriptionPlan =
+  (typeof SubscriptionPlan)[keyof typeof SubscriptionPlan];
+
+export const SubscriptionPlan = {
+  FREE: "FREE",
+  PRO: "PRO",
+  ELITE: "ELITE",
+} as const;
+
+export type SubscriptionStatus =
+  (typeof SubscriptionStatus)[keyof typeof SubscriptionStatus];
+
+export const SubscriptionStatus = {
+  NONE: "NONE",
+  INCOMPLETE: "INCOMPLETE",
+  ACTIVE: "ACTIVE",
+  PAST_DUE: "PAST_DUE",
+  UNPAID: "UNPAID",
+  CANCELED: "CANCELED",
+  PAUSED: "PAUSED",
+} as const;
+
+export type OwnerSubscriptionCapabilitiesItem =
+  (typeof OwnerSubscriptionCapabilitiesItem)[keyof typeof OwnerSubscriptionCapabilitiesItem];
+
+export const OwnerSubscriptionCapabilitiesItem = {
+  MANUAL_BOOKING: "MANUAL_BOOKING",
+} as const;
+
+export interface OwnerSubscription {
+  plan: SubscriptionPlan;
+  effectivePlan: SubscriptionPlan;
+  status: SubscriptionStatus;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  overridePlan: SubscriptionPlan | null;
+  overrideReason: string | null;
+  overrideStartsAt: string | null;
+  overrideEndsAt: string | null;
+  capabilities: OwnerSubscriptionCapabilitiesItem[];
+  billingConfigured: boolean;
+}
+
+export type SubscriptionCheckoutInputPlan =
+  (typeof SubscriptionCheckoutInputPlan)[keyof typeof SubscriptionCheckoutInputPlan];
+
+export const SubscriptionCheckoutInputPlan = {
+  PRO: "PRO",
+  ELITE: "ELITE",
+} as const;
+
+export interface SubscriptionCheckoutInput {
+  plan: SubscriptionCheckoutInputPlan;
+}
+
+export interface BillingUrl {
+  url: string;
+}
+
+export interface OwnerSubscriptionSummary {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  subscription: OwnerSubscription;
+}
+
+export type SubscriptionEventPreviousValue = { [key: string]: unknown } | null;
+
+export type SubscriptionEventNewValue = { [key: string]: unknown } | null;
+
+export type SubscriptionEventMetadata = { [key: string]: unknown };
+
+export interface SubscriptionEvent {
+  id: string;
+  ownerId: string | null;
+  actorUserId: string | null;
+  providerEventId: string | null;
+  eventType: string;
+  previousValue?: SubscriptionEventPreviousValue;
+  newValue?: SubscriptionEventNewValue;
+  reason?: string | null;
+  metadata: SubscriptionEventMetadata;
+  occurredAt: string;
+  processedAt: string;
+}
+
+export interface OwnerSubscriptionAdminDetail {
+  owner: OwnerSubscriptionSummary;
+  events: SubscriptionEvent[];
+}
+
+export interface SubscriptionOverrideInput {
+  plan: SubscriptionPlan | null;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  reason: string;
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -945,4 +1049,30 @@ export type UpdateAdminSettings200 = {
 
 export type SetVenueFeeOverride200 = {
   settings: AdminSettingsRecord;
+};
+
+export type GetOwnerSubscription200 = {
+  subscription: OwnerSubscription;
+};
+
+export type CancelOwnerSubscription200 = {
+  subscription: OwnerSubscription;
+};
+
+export type ListOwnerSubscriptionsParams = {
+  plan?: SubscriptionPlan;
+};
+
+export type ListOwnerSubscriptions200 = {
+  owners: OwnerSubscriptionSummary[];
+};
+
+export type SetOwnerSubscriptionOverride200 = {
+  subscription: OwnerSubscription;
+};
+
+export type ReceiveStripeSubscriptionWebhookBody = { [key: string]: unknown };
+
+export type ReceiveStripeSubscriptionWebhook200 = {
+  received: boolean;
 };

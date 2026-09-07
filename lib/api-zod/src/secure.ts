@@ -198,6 +198,7 @@ const role = z.enum(["PLAYER", "VENUE_OWNER"]);
 const pitchType = z.enum(["INDOOR", "OUTDOOR", "HYBRID"]);
 const bookingStatus = z.enum(["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"]);
 const venueStatus = z.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]);
+const subscriptionPlan = z.enum(["FREE", "PRO", "ELITE"]);
 const strict = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
 const empty = strict({});
 const queryNumber = (min: number, max: number) =>
@@ -253,6 +254,21 @@ export const requestSchemas = {
   "POST /player/notifications/read": { body: strict({ id: uuid.optional() }) },
   "PATCH /player/notifications/read": { body: strict({ id: uuid.optional() }) },
   "PATCH /owner/notifications/read": { body: strict({ id: uuid.optional() }) },
+  "GET /owner/subscription": {},
+  "POST /owner/subscription/checkout": { body: strict({ plan: z.enum(["PRO", "ELITE"]) }) },
+  "POST /owner/subscription/portal": { body: empty },
+  "POST /owner/subscription/cancel": { body: empty },
+  "GET /admin/subscriptions/owners": { query: strict({ plan: subscriptionPlan.optional() }) },
+  "GET /admin/subscriptions/owners/:ownerId": { params: strict({ ownerId: uuid }) },
+  "PUT /admin/subscriptions/owners/:ownerId/override": {
+    params: strict({ ownerId: uuid }),
+    body: strict({
+      plan: subscriptionPlan.nullable(),
+      reason,
+      startsAt: isoDateTime.nullable().optional(),
+      endsAt: isoDateTime.nullable().optional(),
+    }),
+  },
 } as const;
 
 export type RequestSchemaKey = keyof typeof requestSchemas;
