@@ -6,21 +6,16 @@ import {
   Text,
   View,
   type PressableProps,
-  type PressableStateCallbackType,
-  type ImageStyle,
   type StyleProp,
-  type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { motion } from "@/constants/motion";
 import { useMotion } from "@/context/MotionContext";
 import { useColors } from "@/hooks/useColors";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 type MotionPressableProps = Omit<PressableProps, "style" | "children"> & {
   children: React.ReactNode;
-  style?: StyleProp<ViewStyle | TextStyle | ImageStyle>;
+  style?: StyleProp<ViewStyle>;
   pressScale?: number;
   success?: boolean;
   /** Kept for drop-in compatibility with existing TouchableOpacity usage. */
@@ -31,80 +26,27 @@ type MotionPressableProps = Omit<PressableProps, "style" | "children"> & {
 export function MotionPressable({
   children,
   style,
-  pressScale = motion.scale.press,
-  success,
+  pressScale: _pressScale = motion.scale.press,
+  success: _success,
   activeOpacity: _activeOpacity,
   onPressIn,
   onPressOut,
   disabled,
   ...props
 }: MotionPressableProps) {
-  const { reduceMotion } = useMotion();
-  const scale = useRef(new Animated.Value(1)).current;
-  const previousSuccess = useRef(success);
-
-  const animateTo = (value: number, duration = motion.duration.fast) => {
-    scale.stopAnimation();
-    if (reduceMotion) {
-      scale.setValue(1);
-      return;
-    }
-    Animated.timing(scale, {
-      toValue: value,
-      duration,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
-  };
-
-  useEffect(() => {
-    if (reduceMotion) scale.stopAnimation(() => scale.setValue(1));
-    if (success && !previousSuccess.current && !reduceMotion) {
-      Animated.sequence([
-        Animated.timing(scale, {
-          toValue: motion.scale.success,
-          duration: motion.duration.fast,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scale, {
-          toValue: 1,
-          friction: 5,
-          tension: 140,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
-    previousSuccess.current = success;
-  }, [reduceMotion, scale, success]);
-
-  useEffect(() => () => scale.stopAnimation(), [scale]);
-
   return (
-    <AnimatedPressable
-        {...props}
-        disabled={disabled}
-        // React Native's Animated wrapper loses Pressable's callback-style
-        // typing, although this is supported at runtime on native and web.
-        style={
-          (({ pressed }: PressableStateCallbackType) => [
-            style,
-            {
-              opacity: pressed && !disabled ? motion.opacity.pressed : 1,
-              transform: [{ scale }],
-            },
-          ]) as never
-        }
-        onPressIn={(event) => {
-          animateTo(pressScale);
-          onPressIn?.(event);
-        }}
-        onPressOut={(event) => {
-          animateTo(1);
-          onPressOut?.(event);
-        }}
+    <Pressable
+      {...props}
+      disabled={disabled}
+      style={({ pressed }) => [
+        style,
+        { opacity: pressed && !disabled ? motion.opacity.pressed : 1 },
+      ]}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
     >
       {children}
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 
