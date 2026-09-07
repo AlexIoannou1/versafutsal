@@ -1,0 +1,401 @@
+# Subscription Plans for Venue Owners
+
+Add a **Plans** tab for venue owners.
+
+The Plans tab must:
+- Showcase all premium plans.
+- Clearly show the features of each plan.
+- Clearly show differences between Free, Pro, and Elite.
+- Allow subscription/upgrade/downgrade if payment/subscription infrastructure exists.
+- Show current plan.
+- Prevent access to Pro/Elite-only features unless subscribed.
+
+---
+
+# Free Plan
+
+## Positioning
+
+Free plan keeps everything currently available.
+
+All existing owner tools stay free forever.
+
+## Included Features
+
+Free includes:
+- Venue profile
+- Pitches
+- Photos
+- Opening hours
+- Pricing
+- Booking calendar
+- Manual bookings
+- Basic stats dashboard:
+  - Revenue
+  - Bookings
+  - Peak hours
+- Maintenance blocks
+- Push notifications for new bookings
+
+## Revenue Model
+
+The platform continues taking the platform fee per booking.
+
+The platform fee is now:
+- **6% per booking**
+
+Acceptance criteria:
+- Existing owner features remain available on Free.
+- Free owners do not get Pro/Elite gated features.
+- Platform fee still applies.
+
+---
+
+# Pro Plan — €29/month
+
+## Positioning
+
+For active venues that want to engage players more deeply.
+
+Pro includes everything in Free plus the features below.
+
+---
+
+## 1. Player Match Stats
+
+Owners can input after a game:
+- Scores
+- Goal scorers
+- Match/player stats
+
+Players can see:
+- Their stats on their profile.
+- Their stats on the venue page where applicable.
+
+Reason:
+- This gives players a reason to prefer venues using Versa stats.
+
+Requirements:
+- Only Pro and Elite venue owners can use this feature.
+- Create database models for match stats if not already present.
+- Allow owner to input/edit stats.
+- Display stats to players.
+- Admin should be able to correct stats via leaderboard/stat tools where relevant.
+
+Acceptance criteria:
+- Pro owner can enter match stats.
+- Player can view stats.
+- Free owner cannot access this feature.
+
+---
+
+## 2. SMS Reminders
+
+Automatically send SMS reminders to players:
+- 24 hours before their booking.
+
+Reason:
+- Push notifications can be missed.
+- SMS delivery is strong in Cyprus.
+
+Requirements:
+- Use SMS provider abstraction.
+- Schedule SMS reminders.
+- Cancel SMS if booking is cancelled.
+- Update SMS schedule if booking time changes.
+- Avoid duplicates.
+- Track whether SMS was sent.
+
+Acceptance criteria:
+- SMS reminder sends 24h before booking.
+- Cancelled bookings do not send reminders.
+- Updated bookings reschedule reminders.
+
+---
+
+## 3. Enhanced Owner Analytics
+
+Add enhanced analytics for Pro owners.
+
+Analytics should include:
+- Player retention rate.
+- Repeat customer percentage.
+- Cancellation trends.
+- Revenue forecasts.
+
+Requirements:
+- Only Pro and Elite owners can access.
+- Use real booking data.
+- Show clear charts/cards.
+- Handle insufficient data with empty states.
+
+Acceptance criteria:
+- Pro owner sees enhanced analytics.
+- Free owner does not.
+- Values are calculated consistently.
+
+---
+
+## 4. Verified Pro Badge + Search Boost
+
+Pro venues get:
+- A subtle priority bump in search results.
+- A badge on their card.
+
+Reason:
+- This can directly drive more bookings.
+- The €29/month can pay for itself with one extra booking.
+
+Requirements:
+- Display **Verified Pro** badge on Pro venue cards/pages.
+- Apply a moderate search ranking boost.
+- Do not completely hide Free venues.
+- Elite venues may receive equal or greater priority if appropriate.
+
+Acceptance criteria:
+- Pro badge displays.
+- Search order gives Pro venues a subtle boost.
+
+---
+
+## 5. Loyalty Streaks
+
+Add optional ability for owners to enable streaks for their venue.
+
+Example:
+- A specific player books once a week at the venue.
+- They do this 4 times in a row.
+- The 5th booking is free of charge.
+
+Requirements:
+- Streaks are part of the Pro plan.
+- Elite also includes streaks because Elite includes Pro.
+- Owner can enable/disable streaks.
+- Owner should be prompted during first venue setup asking whether they would like to add streaks.
+- Streaks can only be used if the venue owner has enabled them.
+- Add visual cues to the venue card to showcase a streak.
+- Send push notifications when a streak is about to end or when the player is close to earning a free booking.
+- Track streak progress per player per venue.
+- Prevent abuse where possible.
+- Define the weekly booking rule clearly in code comments/config.
+
+Acceptance criteria:
+- Pro/Elite owner can enable streaks.
+- Free owner cannot enable streaks.
+- Player streak progress is tracked.
+- 5th booking can be free after 4 qualifying weekly bookings.
+- Venue card shows visual streak cue.
+- Push notification triggers near streak completion.
+
+---
+
+## 6. Discount Codes
+
+Owners can create discount codes.
+
+Examples:
+- `SUMMER15` for 15% off.
+- `TEAM10` for €10 off.
+
+Players apply codes at checkout.
+
+Owner dashboard tracks redemption.
+
+Reason:
+- Cyprus has strong seasonal swings:
+  - Summer outdoor drops
+  - Winter indoor spikes
+- Promo codes help owners fill dead slots without permanently lowering prices.
+
+Requirements:
+- Pro and Elite owners can create discount codes.
+- Support percentage discounts.
+- Support fixed amount discounts.
+- Support start/end dates if feasible.
+- Support maximum redemption count if feasible.
+- Support per-player limit if feasible.
+- Validate codes at checkout.
+- Track redemptions.
+- Show redemption analytics in owner dashboard.
+- Ensure platform fee calculation handles discounted booking price correctly.
+
+Acceptance criteria:
+- Owner can create discount code.
+- Player can apply code at checkout.
+- Discount changes final price correctly.
+- Redemption is tracked.
+- Free owners cannot create discount codes.
+
+---
+
+## 7. Stats Section
+
+Add a **Stats** section to accommodate stats inputted by venue owners on Pro and Elite plans.
+
+This section supports:
+
+> Player Match Stats — Owners input scores and goal scorers after a game. Players see their stats on their profile and the venue page. This becomes a reason players prefer the venue.
+
+Requirements:
+- Player-facing stats section.
+- Venue-facing stats section.
+- Owner input form for eligible plans.
+- Admin correction tools where relevant.
+- Empty state when no stats exist.
+
+Acceptance criteria:
+- Stats section exists.
+- Stats are visible to players.
+- Stats are editable by eligible owners.
+
+---
+
+# Elite Plan — €59/month
+
+## Positioning
+
+For venues running events and building a community.
+
+Elite includes everything in Pro plus the features below.
+
+---
+
+## 1. Tournament Creator
+
+Owners can:
+- Build tournament brackets.
+- Manage registrations.
+- Track results.
+- Handle prize pools.
+- Allow players to register and pay through the app.
+
+Requirements:
+- Elite only.
+- Create tournament creation flow.
+- Support bracket generation/management.
+- Support player/team registration.
+- Support payments through the app.
+- Track tournament status.
+- Allow results input.
+- Display tournaments to players.
+- Handle capacity and registration deadlines if feasible.
+
+Acceptance criteria:
+- Elite owner can create tournament.
+- Players can register.
+- Payment is processed.
+- Results can be tracked.
+- Free/Pro owners cannot access tournament creator.
+
+---
+
+## 2. Matchmaking / Team Finder
+
+Players submit:
+- Squad of 5.
+- Skill level.
+
+System:
+- Matches two teams for a friendly.
+- Auto-books the slot.
+
+Goal:
+- Fill dead hours without owner manual effort.
+
+Requirements:
+- Elite only for venue owners.
+- Players can submit team/squad details.
+- Capture skill level.
+- Match compatible teams.
+- Auto-book available slot based on venue availability.
+- Respect blocked hours, bookings, off-days, and pitch availability.
+- Notify teams when matched.
+- Handle cancellation/no-match states.
+
+Acceptance criteria:
+- Players can submit squad and skill level.
+- System can match teams.
+- Slot is booked automatically when conditions are met.
+- Booking conflicts are avoided.
+
+---
+
+## 3. Venue-Specific Promo Codes
+
+Elite includes venue-specific promo code functionality.
+
+Note:
+- Pro already includes owner discount codes.
+- For Elite, ensure promo codes can be more advanced and venue-specific where the data model supports multiple venues per owner.
+
+Requirements:
+- Codes can be tied to a specific venue.
+- Codes should not unintentionally apply to unrelated venues.
+- Track redemption by venue.
+
+Acceptance criteria:
+- Elite owner can create venue-specific promo code.
+- Code applies only to intended venue.
+- Redemption tracking includes venue.
+
+---
+
+## 4. Waitlist for Sold-Out Slots
+
+When a slot is fully booked:
+- Players can join a waitlist.
+- If someone cancels, the first waitlisted player gets an auto-notification.
+- That player has a 10-minute claim window.
+
+Reason:
+- Turns cancellations into zero-effort rebookings.
+- Owners hate empty slots.
+
+Requirements:
+- Elite only.
+- Add waitlist button for full slots.
+- Maintain waitlist order.
+- On cancellation, notify first waitlisted player.
+- Hold slot for 10 minutes.
+- If not claimed, move to next waitlisted player.
+- Avoid race conditions.
+- Expire claim windows properly.
+- Reflect waitlist status in UI.
+
+Acceptance criteria:
+- Player can join waitlist.
+- First waitlisted player is notified on cancellation.
+- Claim window lasts 10 minutes.
+- Slot passes to next player if unclaimed.
+
+---
+
+## 5. Player Leaderboard — Venue Scoped
+
+Track for each player at a venue:
+- Goals scored.
+- Matches played.
+- Win rate.
+
+Display leaderboard on venue page.
+
+Example:
+- “Top Scorer at Futsal Arena Limassol.”
+
+Reason:
+- Creates a mini competitive community.
+- Players choose a venue to climb its leaderboard.
+
+Requirements:
+- Elite only.
+- Leaderboards are venue-scoped.
+- Stats should be generated from match stats where possible.
+- Admin can add/edit/delete leaderboard data.
+- Display leaderboard on venue page.
+- Include ranking, player name, and relevant stat values.
+
+Acceptance criteria:
+- Venue page shows leaderboard.
+- Leaderboard is scoped to that venue.
+- Admin can manage leaderboard records.
+- Stats update when match results change.
