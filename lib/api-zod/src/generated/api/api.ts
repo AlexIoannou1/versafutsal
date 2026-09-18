@@ -2889,8 +2889,6 @@ export const putAdminMatchStatisticsBodyHomeScoreMax = 100;
 export const putAdminMatchStatisticsBodyAwayScoreMin = 0;
 export const putAdminMatchStatisticsBodyAwayScoreMax = 100;
 
-export const putAdminMatchStatisticsBodyExpectedVersionMin = 0;
-
 export const putAdminMatchStatisticsBodyParticipantsItemGoalsMin = 0;
 export const putAdminMatchStatisticsBodyParticipantsItemGoalsMax = 100;
 
@@ -2909,6 +2907,8 @@ export const putAdminMatchStatisticsBodyParticipantsItemRedCardsMax = 1;
 export const putAdminMatchStatisticsBodyParticipantsMin = 2;
 export const putAdminMatchStatisticsBodyParticipantsMax = 40;
 
+export const putAdminMatchStatisticsBodyReasonMax = 500;
+
 export const PutAdminMatchStatisticsBody = zod.object({
   homeScore: zod
     .number()
@@ -2918,10 +2918,7 @@ export const PutAdminMatchStatisticsBody = zod.object({
     .number()
     .min(putAdminMatchStatisticsBodyAwayScoreMin)
     .max(putAdminMatchStatisticsBodyAwayScoreMax),
-  expectedVersion: zod
-    .number()
-    .min(putAdminMatchStatisticsBodyExpectedVersionMin)
-    .describe("Use 0 when creating, or the current version when editing."),
+  expectedVersion: zod.number().min(1),
   participants: zod
     .array(
       zod.object({
@@ -2951,6 +2948,7 @@ export const PutAdminMatchStatisticsBody = zod.object({
     )
     .min(putAdminMatchStatisticsBodyParticipantsMin)
     .max(putAdminMatchStatisticsBodyParticipantsMax),
+  reason: zod.string().min(1).max(putAdminMatchStatisticsBodyReasonMax),
 });
 
 export const PutAdminMatchStatisticsResponse = zod.object({
@@ -3035,3 +3033,222 @@ export const GetPlayerVenueMatchStatisticsResponse = zod
       venueName: zod.string(),
     }),
   );
+
+export const GetVenueLeaderboardParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+});
+
+export const getVenueLeaderboardQueryPageDefault = 1;
+export const getVenueLeaderboardQueryPageMax = 10000;
+
+export const getVenueLeaderboardQueryLimitDefault = 20;
+export const getVenueLeaderboardQueryLimitMax = 50;
+
+export const GetVenueLeaderboardQueryParams = zod.object({
+  metric: zod.enum(["goals", "matches", "winRate"]),
+  page: zod.coerce
+    .number()
+    .min(1)
+    .max(getVenueLeaderboardQueryPageMax)
+    .default(getVenueLeaderboardQueryPageDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getVenueLeaderboardQueryLimitMax)
+    .default(getVenueLeaderboardQueryLimitDefault),
+});
+
+export const getVenueLeaderboardResponseLimitMax = 50;
+
+export const getVenueLeaderboardResponseTotalMin = 0;
+
+export const getVenueLeaderboardResponseEntriesItemOneGoalsMin = 0;
+
+export const getVenueLeaderboardResponseEntriesItemOneWinsMin = 0;
+
+export const getVenueLeaderboardResponseEntriesItemOneDrawsMin = 0;
+
+export const getVenueLeaderboardResponseEntriesItemOneLossesMin = 0;
+
+export const getVenueLeaderboardResponseEntriesItemOneWinRateMin = 0;
+export const getVenueLeaderboardResponseEntriesItemOneWinRateMax = 100;
+
+export const GetVenueLeaderboardResponse = zod.object({
+  venueId: zod.string().uuid(),
+  venueName: zod.string(),
+  metric: zod.enum(["goals", "matches", "winRate"]),
+  page: zod.number().min(1),
+  limit: zod.number().min(1).max(getVenueLeaderboardResponseLimitMax),
+  total: zod.number().min(getVenueLeaderboardResponseTotalMin),
+  minimumMatches: zod.literal(3),
+  entries: zod.array(
+    zod
+      .object({
+        playerId: zod.string().uuid(),
+        name: zod.string(),
+        goals: zod
+          .number()
+          .min(getVenueLeaderboardResponseEntriesItemOneGoalsMin),
+        matches: zod.number().min(1),
+        wins: zod
+          .number()
+          .min(getVenueLeaderboardResponseEntriesItemOneWinsMin),
+        draws: zod
+          .number()
+          .min(getVenueLeaderboardResponseEntriesItemOneDrawsMin),
+        losses: zod
+          .number()
+          .min(getVenueLeaderboardResponseEntriesItemOneLossesMin),
+        winRate: zod
+          .number()
+          .min(getVenueLeaderboardResponseEntriesItemOneWinRateMin)
+          .max(getVenueLeaderboardResponseEntriesItemOneWinRateMax),
+        winRateEligible: zod.boolean(),
+      })
+      .and(
+        zod.object({
+          rank: zod.number().min(1),
+        }),
+      ),
+  ),
+});
+
+export const GetVenueLeaderboardPlayerParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+  playerId: zod.coerce.string().uuid(),
+});
+
+export const getVenueLeaderboardPlayerResponsePlayerGoalsMin = 0;
+
+export const getVenueLeaderboardPlayerResponsePlayerWinsMin = 0;
+
+export const getVenueLeaderboardPlayerResponsePlayerDrawsMin = 0;
+
+export const getVenueLeaderboardPlayerResponsePlayerLossesMin = 0;
+
+export const getVenueLeaderboardPlayerResponsePlayerWinRateMin = 0;
+export const getVenueLeaderboardPlayerResponsePlayerWinRateMax = 100;
+
+export const GetVenueLeaderboardPlayerResponse = zod.object({
+  venueId: zod.string().uuid(),
+  venueName: zod.string(),
+  player: zod.object({
+    playerId: zod.string().uuid(),
+    name: zod.string(),
+    goals: zod.number().min(getVenueLeaderboardPlayerResponsePlayerGoalsMin),
+    matches: zod.number().min(1),
+    wins: zod.number().min(getVenueLeaderboardPlayerResponsePlayerWinsMin),
+    draws: zod.number().min(getVenueLeaderboardPlayerResponsePlayerDrawsMin),
+    losses: zod.number().min(getVenueLeaderboardPlayerResponsePlayerLossesMin),
+    winRate: zod
+      .number()
+      .min(getVenueLeaderboardPlayerResponsePlayerWinRateMin)
+      .max(getVenueLeaderboardPlayerResponsePlayerWinRateMax),
+    winRateEligible: zod.boolean(),
+  }),
+});
+
+export const GetAdminVenueLeaderboardPlayerSourcesParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+  playerId: zod.coerce.string().uuid(),
+});
+
+export const getAdminVenueLeaderboardPlayerSourcesQueryPageDefault = 1;
+export const getAdminVenueLeaderboardPlayerSourcesQueryPageMax = 10000;
+
+export const getAdminVenueLeaderboardPlayerSourcesQueryLimitDefault = 20;
+export const getAdminVenueLeaderboardPlayerSourcesQueryLimitMax = 50;
+
+export const GetAdminVenueLeaderboardPlayerSourcesQueryParams = zod.object({
+  page: zod.coerce
+    .number()
+    .min(1)
+    .max(getAdminVenueLeaderboardPlayerSourcesQueryPageMax)
+    .default(getAdminVenueLeaderboardPlayerSourcesQueryPageDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getAdminVenueLeaderboardPlayerSourcesQueryLimitMax)
+    .default(getAdminVenueLeaderboardPlayerSourcesQueryLimitDefault),
+});
+
+export const getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneGoalsMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneWinsMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneDrawsMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneLossesMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneWinRateMin = 0;
+export const getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneWinRateMax = 100;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponseLimitMax = 50;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponseTotalMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponseSourcesItemGoalsMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponseSourcesItemHomeScoreMin = 0;
+
+export const getAdminVenueLeaderboardPlayerSourcesResponseSourcesItemAwayScoreMin = 0;
+
+export const GetAdminVenueLeaderboardPlayerSourcesResponse = zod.object({
+  venueId: zod.string().uuid(),
+  venueName: zod.string(),
+  player: zod.union([
+    zod.object({
+      playerId: zod.string().uuid(),
+      name: zod.string(),
+      goals: zod
+        .number()
+        .min(getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneGoalsMin),
+      matches: zod.number().min(1),
+      wins: zod
+        .number()
+        .min(getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneWinsMin),
+      draws: zod
+        .number()
+        .min(getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneDrawsMin),
+      losses: zod
+        .number()
+        .min(getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneLossesMin),
+      winRate: zod
+        .number()
+        .min(getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneWinRateMin)
+        .max(getAdminVenueLeaderboardPlayerSourcesResponsePlayerOneWinRateMax),
+      winRateEligible: zod.boolean(),
+    }),
+    zod.null(),
+  ]),
+  page: zod.number().min(1),
+  limit: zod
+    .number()
+    .min(1)
+    .max(getAdminVenueLeaderboardPlayerSourcesResponseLimitMax),
+  total: zod
+    .number()
+    .min(getAdminVenueLeaderboardPlayerSourcesResponseTotalMin),
+  sources: zod.array(
+    zod.object({
+      matchId: zod.string().uuid(),
+      bookingId: zod.string().uuid(),
+      playedAt: zod.coerce.date(),
+      goals: zod
+        .number()
+        .min(getAdminVenueLeaderboardPlayerSourcesResponseSourcesItemGoalsMin),
+      team: zod.enum(["HOME", "AWAY"]),
+      homeScore: zod
+        .number()
+        .min(
+          getAdminVenueLeaderboardPlayerSourcesResponseSourcesItemHomeScoreMin,
+        ),
+      awayScore: zod
+        .number()
+        .min(
+          getAdminVenueLeaderboardPlayerSourcesResponseSourcesItemAwayScoreMin,
+        ),
+      version: zod.number().min(1),
+    }),
+  ),
+});

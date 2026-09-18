@@ -22,12 +22,14 @@ import type {
   AdminGetBooking200,
   AdminGetBookingAudit200,
   AdminGetVenue200,
+  AdminLeaderboardPlayerSources,
   AdminListBookings200,
   AdminListBookingsParams,
   AdminListUsers200,
   AdminListUsersParams,
   AdminListVenues200,
   AdminListVenuesParams,
+  AdminMatchStatisticsCorrectionInput,
   ApiError,
   ApproveVenue200,
   AuthResponse,
@@ -51,6 +53,7 @@ import type {
   ExportAdminBookingsParams,
   ExportOwnerBookingsParams,
   GetAdminSettings200,
+  GetAdminVenueLeaderboardPlayerSourcesParams,
   GetBookingPayment200,
   GetCheckoutFeeParams,
   GetOwnerBooking200,
@@ -62,6 +65,7 @@ import type {
   GetPitchAvailabilityParams,
   GetPlayerBooking200,
   GetVenue200,
+  GetVenueLeaderboardParams,
   GetVenuePhotoFileParams,
   HealthStatus,
   ListOwnerBookings200,
@@ -115,6 +119,8 @@ import type {
   UpdateVenueRequest,
   UploadVenuePhoto201,
   VenueFeeOverrideRequest,
+  VenueLeaderboard,
+  VenueLeaderboardPlayerResponse,
   VenuePhotoOrder,
   VenuePhotoOrderResult,
   VenuePhotoUpload,
@@ -6227,7 +6233,7 @@ export const getPutAdminMatchStatisticsUrl = (matchId: string) => {
 
 export const putAdminMatchStatistics = async (
   matchId: string,
-  matchStatisticsInput: MatchStatisticsInput,
+  adminMatchStatisticsCorrectionInput: AdminMatchStatisticsCorrectionInput,
   options?: RequestInit,
 ): Promise<MatchStatisticsResponse> => {
   return customFetch<MatchStatisticsResponse>(
@@ -6236,7 +6242,7 @@ export const putAdminMatchStatistics = async (
       ...options,
       method: "PUT",
       headers: { "Content-Type": "application/json", ...options?.headers },
-      body: JSON.stringify(matchStatisticsInput),
+      body: JSON.stringify(adminMatchStatisticsCorrectionInput),
     },
   );
 };
@@ -6248,14 +6254,14 @@ export const getPutAdminMatchStatisticsMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof putAdminMatchStatistics>>,
     TError,
-    { matchId: string; data: BodyType<MatchStatisticsInput> },
+    { matchId: string; data: BodyType<AdminMatchStatisticsCorrectionInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof putAdminMatchStatistics>>,
   TError,
-  { matchId: string; data: BodyType<MatchStatisticsInput> },
+  { matchId: string; data: BodyType<AdminMatchStatisticsCorrectionInput> },
   TContext
 > => {
   const mutationKey = ["putAdminMatchStatistics"];
@@ -6269,7 +6275,7 @@ export const getPutAdminMatchStatisticsMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof putAdminMatchStatistics>>,
-    { matchId: string; data: BodyType<MatchStatisticsInput> }
+    { matchId: string; data: BodyType<AdminMatchStatisticsCorrectionInput> }
   > = (props) => {
     const { matchId, data } = props ?? {};
 
@@ -6283,7 +6289,7 @@ export type PutAdminMatchStatisticsMutationResult = NonNullable<
   Awaited<ReturnType<typeof putAdminMatchStatistics>>
 >;
 export type PutAdminMatchStatisticsMutationBody =
-  BodyType<MatchStatisticsInput>;
+  BodyType<AdminMatchStatisticsCorrectionInput>;
 export type PutAdminMatchStatisticsMutationError = ErrorType<ApiError>;
 
 export const usePutAdminMatchStatistics = <
@@ -6293,14 +6299,14 @@ export const usePutAdminMatchStatistics = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof putAdminMatchStatistics>>,
     TError,
-    { matchId: string; data: BodyType<MatchStatisticsInput> },
+    { matchId: string; data: BodyType<AdminMatchStatisticsCorrectionInput> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof putAdminMatchStatistics>>,
   TError,
-  { matchId: string; data: BodyType<MatchStatisticsInput> },
+  { matchId: string; data: BodyType<AdminMatchStatisticsCorrectionInput> },
   TContext
 > => {
   return useMutation(getPutAdminMatchStatisticsMutationOptions(options));
@@ -6571,6 +6577,342 @@ export function useGetPlayerVenueMatchStatistics<
   const queryOptions = getGetPlayerVenueMatchStatisticsQueryOptions(
     venueId,
     playerId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetVenueLeaderboardUrl = (
+  venueId: string,
+  params: GetVenueLeaderboardParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/venues/${venueId}/leaderboard?${stringifiedParams}`
+    : `/api/venues/${venueId}/leaderboard`;
+};
+
+export const getVenueLeaderboard = async (
+  venueId: string,
+  params: GetVenueLeaderboardParams,
+  options?: RequestInit,
+): Promise<VenueLeaderboard> => {
+  return customFetch<VenueLeaderboard>(
+    getGetVenueLeaderboardUrl(venueId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetVenueLeaderboardQueryKey = (
+  venueId: string,
+  params?: GetVenueLeaderboardParams,
+) => {
+  return [
+    `/api/venues/${venueId}/leaderboard`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetVenueLeaderboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVenueLeaderboard>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  params: GetVenueLeaderboardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVenueLeaderboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetVenueLeaderboardQueryKey(venueId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getVenueLeaderboard>>
+  > = ({ signal }) =>
+    getVenueLeaderboard(venueId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!venueId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVenueLeaderboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVenueLeaderboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVenueLeaderboard>>
+>;
+export type GetVenueLeaderboardQueryError = ErrorType<ApiError>;
+
+export function useGetVenueLeaderboard<
+  TData = Awaited<ReturnType<typeof getVenueLeaderboard>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  params: GetVenueLeaderboardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVenueLeaderboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVenueLeaderboardQueryOptions(
+    venueId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetVenueLeaderboardPlayerUrl = (
+  venueId: string,
+  playerId: string,
+) => {
+  return `/api/venues/${venueId}/leaderboard/players/${playerId}`;
+};
+
+export const getVenueLeaderboardPlayer = async (
+  venueId: string,
+  playerId: string,
+  options?: RequestInit,
+): Promise<VenueLeaderboardPlayerResponse> => {
+  return customFetch<VenueLeaderboardPlayerResponse>(
+    getGetVenueLeaderboardPlayerUrl(venueId, playerId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetVenueLeaderboardPlayerQueryKey = (
+  venueId: string,
+  playerId: string,
+) => {
+  return [`/api/venues/${venueId}/leaderboard/players/${playerId}`] as const;
+};
+
+export const getGetVenueLeaderboardPlayerQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  playerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetVenueLeaderboardPlayerQueryKey(venueId, playerId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>
+  > = ({ signal }) =>
+    getVenueLeaderboardPlayer(venueId, playerId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(venueId && playerId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVenueLeaderboardPlayerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>
+>;
+export type GetVenueLeaderboardPlayerQueryError = ErrorType<ApiError>;
+
+export function useGetVenueLeaderboardPlayer<
+  TData = Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  playerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getVenueLeaderboardPlayer>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVenueLeaderboardPlayerQueryOptions(
+    venueId,
+    playerId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetAdminVenueLeaderboardPlayerSourcesUrl = (
+  venueId: string,
+  playerId: string,
+  params?: GetAdminVenueLeaderboardPlayerSourcesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/venues/${venueId}/leaderboard/players/${playerId}/sources?${stringifiedParams}`
+    : `/api/admin/venues/${venueId}/leaderboard/players/${playerId}/sources`;
+};
+
+export const getAdminVenueLeaderboardPlayerSources = async (
+  venueId: string,
+  playerId: string,
+  params?: GetAdminVenueLeaderboardPlayerSourcesParams,
+  options?: RequestInit,
+): Promise<AdminLeaderboardPlayerSources> => {
+  return customFetch<AdminLeaderboardPlayerSources>(
+    getGetAdminVenueLeaderboardPlayerSourcesUrl(venueId, playerId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminVenueLeaderboardPlayerSourcesQueryKey = (
+  venueId: string,
+  playerId: string,
+  params?: GetAdminVenueLeaderboardPlayerSourcesParams,
+) => {
+  return [
+    `/api/admin/venues/${venueId}/leaderboard/players/${playerId}/sources`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetAdminVenueLeaderboardPlayerSourcesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  playerId: string,
+  params?: GetAdminVenueLeaderboardPlayerSourcesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetAdminVenueLeaderboardPlayerSourcesQueryKey(venueId, playerId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>
+  > = ({ signal }) =>
+    getAdminVenueLeaderboardPlayerSources(venueId, playerId, params, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(venueId && playerId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminVenueLeaderboardPlayerSourcesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>
+>;
+export type GetAdminVenueLeaderboardPlayerSourcesQueryError =
+  ErrorType<ApiError>;
+
+export function useGetAdminVenueLeaderboardPlayerSources<
+  TData = Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  playerId: string,
+  params?: GetAdminVenueLeaderboardPlayerSourcesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminVenueLeaderboardPlayerSources>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminVenueLeaderboardPlayerSourcesQueryOptions(
+    venueId,
+    playerId,
+    params,
     options,
   );
 

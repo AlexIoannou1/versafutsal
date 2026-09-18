@@ -113,6 +113,10 @@ export default function MatchStatsManager(props: Props) {
 
   const validate = (): MatchStatsInput | null => {
     setEditorError(null);
+    if (props.admin && !draft.reason.trim()) {
+      setEditorError("A reason is required for every correction.");
+      return null;
+    }
     const homeScore = Number(draft.homeScore);
     const awayScore = Number(draft.awayScore);
     if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0 || homeScore > 100 || awayScore > 100) {
@@ -140,6 +144,7 @@ export default function MatchStatsManager(props: Props) {
       return null;
     }
     return {
+      ...(props.admin ? { reason: draft.reason.trim() } : {}),
       homeScore,
       awayScore,
       expectedVersion: props.match?.version ?? 0,
@@ -152,9 +157,10 @@ export default function MatchStatsManager(props: Props) {
     if (!data) return;
     try {
       await props.onSave(data);
-      await Promise.all(props.queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+      await invalidateStatistics();
       setEditorVisible(false);
     } catch (error) {
+      setEditorError(error instanceof Error ? error.message : "Statistics could not be saved. Please try again.");
       Alert.alert("Statistics not saved", error instanceof Error ? error.message : "Please try again.");
     }
   };
@@ -163,13 +169,22 @@ export default function MatchStatsManager(props: Props) {
     if (!props.onDelete || !removeReason.trim()) return;
     try {
       await props.onDelete(removeReason.trim());
-      await Promise.all(props.queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
+      await invalidateStatistics();
       setRemoveVisible(false);
       setRemoveReason("");
     } catch (error) {
       Alert.alert("Statistics not removed", error instanceof Error ? error.message : "Please try again.");
     }
   };
+
+  async function invalidateStatistics() {
+    await Promise.all([
+      ...props.queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      queryClient.invalidateQueries({
+        predicate: (query) => /leaderboard/i.test(String(query.queryKey[0])),
+      }),
+    ]);
+  }
 
   return (
     <>
@@ -296,6 +311,17 @@ export default function MatchStatsManager(props: Props) {
             bottomOffset={64}
             keyboardDismissMode="interactive"
           >
+            {props.admin && (
+              <>
+                <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>CORRECTION REASON (REQUIRED)</Text>
+                <TextInput testID="match-correction-reason" accessibilityLabel="Correction reason"
+                  value={draft.reason} onChangeText={(reason) => setDraft((current) => ({ ...current, reason }))}
+                  multiline maxLength={500} placeholder="Why is this record being corrected?"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.reasonInput, { color: colors.foreground, backgroundColor: colors.card, borderColor: colors.border }]} />
+                <Text style={[styles.stateText, { color: colors.mutedForeground }]}>This updates venue rankings and saves the reason in the audit history.</Text>
+              </>
+            )}
             <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>FINAL SCORE</Text>
             <View style={styles.scoreInputs}>
               <View style={styles.scoreInputWrap}>

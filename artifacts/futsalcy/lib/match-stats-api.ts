@@ -41,6 +41,7 @@ export interface MatchStats {
 }
 
 export interface MatchStatsInput {
+  reason?: string;
   homeScore: number;
   awayScore: number;
   participants: MatchParticipant[];

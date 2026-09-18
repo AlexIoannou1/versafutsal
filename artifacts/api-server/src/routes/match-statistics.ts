@@ -166,7 +166,18 @@ async function saveMatchStatistics(
     return;
   }
 
-  const input = body.data as MatchStatisticsInput;
+  const correctionReason = admin
+    ? (body.data as MatchStatisticsInput & { reason: string }).reason
+    : undefined;
+  if (admin && !correctionReason?.trim()) {
+    res.status(400).json({ error: "A correction reason is required" });
+    return;
+  }
+  const input = admin
+    ? (({ reason: _reason, ...statistics }) => statistics)(
+        body.data as MatchStatisticsInput & { reason: string },
+      )
+    : body.data as MatchStatisticsInput;
   const identity = params.data as { matchId?: string; bookingId?: string };
   const existing = await loadMatch(identity.matchId, identity.bookingId);
   const bookingId = existing?.bookingId ?? identity.bookingId;
@@ -352,6 +363,7 @@ async function saveMatchStatistics(
           action: current ? "MATCH_STATISTICS_UPDATED" : "MATCH_STATISTICS_CREATED",
           previousValue,
           newValue: { ...input, version: saved.version },
+          notes: correctionReason,
           metadata: { venueId: booking.venueId },
         });
         return saved.id;

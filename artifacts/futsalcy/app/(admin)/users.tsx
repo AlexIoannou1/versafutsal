@@ -34,6 +34,7 @@ import type {
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import AdminLeaderboardSources from "@/components/AdminLeaderboardSources";
 
 const ROLES = [
   { key: "ALL", label: "All users" },
@@ -386,6 +387,7 @@ function UserDetailModal({
             <DetailRow label="Joined" value={formatDate(user.createdAt)} colors={colors} />
             <DetailRow label="Account status" value={user.deletedAt ? `Deleted ${formatDate(user.deletedAt)}` : "Active"} colors={colors} />
             {user.role === "VENUE_OWNER" && <OwnerSubscriptionPanel user={user} colors={colors} />}
+             {user.role === "PLAYER" && !user.deletedAt && <AdminLeaderboardSources key={user.id} playerId={user.id} onNavigate={onClose} />}
           </KeyboardAwareScrollViewCompat>
         </View>
       </View>

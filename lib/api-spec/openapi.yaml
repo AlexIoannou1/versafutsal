@@ -2248,7 +2248,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MatchStatisticsInput" }
+            schema: { $ref: "#/components/schemas/AdminMatchStatisticsCorrectionInput" }
       responses:
         "200":
           description: Corrected match statistics
@@ -2334,6 +2334,79 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
 
+  /venues/{venueId}/leaderboard:
+    get:
+      operationId: getVenueLeaderboard
+      tags: [match-statistics, venues]
+      parameters:
+        - { name: venueId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: metric, in: query, required: true, schema: { $ref: "#/components/schemas/LeaderboardMetric" } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        "200":
+          description: Live Elite venue leaderboard
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueLeaderboard" }
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Venue is not currently eligible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /venues/{venueId}/leaderboard/players/{playerId}:
+    get:
+      operationId: getVenueLeaderboardPlayer
+      tags: [match-statistics, venues]
+      parameters:
+        - { name: venueId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: playerId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Live player totals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VenueLeaderboardPlayerResponse" }
+        "404":
+          description: Venue or participating player is not eligible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /admin/venues/{venueId}/leaderboard/players/{playerId}/sources:
+    get:
+      operationId: getAdminVenueLeaderboardPlayerSources
+      tags: [match-statistics, admin]
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: venueId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: playerId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, maximum: 10000, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        "200":
+          description: Auditable source matches behind live totals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminLeaderboardPlayerSources" }
+        "403":
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Venue is not currently eligible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2373,6 +2446,20 @@ components:
           minItems: 2
           maxItems: 40
           items: { $ref: "#/components/schemas/MatchParticipantInput" }
+    AdminMatchStatisticsCorrectionInput:
+      type: object
+      additionalProperties: false
+      required: [homeScore, awayScore, expectedVersion, participants, reason]
+      properties:
+        homeScore: { type: integer, minimum: 0, maximum: 100 }
+        awayScore: { type: integer, minimum: 0, maximum: 100 }
+        expectedVersion: { type: integer, minimum: 1 }
+        participants:
+          type: array
+          minItems: 2
+          maxItems: 40
+          items: { $ref: "#/components/schemas/MatchParticipantInput" }
+        reason: { type: string, minLength: 1, maxLength: 500 }
     MatchStatisticsDeleteInput:
       type: object
       additionalProperties: false
@@ -2452,6 +2539,79 @@ components:
           properties:
             venueId: { type: string, format: uuid }
             venueName: { type: string }
+
+    LeaderboardMetric:
+      type: string
+      enum: [goals, matches, winRate]
+    LeaderboardPlayerTotals:
+      type: object
+      required: [playerId, name, goals, matches, wins, draws, losses, winRate, winRateEligible]
+      properties:
+        playerId: { type: string, format: uuid }
+        name: { type: string }
+        goals: { type: integer, minimum: 0 }
+        matches: { type: integer, minimum: 1 }
+        wins: { type: integer, minimum: 0 }
+        draws: { type: integer, minimum: 0 }
+        losses: { type: integer, minimum: 0 }
+        winRate: { type: number, minimum: 0, maximum: 100 }
+        winRateEligible: { type: boolean }
+    LeaderboardEntry:
+      allOf:
+        - { $ref: "#/components/schemas/LeaderboardPlayerTotals" }
+        - type: object
+          required: [rank]
+          properties:
+            rank: { type: integer, minimum: 1 }
+    VenueLeaderboard:
+      type: object
+      required: [venueId, venueName, metric, page, limit, total, minimumMatches, entries]
+      properties:
+        venueId: { type: string, format: uuid }
+        venueName: { type: string }
+        metric: { $ref: "#/components/schemas/LeaderboardMetric" }
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 50 }
+        total: { type: integer, minimum: 0 }
+        minimumMatches: { type: integer, enum: [3] }
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/LeaderboardEntry" }
+    VenueLeaderboardPlayerResponse:
+      type: object
+      required: [venueId, venueName, player]
+      properties:
+        venueId: { type: string, format: uuid }
+        venueName: { type: string }
+        player: { $ref: "#/components/schemas/LeaderboardPlayerTotals" }
+    LeaderboardSource:
+      type: object
+      required: [matchId, bookingId, playedAt, goals, team, homeScore, awayScore, version]
+      properties:
+        matchId: { type: string, format: uuid }
+        bookingId: { type: string, format: uuid }
+        playedAt: { type: string, format: date-time }
+        goals: { type: integer, minimum: 0 }
+        team: { $ref: "#/components/schemas/MatchTeam" }
+        homeScore: { type: integer, minimum: 0 }
+        awayScore: { type: integer, minimum: 0 }
+        version: { type: integer, minimum: 1 }
+    AdminLeaderboardPlayerSources:
+      type: object
+      required: [venueId, venueName, player, page, limit, total, sources]
+      properties:
+        venueId: { type: string, format: uuid }
+        venueName: { type: string }
+        player:
+          oneOf:
+            - { $ref: "#/components/schemas/LeaderboardPlayerTotals" }
+            - { type: "null" }
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 50 }
+        total: { type: integer, minimum: 0 }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/LeaderboardSource" }
 
     SubscriptionPlan:
       type: string

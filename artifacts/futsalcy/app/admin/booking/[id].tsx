@@ -615,7 +615,7 @@ export default function AdminBookingDetailScreen() {
           canManage={!!matchQuery.data?.match && new Date(booking.endAt).getTime() <= Date.now()}
           isSaving={updateMatch.isPending}
           isDeleting={deleteMatch.isPending}
-          onSave={(matchData) => updateMatch.mutateAsync({ matchId, data: matchData })}
+          onSave={(matchData) => updateMatch.mutateAsync({ matchId, data: { ...matchData, reason: matchData.reason ?? "" } })}
           onDelete={(reason) => deleteMatch.mutateAsync({ matchId, data: { reason } })}
           queryKeys={[
             ["adminBookingMatchStats", matchId],

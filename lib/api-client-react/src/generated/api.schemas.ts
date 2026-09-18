@@ -65,6 +65,31 @@ export interface MatchStatisticsInput {
   participants: MatchParticipantInput[];
 }
 
+export interface AdminMatchStatisticsCorrectionInput {
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  homeScore: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  awayScore: number;
+  /** @minimum 1 */
+  expectedVersion: number;
+  /**
+   * @minItems 2
+   * @maxItems 40
+   */
+  participants: MatchParticipantInput[];
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  reason: string;
+}
+
 export interface MatchStatisticsDeleteInput {
   /** @maxLength 500 */
   reason?: string;
@@ -126,6 +151,102 @@ export type PlayerVenueMatchStatisticsSummary = PlayerMatchStatisticsSummary & {
   venueId: string;
   venueName: string;
 };
+
+export type LeaderboardMetric =
+  (typeof LeaderboardMetric)[keyof typeof LeaderboardMetric];
+
+export const LeaderboardMetric = {
+  goals: "goals",
+  matches: "matches",
+  winRate: "winRate",
+} as const;
+
+export interface LeaderboardPlayerTotals {
+  playerId: string;
+  name: string;
+  /** @minimum 0 */
+  goals: number;
+  /** @minimum 1 */
+  matches: number;
+  /** @minimum 0 */
+  wins: number;
+  /** @minimum 0 */
+  draws: number;
+  /** @minimum 0 */
+  losses: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  winRate: number;
+  winRateEligible: boolean;
+}
+
+export type LeaderboardEntry = LeaderboardPlayerTotals & {
+  /** @minimum 1 */
+  rank: number;
+};
+
+export type VenueLeaderboardMinimumMatches =
+  (typeof VenueLeaderboardMinimumMatches)[keyof typeof VenueLeaderboardMinimumMatches];
+
+export const VenueLeaderboardMinimumMatches = {
+  NUMBER_3: 3,
+} as const;
+
+export interface VenueLeaderboard {
+  venueId: string;
+  venueName: string;
+  metric: LeaderboardMetric;
+  /** @minimum 1 */
+  page: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit: number;
+  /** @minimum 0 */
+  total: number;
+  minimumMatches: VenueLeaderboardMinimumMatches;
+  entries: LeaderboardEntry[];
+}
+
+export interface VenueLeaderboardPlayerResponse {
+  venueId: string;
+  venueName: string;
+  player: LeaderboardPlayerTotals;
+}
+
+export interface LeaderboardSource {
+  matchId: string;
+  bookingId: string;
+  playedAt: string;
+  /** @minimum 0 */
+  goals: number;
+  team: MatchTeam;
+  /** @minimum 0 */
+  homeScore: number;
+  /** @minimum 0 */
+  awayScore: number;
+  /** @minimum 1 */
+  version: number;
+}
+
+export interface AdminLeaderboardPlayerSources {
+  venueId: string;
+  venueName: string;
+  player: LeaderboardPlayerTotals | null;
+  /** @minimum 1 */
+  page: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit: number;
+  /** @minimum 0 */
+  total: number;
+  sources: LeaderboardSource[];
+}
 
 export type SubscriptionPlan =
   (typeof SubscriptionPlan)[keyof typeof SubscriptionPlan];
@@ -1427,4 +1548,31 @@ export type ReceiveStripeSubscriptionWebhookBody = { [key: string]: unknown };
 
 export type ReceiveStripeSubscriptionWebhook200 = {
   received: boolean;
+};
+
+export type GetVenueLeaderboardParams = {
+  metric: LeaderboardMetric;
+  /**
+   * @minimum 1
+   * @maximum 10000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
+};
+
+export type GetAdminVenueLeaderboardPlayerSourcesParams = {
+  /**
+   * @minimum 1
+   * @maximum 10000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 50
+   */
+  limit?: number;
 };

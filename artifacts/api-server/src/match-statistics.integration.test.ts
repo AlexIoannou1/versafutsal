@@ -194,7 +194,8 @@ async function main(): Promise<void> {
     const adminVersion = (inspected.data.match as { version: number }).version;
     assert.equal((await request(baseUrl, `/api/admin/match-statistics/${match.id}`, {
       method: "PUT", token: tokens.admin, body: { ...correction, expectedVersion: adminVersion, awayScore: 2,
-        participants: [correction.participants[0], { ...correction.participants[1], goals: 2 }] },
+        participants: [correction.participants[0], { ...correction.participants[1], goals: 2 }],
+        reason: "Correcting verified source result" },
     })).status, 200, "admins can correct a result");
     assert.equal((await request(baseUrl, `/api/admin/match-statistics/${match.id}`, {
       method: "DELETE", token: tokens.admin, body: { reason: "Integration correction cleanup" },

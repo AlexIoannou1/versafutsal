@@ -25,6 +25,7 @@ import {
   useGetPitchAvailability,
 } from "@workspace/api-client-react";
 import PlayerStatsCard from "@/components/PlayerStatsCard";
+import VenueLeaderboard from "@/components/VenueLeaderboard";
 import { usePlayerVenueMatchStats } from "@/lib/match-stats-api";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -739,6 +740,10 @@ export default function PlayerVenueDetailScreen() {
               error={venueStats.error}
             />
           </View>
+
+          {effectivePlan === "ELITE" && (
+            <VenueLeaderboard venueId={id!} />
+          )}
 
           {amenities.length > 0 && (
             <>
