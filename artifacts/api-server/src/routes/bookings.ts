@@ -13,7 +13,7 @@ import {
   refundsTable,
   auditLogTable,
 } from "@workspace/db/schema";
-import { eq, and, gte, lte, lt, gt, inArray, desc, ne, or, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, lt, gt, inArray, desc, ne, or, isNull, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import {
   getOwnerEntitlements,
@@ -1498,12 +1498,18 @@ router.get<{ id: string }>(
         .from(auditLogTable)
         .leftJoin(usersTable, eq(auditLogTable.actorUserId, usersTable.id))
         .where(
-          and(
-            or(
-              eq(auditLogTable.entityType, "BOOKING"),
-              eq(auditLogTable.entityType, "PAYMENT"),
+          or(
+            and(
+              or(
+                eq(auditLogTable.entityType, "BOOKING"),
+                eq(auditLogTable.entityType, "PAYMENT"),
+              ),
+              eq(auditLogTable.entityId, bookingId),
             ),
-            eq(auditLogTable.entityId, bookingId),
+            and(
+              eq(auditLogTable.entityType, "MATCH_STATISTICS"),
+              sql`${auditLogTable.metadata}->>'bookingId' = ${bookingId}`,
+            ),
           ),
         )
         .orderBy(desc(auditLogTable.createdAt));

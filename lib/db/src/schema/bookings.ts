@@ -56,6 +56,7 @@ export const bookingsTable = pgTable(
     uniquePitchSlotActive: uniqueIndex("unique_pitch_slot_active")
       .on(table.pitchId, table.startAt)
       .where(sql`(status = 'PENDING' OR status = 'CONFIRMED')`),
+    bookingVenueUnique: uniqueIndex("bookings_id_venue_unique").on(table.id, table.venueId),
   }),
 );
 

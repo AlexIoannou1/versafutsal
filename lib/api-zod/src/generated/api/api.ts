@@ -2497,7 +2497,9 @@ export const GetOwnerSubscriptionResponse = zod.object({
     overrideReason: zod.string().nullable(),
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
-    capabilities: zod.array(zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"])),
+    capabilities: zod.array(
+      zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+    ),
     billingConfigured: zod.boolean(),
   }),
 });
@@ -2530,7 +2532,9 @@ export const CancelOwnerSubscriptionResponse = zod.object({
     overrideReason: zod.string().nullable(),
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
-    capabilities: zod.array(zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"])),
+    capabilities: zod.array(
+      zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+    ),
     billingConfigured: zod.boolean(),
   }),
 });
@@ -2566,7 +2570,11 @@ export const ListOwnerSubscriptionsResponse = zod.object({
         overrideStartsAt: zod.coerce.date().nullable(),
         overrideEndsAt: zod.coerce.date().nullable(),
         capabilities: zod.array(
-          zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"]),
+          zod.enum([
+            "MANUAL_BOOKING",
+            "ADVANCED_ANALYTICS",
+            "MATCH_STATISTICS",
+          ]),
         ),
         billingConfigured: zod.boolean(),
       }),
@@ -2604,7 +2612,7 @@ export const GetOwnerSubscriptionAdminResponse = zod.object({
       overrideStartsAt: zod.coerce.date().nullable(),
       overrideEndsAt: zod.coerce.date().nullable(),
       capabilities: zod.array(
-        zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"]),
+        zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
       ),
       billingConfigured: zod.boolean(),
     }),
@@ -2659,7 +2667,9 @@ export const SetOwnerSubscriptionOverrideResponse = zod.object({
     overrideReason: zod.string().nullable(),
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
-    capabilities: zod.array(zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"])),
+    capabilities: zod.array(
+      zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+    ),
     billingConfigured: zod.boolean(),
   }),
 });
@@ -2676,3 +2686,352 @@ export const ReceiveStripeSubscriptionWebhookBody = zod.record(
 export const ReceiveStripeSubscriptionWebhookResponse = zod.object({
   received: zod.boolean(),
 });
+
+export const GetOwnerMatchStatisticsParams = zod.object({
+  bookingId: zod.coerce.string().uuid(),
+});
+
+export const GetOwnerMatchStatisticsResponse = zod.object({
+  match: zod.union([
+    zod.object({
+      id: zod.string().uuid(),
+      bookingId: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      homeScore: zod.number(),
+      awayScore: zod.number(),
+      version: zod.number(),
+      participants: zod.array(
+        zod.object({
+          id: zod.string().uuid(),
+          playerId: zod.string().uuid(),
+          playerName: zod.string(),
+          team: zod.enum(["HOME", "AWAY"]),
+          goals: zod.number(),
+          assists: zod.number(),
+          saves: zod.number(),
+          yellowCards: zod.number(),
+          redCards: zod.number(),
+        }),
+      ),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+    zod.null(),
+  ]),
+  availablePlayers: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      name: zod.string(),
+      avatarUrl: zod.string().nullish(),
+    }),
+  ),
+});
+
+export const PutOwnerMatchStatisticsParams = zod.object({
+  bookingId: zod.coerce.string().uuid(),
+});
+
+export const putOwnerMatchStatisticsBodyHomeScoreMin = 0;
+export const putOwnerMatchStatisticsBodyHomeScoreMax = 100;
+
+export const putOwnerMatchStatisticsBodyAwayScoreMin = 0;
+export const putOwnerMatchStatisticsBodyAwayScoreMax = 100;
+
+export const putOwnerMatchStatisticsBodyExpectedVersionMin = 0;
+
+export const putOwnerMatchStatisticsBodyParticipantsItemGoalsMin = 0;
+export const putOwnerMatchStatisticsBodyParticipantsItemGoalsMax = 100;
+
+export const putOwnerMatchStatisticsBodyParticipantsItemAssistsMin = 0;
+export const putOwnerMatchStatisticsBodyParticipantsItemAssistsMax = 100;
+
+export const putOwnerMatchStatisticsBodyParticipantsItemSavesMin = 0;
+export const putOwnerMatchStatisticsBodyParticipantsItemSavesMax = 500;
+
+export const putOwnerMatchStatisticsBodyParticipantsItemYellowCardsMin = 0;
+export const putOwnerMatchStatisticsBodyParticipantsItemYellowCardsMax = 2;
+
+export const putOwnerMatchStatisticsBodyParticipantsItemRedCardsMin = 0;
+export const putOwnerMatchStatisticsBodyParticipantsItemRedCardsMax = 1;
+
+export const putOwnerMatchStatisticsBodyParticipantsMin = 2;
+export const putOwnerMatchStatisticsBodyParticipantsMax = 40;
+
+export const PutOwnerMatchStatisticsBody = zod.object({
+  homeScore: zod
+    .number()
+    .min(putOwnerMatchStatisticsBodyHomeScoreMin)
+    .max(putOwnerMatchStatisticsBodyHomeScoreMax),
+  awayScore: zod
+    .number()
+    .min(putOwnerMatchStatisticsBodyAwayScoreMin)
+    .max(putOwnerMatchStatisticsBodyAwayScoreMax),
+  expectedVersion: zod
+    .number()
+    .min(putOwnerMatchStatisticsBodyExpectedVersionMin)
+    .describe("Use 0 when creating, or the current version when editing."),
+  participants: zod
+    .array(
+      zod.object({
+        playerId: zod.string().uuid(),
+        team: zod.enum(["HOME", "AWAY"]),
+        goals: zod
+          .number()
+          .min(putOwnerMatchStatisticsBodyParticipantsItemGoalsMin)
+          .max(putOwnerMatchStatisticsBodyParticipantsItemGoalsMax),
+        assists: zod
+          .number()
+          .min(putOwnerMatchStatisticsBodyParticipantsItemAssistsMin)
+          .max(putOwnerMatchStatisticsBodyParticipantsItemAssistsMax),
+        saves: zod
+          .number()
+          .min(putOwnerMatchStatisticsBodyParticipantsItemSavesMin)
+          .max(putOwnerMatchStatisticsBodyParticipantsItemSavesMax),
+        yellowCards: zod
+          .number()
+          .min(putOwnerMatchStatisticsBodyParticipantsItemYellowCardsMin)
+          .max(putOwnerMatchStatisticsBodyParticipantsItemYellowCardsMax),
+        redCards: zod
+          .number()
+          .min(putOwnerMatchStatisticsBodyParticipantsItemRedCardsMin)
+          .max(putOwnerMatchStatisticsBodyParticipantsItemRedCardsMax),
+      }),
+    )
+    .min(putOwnerMatchStatisticsBodyParticipantsMin)
+    .max(putOwnerMatchStatisticsBodyParticipantsMax),
+});
+
+export const PutOwnerMatchStatisticsResponse = zod.object({
+  match: zod.object({
+    id: zod.string().uuid(),
+    bookingId: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    homeScore: zod.number(),
+    awayScore: zod.number(),
+    version: zod.number(),
+    participants: zod.array(
+      zod.object({
+        id: zod.string().uuid(),
+        playerId: zod.string().uuid(),
+        playerName: zod.string(),
+        team: zod.enum(["HOME", "AWAY"]),
+        goals: zod.number(),
+        assists: zod.number(),
+        saves: zod.number(),
+        yellowCards: zod.number(),
+        redCards: zod.number(),
+      }),
+    ),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  availablePlayers: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        name: zod.string(),
+        avatarUrl: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+});
+
+export const DeleteOwnerMatchStatisticsParams = zod.object({
+  bookingId: zod.coerce.string().uuid(),
+});
+
+export const GetAdminMatchStatisticsParams = zod.object({
+  matchId: zod.coerce.string().uuid(),
+});
+
+export const GetAdminMatchStatisticsResponse = zod.object({
+  match: zod.object({
+    id: zod.string().uuid(),
+    bookingId: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    homeScore: zod.number(),
+    awayScore: zod.number(),
+    version: zod.number(),
+    participants: zod.array(
+      zod.object({
+        id: zod.string().uuid(),
+        playerId: zod.string().uuid(),
+        playerName: zod.string(),
+        team: zod.enum(["HOME", "AWAY"]),
+        goals: zod.number(),
+        assists: zod.number(),
+        saves: zod.number(),
+        yellowCards: zod.number(),
+        redCards: zod.number(),
+      }),
+    ),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  availablePlayers: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        name: zod.string(),
+        avatarUrl: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+});
+
+export const PutAdminMatchStatisticsParams = zod.object({
+  matchId: zod.coerce.string().uuid(),
+});
+
+export const putAdminMatchStatisticsBodyHomeScoreMin = 0;
+export const putAdminMatchStatisticsBodyHomeScoreMax = 100;
+
+export const putAdminMatchStatisticsBodyAwayScoreMin = 0;
+export const putAdminMatchStatisticsBodyAwayScoreMax = 100;
+
+export const putAdminMatchStatisticsBodyExpectedVersionMin = 0;
+
+export const putAdminMatchStatisticsBodyParticipantsItemGoalsMin = 0;
+export const putAdminMatchStatisticsBodyParticipantsItemGoalsMax = 100;
+
+export const putAdminMatchStatisticsBodyParticipantsItemAssistsMin = 0;
+export const putAdminMatchStatisticsBodyParticipantsItemAssistsMax = 100;
+
+export const putAdminMatchStatisticsBodyParticipantsItemSavesMin = 0;
+export const putAdminMatchStatisticsBodyParticipantsItemSavesMax = 500;
+
+export const putAdminMatchStatisticsBodyParticipantsItemYellowCardsMin = 0;
+export const putAdminMatchStatisticsBodyParticipantsItemYellowCardsMax = 2;
+
+export const putAdminMatchStatisticsBodyParticipantsItemRedCardsMin = 0;
+export const putAdminMatchStatisticsBodyParticipantsItemRedCardsMax = 1;
+
+export const putAdminMatchStatisticsBodyParticipantsMin = 2;
+export const putAdminMatchStatisticsBodyParticipantsMax = 40;
+
+export const PutAdminMatchStatisticsBody = zod.object({
+  homeScore: zod
+    .number()
+    .min(putAdminMatchStatisticsBodyHomeScoreMin)
+    .max(putAdminMatchStatisticsBodyHomeScoreMax),
+  awayScore: zod
+    .number()
+    .min(putAdminMatchStatisticsBodyAwayScoreMin)
+    .max(putAdminMatchStatisticsBodyAwayScoreMax),
+  expectedVersion: zod
+    .number()
+    .min(putAdminMatchStatisticsBodyExpectedVersionMin)
+    .describe("Use 0 when creating, or the current version when editing."),
+  participants: zod
+    .array(
+      zod.object({
+        playerId: zod.string().uuid(),
+        team: zod.enum(["HOME", "AWAY"]),
+        goals: zod
+          .number()
+          .min(putAdminMatchStatisticsBodyParticipantsItemGoalsMin)
+          .max(putAdminMatchStatisticsBodyParticipantsItemGoalsMax),
+        assists: zod
+          .number()
+          .min(putAdminMatchStatisticsBodyParticipantsItemAssistsMin)
+          .max(putAdminMatchStatisticsBodyParticipantsItemAssistsMax),
+        saves: zod
+          .number()
+          .min(putAdminMatchStatisticsBodyParticipantsItemSavesMin)
+          .max(putAdminMatchStatisticsBodyParticipantsItemSavesMax),
+        yellowCards: zod
+          .number()
+          .min(putAdminMatchStatisticsBodyParticipantsItemYellowCardsMin)
+          .max(putAdminMatchStatisticsBodyParticipantsItemYellowCardsMax),
+        redCards: zod
+          .number()
+          .min(putAdminMatchStatisticsBodyParticipantsItemRedCardsMin)
+          .max(putAdminMatchStatisticsBodyParticipantsItemRedCardsMax),
+      }),
+    )
+    .min(putAdminMatchStatisticsBodyParticipantsMin)
+    .max(putAdminMatchStatisticsBodyParticipantsMax),
+});
+
+export const PutAdminMatchStatisticsResponse = zod.object({
+  match: zod.object({
+    id: zod.string().uuid(),
+    bookingId: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    homeScore: zod.number(),
+    awayScore: zod.number(),
+    version: zod.number(),
+    participants: zod.array(
+      zod.object({
+        id: zod.string().uuid(),
+        playerId: zod.string().uuid(),
+        playerName: zod.string(),
+        team: zod.enum(["HOME", "AWAY"]),
+        goals: zod.number(),
+        assists: zod.number(),
+        saves: zod.number(),
+        yellowCards: zod.number(),
+        redCards: zod.number(),
+      }),
+    ),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  availablePlayers: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        name: zod.string(),
+        avatarUrl: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+});
+
+export const DeleteAdminMatchStatisticsParams = zod.object({
+  matchId: zod.coerce.string().uuid(),
+});
+
+export const deleteAdminMatchStatisticsBodyReasonMax = 500;
+
+export const DeleteAdminMatchStatisticsBody = zod.object({
+  reason: zod.string().max(deleteAdminMatchStatisticsBodyReasonMax).optional(),
+});
+
+export const GetPlayerCareerMatchStatisticsParams = zod.object({
+  playerId: zod.coerce.string().uuid(),
+});
+
+export const GetPlayerCareerMatchStatisticsResponse = zod.object({
+  playerId: zod.string().uuid(),
+  matchesPlayed: zod.number(),
+  goals: zod.number(),
+  assists: zod.number(),
+  saves: zod.number(),
+  yellowCards: zod.number(),
+  redCards: zod.number(),
+  venuesPlayed: zod.number(),
+});
+
+export const GetPlayerVenueMatchStatisticsParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+  playerId: zod.coerce.string().uuid(),
+});
+
+export const GetPlayerVenueMatchStatisticsResponse = zod
+  .object({
+    playerId: zod.string().uuid(),
+    matchesPlayed: zod.number(),
+    goals: zod.number(),
+    assists: zod.number(),
+    saves: zod.number(),
+    yellowCards: zod.number(),
+    redCards: zod.number(),
+    venuesPlayed: zod.number(),
+  })
+  .and(
+    zod.object({
+      venueId: zod.string().uuid(),
+      venueName: zod.string(),
+    }),
+  );

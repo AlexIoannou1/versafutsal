@@ -18,6 +18,8 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import EditProfileSheet from "@/components/EditProfileSheet";
 import { uploadAvatar } from "@workspace/api-client-react";
+import PlayerStatsCard from "@/components/PlayerStatsCard";
+import { usePlayerCareerMatchStats } from "@/lib/match-stats-api";
 
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // Must match the avatar API limit.
 
@@ -40,6 +42,7 @@ export default function PlayerProfileScreen() {
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const uploading = uploadState === "preparing" || uploadState === "uploading";
+  const careerStats = usePlayerCareerMatchStats(user?.id ?? "");
 
   const handleLogout = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -223,6 +226,9 @@ export default function PlayerProfileScreen() {
       fontFamily: "PlusJakartaSans_600SemiBold",
       color: colors.primary,
     },
+    statsWrap: {
+      marginBottom: 18,
+    },
     editBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -335,6 +341,17 @@ export default function PlayerProfileScreen() {
         ) : null}
         <View style={s.roleBadge}>
           <Text style={s.roleText}>Player</Text>
+        </View>
+
+        <View style={s.statsWrap}>
+          <PlayerStatsCard
+            testID="player-career-stats"
+            title="Career stats"
+            subtitle="Your official record across every participating venue."
+            stats={careerStats.data}
+            isLoading={careerStats.isLoading}
+            error={careerStats.error}
+          />
         </View>
 
         <TouchableOpacity style={s.editBtn} onPress={() => setEditVisible(true)}>

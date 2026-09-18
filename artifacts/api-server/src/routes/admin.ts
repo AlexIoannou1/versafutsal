@@ -11,6 +11,7 @@ import {
   paymentsTable,
   refundsTable,
   auditLogTable,
+  matchResultsTable,
 } from "@workspace/db/schema";
 import { eq, inArray, and, gte, lte, desc, ilike, or, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -411,6 +412,7 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
     const [row] = await db
       .select({
         booking: bookingsTable,
+        matchStatisticsId: matchResultsTable.id,
          player: { id: usersTable.id, name: usersTable.name, email: usersTable.email, phoneNumber: usersTable.phoneNumber },
         venue: { id: venuesTable.id, name: venuesTable.name, district: venuesTable.district, address: venuesTable.address },
         pitch: {
@@ -425,6 +427,7 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
       .leftJoin(usersTable, eq(bookingsTable.playerId, usersTable.id))
       .leftJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
       .leftJoin(venuesTable, eq(pitchesTable.venueId, venuesTable.id))
+      .leftJoin(matchResultsTable, eq(matchResultsTable.bookingId, bookingsTable.id))
       .where(eq(bookingsTable.id, bookingId))
       .limit(1);
 
@@ -436,6 +439,7 @@ router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMI
     res.json({
       booking: {
         ...row.booking,
+        matchStatisticsId: row.matchStatisticsId,
         startAt: row.booking.startAt.toISOString(),
         endAt: row.booking.endAt.toISOString(),
         createdAt: row.booking.createdAt.toISOString(),
@@ -668,12 +672,18 @@ router.get<{ id: string }>(
         .from(auditLogTable)
         .leftJoin(usersTable, eq(auditLogTable.actorUserId, usersTable.id))
         .where(
-          and(
-            or(
-              eq(auditLogTable.entityType, "BOOKING"),
-              eq(auditLogTable.entityType, "PAYMENT"),
+          or(
+            and(
+              or(
+                eq(auditLogTable.entityType, "BOOKING"),
+                eq(auditLogTable.entityType, "PAYMENT"),
+              ),
+              eq(auditLogTable.entityId, bookingId),
             ),
-            eq(auditLogTable.entityId, bookingId),
+            and(
+              eq(auditLogTable.entityType, "MATCH_STATISTICS"),
+              sql`${auditLogTable.metadata}->>'bookingId' = ${bookingId}`,
+            ),
           ),
         )
         .orderBy(desc(auditLogTable.createdAt));

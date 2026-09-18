@@ -75,6 +75,10 @@ import type {
   ListVenuesParams,
   LoginRequest,
   ManualBookingInput,
+  MatchStatisticsDeleteInput,
+  MatchStatisticsInput,
+  MatchStatisticsOptionalResponse,
+  MatchStatisticsResponse,
   MeResponse,
   OwnerStatsResponse,
   OwnerSubscriptionAdminDetail,
@@ -83,6 +87,8 @@ import type {
   PasswordResetConfirmRequest,
   PasswordResetRequest,
   PasswordResetRequestResponse,
+  PlayerMatchStatisticsSummary,
+  PlayerVenueMatchStatisticsSummary,
   ReceiveStripeSubscriptionWebhook200,
   ReceiveStripeSubscriptionWebhookBody,
   RegisterPushToken200,
@@ -5878,3 +5884,699 @@ export const useReceiveStripeSubscriptionWebhook = <
     getReceiveStripeSubscriptionWebhookMutationOptions(options),
   );
 };
+
+export const getGetOwnerMatchStatisticsUrl = (bookingId: string) => {
+  return `/api/owner/bookings/${bookingId}/match-statistics`;
+};
+
+export const getOwnerMatchStatistics = async (
+  bookingId: string,
+  options?: RequestInit,
+): Promise<MatchStatisticsOptionalResponse> => {
+  return customFetch<MatchStatisticsOptionalResponse>(
+    getGetOwnerMatchStatisticsUrl(bookingId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetOwnerMatchStatisticsQueryKey = (bookingId: string) => {
+  return [`/api/owner/bookings/${bookingId}/match-statistics`] as const;
+};
+
+export const getGetOwnerMatchStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  bookingId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetOwnerMatchStatisticsQueryKey(bookingId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOwnerMatchStatistics>>
+  > = ({ signal }) =>
+    getOwnerMatchStatistics(bookingId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!bookingId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerMatchStatistics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerMatchStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerMatchStatistics>>
+>;
+export type GetOwnerMatchStatisticsQueryError = ErrorType<ApiError>;
+
+export function useGetOwnerMatchStatistics<
+  TData = Awaited<ReturnType<typeof getOwnerMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  bookingId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerMatchStatisticsQueryOptions(
+    bookingId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPutOwnerMatchStatisticsUrl = (bookingId: string) => {
+  return `/api/owner/bookings/${bookingId}/match-statistics`;
+};
+
+export const putOwnerMatchStatistics = async (
+  bookingId: string,
+  matchStatisticsInput: MatchStatisticsInput,
+  options?: RequestInit,
+): Promise<MatchStatisticsResponse> => {
+  return customFetch<MatchStatisticsResponse>(
+    getPutOwnerMatchStatisticsUrl(bookingId),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(matchStatisticsInput),
+    },
+  );
+};
+
+export const getPutOwnerMatchStatisticsMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof putOwnerMatchStatistics>>,
+    TError,
+    { bookingId: string; data: BodyType<MatchStatisticsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof putOwnerMatchStatistics>>,
+  TError,
+  { bookingId: string; data: BodyType<MatchStatisticsInput> },
+  TContext
+> => {
+  const mutationKey = ["putOwnerMatchStatistics"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof putOwnerMatchStatistics>>,
+    { bookingId: string; data: BodyType<MatchStatisticsInput> }
+  > = (props) => {
+    const { bookingId, data } = props ?? {};
+
+    return putOwnerMatchStatistics(bookingId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PutOwnerMatchStatisticsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof putOwnerMatchStatistics>>
+>;
+export type PutOwnerMatchStatisticsMutationBody =
+  BodyType<MatchStatisticsInput>;
+export type PutOwnerMatchStatisticsMutationError = ErrorType<ApiError>;
+
+export const usePutOwnerMatchStatistics = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof putOwnerMatchStatistics>>,
+    TError,
+    { bookingId: string; data: BodyType<MatchStatisticsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof putOwnerMatchStatistics>>,
+  TError,
+  { bookingId: string; data: BodyType<MatchStatisticsInput> },
+  TContext
+> => {
+  return useMutation(getPutOwnerMatchStatisticsMutationOptions(options));
+};
+
+export const getDeleteOwnerMatchStatisticsUrl = (bookingId: string) => {
+  return `/api/owner/bookings/${bookingId}/match-statistics`;
+};
+
+export const deleteOwnerMatchStatistics = async (
+  bookingId: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteOwnerMatchStatisticsUrl(bookingId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteOwnerMatchStatisticsMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOwnerMatchStatistics>>,
+    TError,
+    { bookingId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteOwnerMatchStatistics>>,
+  TError,
+  { bookingId: string },
+  TContext
+> => {
+  const mutationKey = ["deleteOwnerMatchStatistics"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteOwnerMatchStatistics>>,
+    { bookingId: string }
+  > = (props) => {
+    const { bookingId } = props ?? {};
+
+    return deleteOwnerMatchStatistics(bookingId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteOwnerMatchStatisticsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteOwnerMatchStatistics>>
+>;
+
+export type DeleteOwnerMatchStatisticsMutationError = ErrorType<ApiError>;
+
+export const useDeleteOwnerMatchStatistics = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOwnerMatchStatistics>>,
+    TError,
+    { bookingId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteOwnerMatchStatistics>>,
+  TError,
+  { bookingId: string },
+  TContext
+> => {
+  return useMutation(getDeleteOwnerMatchStatisticsMutationOptions(options));
+};
+
+export const getGetAdminMatchStatisticsUrl = (matchId: string) => {
+  return `/api/admin/match-statistics/${matchId}`;
+};
+
+export const getAdminMatchStatistics = async (
+  matchId: string,
+  options?: RequestInit,
+): Promise<MatchStatisticsResponse> => {
+  return customFetch<MatchStatisticsResponse>(
+    getGetAdminMatchStatisticsUrl(matchId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAdminMatchStatisticsQueryKey = (matchId: string) => {
+  return [`/api/admin/match-statistics/${matchId}`] as const;
+};
+
+export const getGetAdminMatchStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  matchId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetAdminMatchStatisticsQueryKey(matchId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAdminMatchStatistics>>
+  > = ({ signal }) =>
+    getAdminMatchStatistics(matchId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!matchId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminMatchStatistics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetAdminMatchStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminMatchStatistics>>
+>;
+export type GetAdminMatchStatisticsQueryError = ErrorType<ApiError>;
+
+export function useGetAdminMatchStatistics<
+  TData = Awaited<ReturnType<typeof getAdminMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  matchId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminMatchStatisticsQueryOptions(matchId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getPutAdminMatchStatisticsUrl = (matchId: string) => {
+  return `/api/admin/match-statistics/${matchId}`;
+};
+
+export const putAdminMatchStatistics = async (
+  matchId: string,
+  matchStatisticsInput: MatchStatisticsInput,
+  options?: RequestInit,
+): Promise<MatchStatisticsResponse> => {
+  return customFetch<MatchStatisticsResponse>(
+    getPutAdminMatchStatisticsUrl(matchId),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(matchStatisticsInput),
+    },
+  );
+};
+
+export const getPutAdminMatchStatisticsMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof putAdminMatchStatistics>>,
+    TError,
+    { matchId: string; data: BodyType<MatchStatisticsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof putAdminMatchStatistics>>,
+  TError,
+  { matchId: string; data: BodyType<MatchStatisticsInput> },
+  TContext
+> => {
+  const mutationKey = ["putAdminMatchStatistics"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof putAdminMatchStatistics>>,
+    { matchId: string; data: BodyType<MatchStatisticsInput> }
+  > = (props) => {
+    const { matchId, data } = props ?? {};
+
+    return putAdminMatchStatistics(matchId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PutAdminMatchStatisticsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof putAdminMatchStatistics>>
+>;
+export type PutAdminMatchStatisticsMutationBody =
+  BodyType<MatchStatisticsInput>;
+export type PutAdminMatchStatisticsMutationError = ErrorType<ApiError>;
+
+export const usePutAdminMatchStatistics = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof putAdminMatchStatistics>>,
+    TError,
+    { matchId: string; data: BodyType<MatchStatisticsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof putAdminMatchStatistics>>,
+  TError,
+  { matchId: string; data: BodyType<MatchStatisticsInput> },
+  TContext
+> => {
+  return useMutation(getPutAdminMatchStatisticsMutationOptions(options));
+};
+
+export const getDeleteAdminMatchStatisticsUrl = (matchId: string) => {
+  return `/api/admin/match-statistics/${matchId}`;
+};
+
+export const deleteAdminMatchStatistics = async (
+  matchId: string,
+  matchStatisticsDeleteInput?: MatchStatisticsDeleteInput,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteAdminMatchStatisticsUrl(matchId), {
+    ...options,
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(matchStatisticsDeleteInput),
+  });
+};
+
+export const getDeleteAdminMatchStatisticsMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminMatchStatistics>>,
+    TError,
+    { matchId: string; data: BodyType<MatchStatisticsDeleteInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAdminMatchStatistics>>,
+  TError,
+  { matchId: string; data: BodyType<MatchStatisticsDeleteInput> },
+  TContext
+> => {
+  const mutationKey = ["deleteAdminMatchStatistics"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAdminMatchStatistics>>,
+    { matchId: string; data: BodyType<MatchStatisticsDeleteInput> }
+  > = (props) => {
+    const { matchId, data } = props ?? {};
+
+    return deleteAdminMatchStatistics(matchId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAdminMatchStatisticsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAdminMatchStatistics>>
+>;
+export type DeleteAdminMatchStatisticsMutationBody =
+  BodyType<MatchStatisticsDeleteInput>;
+export type DeleteAdminMatchStatisticsMutationError = ErrorType<ApiError>;
+
+export const useDeleteAdminMatchStatistics = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAdminMatchStatistics>>,
+    TError,
+    { matchId: string; data: BodyType<MatchStatisticsDeleteInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAdminMatchStatistics>>,
+  TError,
+  { matchId: string; data: BodyType<MatchStatisticsDeleteInput> },
+  TContext
+> => {
+  return useMutation(getDeleteAdminMatchStatisticsMutationOptions(options));
+};
+
+export const getGetPlayerCareerMatchStatisticsUrl = (playerId: string) => {
+  return `/api/players/${playerId}/match-statistics`;
+};
+
+export const getPlayerCareerMatchStatistics = async (
+  playerId: string,
+  options?: RequestInit,
+): Promise<PlayerMatchStatisticsSummary> => {
+  return customFetch<PlayerMatchStatisticsSummary>(
+    getGetPlayerCareerMatchStatisticsUrl(playerId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPlayerCareerMatchStatisticsQueryKey = (playerId: string) => {
+  return [`/api/players/${playerId}/match-statistics`] as const;
+};
+
+export const getGetPlayerCareerMatchStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  playerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetPlayerCareerMatchStatisticsQueryKey(playerId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>
+  > = ({ signal }) =>
+    getPlayerCareerMatchStatistics(playerId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!playerId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPlayerCareerMatchStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>
+>;
+export type GetPlayerCareerMatchStatisticsQueryError = ErrorType<ApiError>;
+
+export function useGetPlayerCareerMatchStatistics<
+  TData = Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  playerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerCareerMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPlayerCareerMatchStatisticsQueryOptions(
+    playerId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getGetPlayerVenueMatchStatisticsUrl = (
+  venueId: string,
+  playerId: string,
+) => {
+  return `/api/venues/${venueId}/players/${playerId}/match-statistics`;
+};
+
+export const getPlayerVenueMatchStatistics = async (
+  venueId: string,
+  playerId: string,
+  options?: RequestInit,
+): Promise<PlayerVenueMatchStatisticsSummary> => {
+  return customFetch<PlayerVenueMatchStatisticsSummary>(
+    getGetPlayerVenueMatchStatisticsUrl(venueId, playerId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetPlayerVenueMatchStatisticsQueryKey = (
+  venueId: string,
+  playerId: string,
+) => {
+  return [
+    `/api/venues/${venueId}/players/${playerId}/match-statistics`,
+  ] as const;
+};
+
+export const getGetPlayerVenueMatchStatisticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  playerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetPlayerVenueMatchStatisticsQueryKey(venueId, playerId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>
+  > = ({ signal }) =>
+    getPlayerVenueMatchStatistics(venueId, playerId, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(venueId && playerId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPlayerVenueMatchStatisticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>
+>;
+export type GetPlayerVenueMatchStatisticsQueryError = ErrorType<ApiError>;
+
+export function useGetPlayerVenueMatchStatistics<
+  TData = Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>,
+  TError = ErrorType<ApiError>,
+>(
+  venueId: string,
+  playerId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerVenueMatchStatistics>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPlayerVenueMatchStatisticsQueryOptions(
+    venueId,
+    playerId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

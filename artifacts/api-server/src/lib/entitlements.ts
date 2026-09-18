@@ -9,11 +9,11 @@ import { eq } from "drizzle-orm";
 
 export const PLAN_CAPABILITIES = {
   FREE: [],
-  PRO: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS"],
-  ELITE: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS"],
+  PRO: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"],
+  ELITE: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"],
 } as const satisfies Record<SubscriptionPlan, readonly string[]>;
 
-export type OwnerCapability = "MANUAL_BOOKING" | "ADVANCED_ANALYTICS";
+export type OwnerCapability = "MANUAL_BOOKING" | "ADVANCED_ANALYTICS" | "MATCH_STATISTICS";
 
 export function shouldAdvanceProviderEventCursor(
   lastAppliedAt: Date | null,

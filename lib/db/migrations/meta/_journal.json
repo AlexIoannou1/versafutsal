@@ -190,6 +190,20 @@
       "when": 1788258254000,
       "tag": "0027_manual_booking_audit_actions",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788258312000,
+      "tag": "0025_match_statistics",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1789723570561,
+      "tag": "0028_reconcile_schema_drift",
+      "breakpoints": true
     }
   ]
 }

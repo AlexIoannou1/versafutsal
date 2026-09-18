@@ -48,7 +48,7 @@ const PLANS: Array<{
     features: [
       { label: "Create and manage venues", availability: "included" },
       { label: "Manage pitches, prices, and opening hours", availability: "included" },
-      { label: "Booking calendar (online bookings only)", availability: "included" },
+      { label: "Booking calendar and availability blocks", availability: "included" },
       { label: "Receive and manage online bookings", availability: "included" },
       { label: "Player payments and deposits", availability: "included" },
       { label: "Stripe Connect owner payouts", availability: "included" },
@@ -64,8 +64,8 @@ const PLANS: Array<{
     description: "More control for busy venue teams.",
     features: [
       { label: "Includes everything in Free", availability: "included" },
-      { label: "Manual Bookings (walk-ins, phone bookings and offline payments)", availability: "included" },
-      { label: "Advanced match statistics", availability: "comingSoon" },
+      { label: "Create manual and phone bookings", availability: "included" },
+      { label: "Advanced match statistics", availability: "included" },
       { label: "Growth tools and promotions", availability: "comingSoon" },
       { label: "Insights and automated reminders", availability: "comingSoon" },
     ],

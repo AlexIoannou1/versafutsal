@@ -24,6 +24,12 @@ import {
 } from "@workspace/api-client-react";
 import type { AuditLogEntry } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import MatchStatsManager from "@/components/MatchStatsManager";
+import {
+  useOwnerBookingMatchStats,
+  useOwnerMatchStatsPlan,
+  useUpsertOwnerBookingMatchStats,
+} from "@/lib/match-stats-api";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -243,6 +249,9 @@ export default function OwnerBookingDetailScreen() {
 
   const { data: auditData, isLoading: auditLoading } = useGetOwnerBookingAudit(id ?? "");
   const auditEntries = auditData?.entries ?? [];
+  const subscriptionQuery = useOwnerMatchStatsPlan();
+  const matchQuery = useOwnerBookingMatchStats(id ?? "");
+  const upsertMatch = useUpsertOwnerBookingMatchStats();
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -462,7 +471,12 @@ export default function OwnerBookingDetailScreen() {
   }
 
   const statusColor = STATUS_COLORS[booking.status] ?? colors.primary;
-  const player = booking.player as { name: string; email: string } | undefined;
+  const player = booking.player as {
+    id?: string;
+    name: string;
+    email: string;
+    avatarUrl?: string | null;
+  } | undefined;
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
   const isManual = booking.source === "MANUAL";
@@ -500,6 +514,10 @@ export default function OwnerBookingDetailScreen() {
     : (booking.status === "CONFIRMED" || booking.status === "PENDING") && withinWindow;
   const canEdit = isUpcoming && (booking.status === "CONFIRMED" || booking.status === "PENDING");
   const canConfirmOfflinePayment = isManual && booking.status === "PENDING";
+  const isCompleted = new Date(booking.endAt).getTime() <= Date.now() && booking.status === "CONFIRMED";
+  const effectivePlan = subscriptionQuery.data?.subscription.effectivePlan;
+  const canManageMatch =
+    isCompleted && !!subscriptionQuery.data?.subscription.capabilities.includes("MATCH_STATISTICS");
 
   function handleConfirmOfflinePayment() {
     if (!id || !canConfirmOfflinePayment) return;
@@ -693,6 +711,36 @@ export default function OwnerBookingDetailScreen() {
             <Text style={s.rowValue}>{formatDate(booking.createdAt)}</Text>
           </View>
         </View>
+
+        {isCompleted && (
+          <MatchStatsManager
+            bookingId={id ?? ""}
+            match={matchQuery.data?.match}
+            availablePlayers={
+              matchQuery.data?.availablePlayers.length
+                ? matchQuery.data.availablePlayers
+                : player?.id
+                  ? [{ id: player.id, name: player.name, avatarUrl: player.avatarUrl }]
+                  : []
+            }
+            isLoading={matchQuery.isLoading || subscriptionQuery.isLoading}
+            error={matchQuery.error ?? subscriptionQuery.error}
+            canManage={canManageMatch}
+            lockedReason={
+              effectivePlan === "FREE"
+                ? "Upgrade your venue to record scores, participants and player performance."
+                : undefined
+            }
+            onUpgrade={() => router.push({ pathname: "/(owner)/plans" } as never)}
+            isSaving={upsertMatch.isPending}
+            onSave={(matchData) => upsertMatch.mutateAsync({ bookingId: id ?? "", data: matchData })}
+            queryKeys={[
+              ["ownerBookingMatchStats", id ?? ""],
+              ["playerCareerMatchStats"],
+              ["playerVenueMatchStats"],
+            ]}
+          />
+        )}
 
         {/* Activity / Audit Trail */}
         <View style={s.card}>

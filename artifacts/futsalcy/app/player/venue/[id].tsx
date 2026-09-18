@@ -16,6 +16,7 @@ import { AntDesign } from "@expo/vector-icons";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { MotionPressable } from "@/components/Motion";
+import { useAuth } from "@/context/AuthContext";
 import {
   useGetVenue,
   type VenueDetail,
@@ -23,6 +24,8 @@ import {
   useToggleFavourite,
   useGetPitchAvailability,
 } from "@workspace/api-client-react";
+import PlayerStatsCard from "@/components/PlayerStatsCard";
+import { usePlayerVenueMatchStats } from "@/lib/match-stats-api";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -385,6 +388,7 @@ export default function PlayerVenueDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoWidth, setPhotoWidth] = useState(Dimensions.get("window").width);
@@ -403,6 +407,7 @@ export default function PlayerVenueDetailScreen() {
   const { data: favouriteIdsData } = useFavouriteIds();
   const isFavourited = (favouriteIdsData?.venueIds ?? []).includes(id!);
   const toggleFavourite = useToggleFavourite();
+  const venueStats = usePlayerVenueMatchStats(id ?? "", user?.id ?? "");
 
   useEffect(() => {
     if (photoIndex >= photoCount) setPhotoIndex(0);
@@ -723,6 +728,17 @@ export default function PlayerVenueDetailScreen() {
           {venue.description ? (
             <Text style={s.description}>{String(venue.description)}</Text>
           ) : null}
+
+          <View style={{ marginTop: 18 }}>
+            <PlayerStatsCard
+              testID="player-venue-stats"
+              title="Your stats here"
+              subtitle={`Your official match record at ${String(venue.name)}.`}
+              stats={venueStats.data}
+              isLoading={venueStats.isLoading}
+              error={venueStats.error}
+            />
+          </View>
 
           {amenities.length > 0 && (
             <>

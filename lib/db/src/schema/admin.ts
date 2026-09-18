@@ -53,6 +53,9 @@ export const auditActionEnum = pgEnum("audit_action", [
   "OFFLINE_PAYMENT_CONFIRMED",
   "BOOKING_EDITED",
   "NOTIFICATION_SENT",
+  "MATCH_STATISTICS_CREATED",
+  "MATCH_STATISTICS_UPDATED",
+  "MATCH_STATISTICS_DELETED",
 ]);
 
 export const auditLogTable = pgTable("audit_log", {

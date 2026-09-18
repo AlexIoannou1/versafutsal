@@ -20,6 +20,8 @@ tags:
     description: Admin operations
   - name: subscriptions
     description: Owner plan, entitlement, and recurring billing operations
+  - name: match-statistics
+    description: Completed-booking match results and player performance statistics
 paths:
   /healthz:
     get:
@@ -2143,6 +2145,195 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /owner/bookings/{bookingId}/match-statistics:
+    parameters:
+      - name: bookingId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getOwnerMatchStatistics
+      tags: [match-statistics]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Match statistics, or null when none have been entered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MatchStatisticsOptionalResponse" }
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+    put:
+      operationId: putOwnerMatchStatistics
+      tags: [match-statistics]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MatchStatisticsInput" }
+      responses:
+        "200":
+          description: Match statistics saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MatchStatisticsResponse" }
+        "400":
+          description: Invalid match or participant data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "403":
+          description: Owner plan is not eligible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "409":
+          description: Concurrent update conflict
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+    delete:
+      operationId: deleteOwnerMatchStatistics
+      tags: [match-statistics]
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Match statistics deleted
+        "403":
+          description: Owner plan is not eligible
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Match statistics not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /admin/match-statistics/{matchId}:
+    parameters:
+      - name: matchId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getAdminMatchStatistics
+      tags: [match-statistics, admin]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Match statistics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MatchStatisticsResponse" }
+        "404":
+          description: Match statistics not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+    put:
+      operationId: putAdminMatchStatistics
+      tags: [match-statistics, admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MatchStatisticsInput" }
+      responses:
+        "200":
+          description: Corrected match statistics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MatchStatisticsResponse" }
+        "400":
+          description: Invalid match or participant data
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "409":
+          description: Concurrent update conflict
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+    delete:
+      operationId: deleteAdminMatchStatistics
+      tags: [match-statistics, admin]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MatchStatisticsDeleteInput" }
+      responses:
+        "204":
+          description: Match statistics deleted
+        "404":
+          description: Match statistics not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /players/{playerId}/match-statistics:
+    get:
+      operationId: getPlayerCareerMatchStatistics
+      tags: [match-statistics]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Stable career totals, including zero totals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlayerMatchStatisticsSummary" }
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
+  /venues/{venueId}/players/{playerId}/match-statistics:
+    get:
+      operationId: getPlayerVenueMatchStatistics
+      tags: [match-statistics]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: venueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: playerId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Stable player totals at this venue, including zero totals
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlayerVenueMatchStatisticsSummary" }
+        "404":
+          description: Player or venue not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2151,6 +2342,117 @@ components:
       bearerFormat: JWT
 
   schemas:
+    MatchTeam:
+      type: string
+      enum: [HOME, AWAY]
+    MatchParticipantInput:
+      type: object
+      additionalProperties: false
+      required: [playerId, team, goals, assists, saves, yellowCards, redCards]
+      properties:
+        playerId: { type: string, format: uuid }
+        team: { $ref: "#/components/schemas/MatchTeam" }
+        goals: { type: integer, minimum: 0, maximum: 100 }
+        assists: { type: integer, minimum: 0, maximum: 100 }
+        saves: { type: integer, minimum: 0, maximum: 500 }
+        yellowCards: { type: integer, minimum: 0, maximum: 2 }
+        redCards: { type: integer, minimum: 0, maximum: 1 }
+    MatchStatisticsInput:
+      type: object
+      additionalProperties: false
+      required: [homeScore, awayScore, expectedVersion, participants]
+      properties:
+        homeScore: { type: integer, minimum: 0, maximum: 100 }
+        awayScore: { type: integer, minimum: 0, maximum: 100 }
+        expectedVersion:
+          type: integer
+          minimum: 0
+          description: Use 0 when creating, or the current version when editing.
+        participants:
+          type: array
+          minItems: 2
+          maxItems: 40
+          items: { $ref: "#/components/schemas/MatchParticipantInput" }
+    MatchStatisticsDeleteInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: string, maxLength: 500 }
+    MatchParticipant:
+      type: object
+      required: [id, playerId, playerName, team, goals, assists, saves, yellowCards, redCards]
+      properties:
+        id: { type: string, format: uuid }
+        playerId: { type: string, format: uuid }
+        playerName: { type: string }
+        team: { $ref: "#/components/schemas/MatchTeam" }
+        goals: { type: integer }
+        assists: { type: integer }
+        saves: { type: integer }
+        yellowCards: { type: integer }
+        redCards: { type: integer }
+    MatchPlayerSummary:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        avatarUrl: { type: ["string", "null"] }
+    MatchStatistics:
+      type: object
+      required: [id, bookingId, venueId, homeScore, awayScore, version, participants, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        bookingId: { type: string, format: uuid }
+        venueId: { type: string, format: uuid }
+        homeScore: { type: integer }
+        awayScore: { type: integer }
+        version: { type: integer }
+        participants:
+          type: array
+          items: { $ref: "#/components/schemas/MatchParticipant" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    MatchStatisticsResponse:
+      type: object
+      required: [match]
+      properties:
+        match: { $ref: "#/components/schemas/MatchStatistics" }
+        availablePlayers:
+          type: array
+          items: { $ref: "#/components/schemas/MatchPlayerSummary" }
+    MatchStatisticsOptionalResponse:
+      type: object
+      required: [match, availablePlayers]
+      properties:
+        match:
+          oneOf:
+            - { $ref: "#/components/schemas/MatchStatistics" }
+            - { type: "null" }
+        availablePlayers:
+          type: array
+          items: { $ref: "#/components/schemas/MatchPlayerSummary" }
+    PlayerMatchStatisticsSummary:
+      type: object
+      required: [playerId, matchesPlayed, goals, assists, saves, yellowCards, redCards, venuesPlayed]
+      properties:
+        playerId: { type: string, format: uuid }
+        matchesPlayed: { type: integer }
+        goals: { type: integer }
+        assists: { type: integer }
+        saves: { type: integer }
+        yellowCards: { type: integer }
+        redCards: { type: integer }
+        venuesPlayed: { type: integer }
+    PlayerVenueMatchStatisticsSummary:
+      allOf:
+        - { $ref: "#/components/schemas/PlayerMatchStatisticsSummary" }
+        - type: object
+          required: [venueId, venueName]
+          properties:
+            venueId: { type: string, format: uuid }
+            venueName: { type: string }
+
     SubscriptionPlan:
       type: string
       enum: [FREE, PRO, ELITE]
@@ -2197,7 +2499,7 @@ components:
           type: array
           items:
             type: string
-            enum: [MANUAL_BOOKING, ADVANCED_ANALYTICS]
+            enum: [MANUAL_BOOKING, ADVANCED_ANALYTICS, MATCH_STATISTICS]
         billingConfigured:
           type: boolean
       required: [plan, effectivePlan, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, overridePlan, overrideReason, overrideStartsAt, overrideEndsAt, capabilities, billingConfigured]

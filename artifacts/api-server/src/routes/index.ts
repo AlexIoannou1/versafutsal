@@ -12,6 +12,7 @@ import ownerAccountRouter from "./owner-account";
 import ownerNotificationsRouter from "./owner-notifications";
 import playerNotificationsRouter from "./player-notifications";
 import subscriptionsRouter from "./subscriptions";
+import matchStatisticsRouter from "./match-statistics";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(ownerAccountRouter);
 router.use(ownerNotificationsRouter);
 router.use(playerNotificationsRouter);
 router.use(subscriptionsRouter);
+router.use(matchStatisticsRouter);
 
 export default router;

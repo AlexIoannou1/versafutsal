@@ -5,6 +5,128 @@
  * Versa API specification
  * OpenAPI spec version: 0.1.0
  */
+export type MatchTeam = (typeof MatchTeam)[keyof typeof MatchTeam];
+
+export const MatchTeam = {
+  HOME: "HOME",
+  AWAY: "AWAY",
+} as const;
+
+export interface MatchParticipantInput {
+  playerId: string;
+  team: MatchTeam;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  goals: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  assists: number;
+  /**
+   * @minimum 0
+   * @maximum 500
+   */
+  saves: number;
+  /**
+   * @minimum 0
+   * @maximum 2
+   */
+  yellowCards: number;
+  /**
+   * @minimum 0
+   * @maximum 1
+   */
+  redCards: number;
+}
+
+export interface MatchStatisticsInput {
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  homeScore: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  awayScore: number;
+  /**
+   * Use 0 when creating, or the current version when editing.
+   * @minimum 0
+   */
+  expectedVersion: number;
+  /**
+   * @minItems 2
+   * @maxItems 40
+   */
+  participants: MatchParticipantInput[];
+}
+
+export interface MatchStatisticsDeleteInput {
+  /** @maxLength 500 */
+  reason?: string;
+}
+
+export interface MatchParticipant {
+  id: string;
+  playerId: string;
+  playerName: string;
+  team: MatchTeam;
+  goals: number;
+  assists: number;
+  saves: number;
+  yellowCards: number;
+  redCards: number;
+}
+
+export interface MatchPlayerSummary {
+  id: string;
+  name: string;
+  /** @nullable */
+  avatarUrl?: string | null;
+}
+
+export interface MatchStatistics {
+  id: string;
+  bookingId: string;
+  venueId: string;
+  homeScore: number;
+  awayScore: number;
+  version: number;
+  participants: MatchParticipant[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MatchStatisticsResponse {
+  match: MatchStatistics;
+  availablePlayers?: MatchPlayerSummary[];
+}
+
+export interface MatchStatisticsOptionalResponse {
+  match: MatchStatistics | null;
+  availablePlayers: MatchPlayerSummary[];
+}
+
+export interface PlayerMatchStatisticsSummary {
+  playerId: string;
+  matchesPlayed: number;
+  goals: number;
+  assists: number;
+  saves: number;
+  yellowCards: number;
+  redCards: number;
+  venuesPlayed: number;
+}
+
+export type PlayerVenueMatchStatisticsSummary = PlayerMatchStatisticsSummary & {
+  venueId: string;
+  venueName: string;
+};
+
 export type SubscriptionPlan =
   (typeof SubscriptionPlan)[keyof typeof SubscriptionPlan];
 
@@ -33,6 +155,7 @@ export type OwnerSubscriptionCapabilitiesItem =
 export const OwnerSubscriptionCapabilitiesItem = {
   MANUAL_BOOKING: "MANUAL_BOOKING",
   ADVANCED_ANALYTICS: "ADVANCED_ANALYTICS",
+  MATCH_STATISTICS: "MATCH_STATISTICS",
 } as const;
 
 export interface OwnerSubscription {

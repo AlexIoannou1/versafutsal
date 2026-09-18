@@ -22,6 +22,12 @@ import {
 } from "@workspace/api-client-react";
 import type { AuditLogEntry } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import MatchStatsManager from "@/components/MatchStatsManager";
+import {
+  useAdminBookingMatchStats,
+  useDeleteAdminBookingMatchStats,
+  useUpdateAdminBookingMatchStats,
+} from "@/lib/match-stats-api";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -229,6 +235,18 @@ export default function AdminBookingDetailScreen() {
 
   const { data: auditData, isLoading: auditLoading } = useGetAdminBookingAudit(id ?? "");
   const auditEntries = auditData?.entries ?? [];
+  const matchId =
+    (booking as {
+      matchStatistics?: { id: string } | null;
+      match?: { id: string } | null;
+      matchStatisticsId?: string | null;
+    } | undefined)?.matchStatistics?.id ??
+    (booking as { match?: { id: string } | null } | undefined)?.match?.id ??
+    (booking as { matchStatisticsId?: string | null } | undefined)?.matchStatisticsId ??
+    "";
+  const matchQuery = useAdminBookingMatchStats(matchId);
+  const updateMatch = useUpdateAdminBookingMatchStats();
+  const deleteMatch = useDeleteAdminBookingMatchStats();
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -586,6 +604,27 @@ export default function AdminBookingDetailScreen() {
             <Text style={s.rowValue}>{booking.id}</Text>
           </View>
         </View>
+
+        <MatchStatsManager
+          admin
+          bookingId={id ?? ""}
+          match={matchQuery.data?.match}
+          availablePlayers={matchQuery.data?.availablePlayers ?? []}
+          isLoading={matchQuery.isLoading}
+          error={matchQuery.error}
+          canManage={!!matchQuery.data?.match && new Date(booking.endAt).getTime() <= Date.now()}
+          isSaving={updateMatch.isPending}
+          isDeleting={deleteMatch.isPending}
+          onSave={(matchData) => updateMatch.mutateAsync({ matchId, data: matchData })}
+          onDelete={(reason) => deleteMatch.mutateAsync({ matchId, data: { reason } })}
+          queryKeys={[
+            ["adminBookingMatchStats", matchId],
+            ["playerCareerMatchStats"],
+            ["playerVenueMatchStats"],
+            [`/api/admin/bookings/${id ?? ""}`],
+            [`/api/admin/bookings/${id ?? ""}/audit`],
+          ]}
+        />
 
         {/* Activity / Audit Trail */}
         <View style={s.card}>

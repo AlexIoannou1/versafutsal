@@ -22,7 +22,10 @@ export type AuditAction =
   | "USER_CREATED"
   | "MANUAL_BOOKING_CREATED"
   | "OFFLINE_PAYMENT_CONFIRMED"
-  | "NOTIFICATION_SENT";
+  | "NOTIFICATION_SENT"
+  | "MATCH_STATISTICS_CREATED"
+  | "MATCH_STATISTICS_UPDATED"
+  | "MATCH_STATISTICS_DELETED";
 
 export interface LogBookingAuditParams {
   bookingId: string;
@@ -77,4 +80,31 @@ export function logBookingAuditFireAndForget(
   params: LogBookingAuditParams,
 ): void {
   void logBookingAudit(db, params);
+}
+
+export interface LogMatchStatisticsAuditParams
+  extends Omit<LogBookingAuditParams, "bookingId"> {
+  matchId: string;
+  bookingId: string;
+}
+
+export function logMatchStatisticsAudit(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: NodePgDatabase<any>,
+  params: LogMatchStatisticsAuditParams,
+): Promise<void> {
+  return db
+    .insert(auditLogTable)
+    .values({
+      actorUserId: params.actorUserId ?? null,
+      actorRole: params.actorRole ?? null,
+      entityType: "MATCH_STATISTICS",
+      entityId: params.matchId,
+      action: params.action as typeof auditLogTable.$inferInsert["action"],
+      previousValue: params.previousValue ?? null,
+      newValue: params.newValue ?? null,
+      notes: params.notes ?? null,
+      metadata: { ...(params.metadata ?? {}), bookingId: params.bookingId },
+    })
+    .then(() => void 0);
 }

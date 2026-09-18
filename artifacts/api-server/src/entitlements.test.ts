@@ -64,6 +64,9 @@ assert.equal(resolveEffectivePlan(subscription({
 assert.equal(planHasCapability("FREE", "MANUAL_BOOKING"), false);
 assert.equal(planHasCapability("PRO", "MANUAL_BOOKING"), true);
 assert.equal(planHasCapability("ELITE", "MANUAL_BOOKING"), true);
+assert.equal(planHasCapability("FREE", "MATCH_STATISTICS"), false);
+assert.equal(planHasCapability("PRO", "MATCH_STATISTICS"), true);
+assert.equal(planHasCapability("ELITE", "MATCH_STATISTICS"), true);
 assert.equal(shouldAdvanceProviderEventCursor(null, null, now, "evt_b"), true);
 assert.equal(shouldAdvanceProviderEventCursor(new Date("2026-01-14T00:00:00Z"), "evt_z", now, "evt_a"), true);
 assert.equal(shouldAdvanceProviderEventCursor(new Date("2026-01-16T00:00:00Z"), "evt_a", now, "evt_z"), false);
