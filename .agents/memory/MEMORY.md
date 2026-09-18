@@ -2,6 +2,7 @@
 - [Expo physical-device packager routing](expo-android-tunnel.md) — third-party tunnels can return 502; advertise Metro through EXPO_PACKAGER_PROXY_URL on external HTTPS port 3000.
 - [Stripe React Native — Expo web bundling](stripe-react-native-expo-web.md) — import via `.native.ts`/`.ts` shim pair, not directly; app.json plugin needs merchantIdentifier or startup fails.
 - [Drizzle migration generation is interactive](drizzle-migration-workflow.md) — column rename/retype needs hand-written SQL + journal entry, not `drizzle-kit generate`, in this project.
+- [Postgres enum migration drift](postgres-enum-migration-drift.md) — enum values needed after an applied migration require an idempotent forward migration for existing databases.
 - [Expo web API base URL routing](expo-api-base-url-routing.md) — on web, derive API base URL from window.location.hostname (strip .expo.); never rely on EXPO_PUBLIC_DOMAIN which goes stale.
 - [Expo ImagePicker FormData — web vs native](expo-imagepicker-formdata.md) — the RN { uri, type, name } FormData trick only works on native; on web you must fetch(uri) to get a real Blob then append a File object.
 - [Expo static build port assumption](expo-static-build-port.md) — the static build expects Metro on 8081; concurrent workflows can make its non-interactive port prompt fail.

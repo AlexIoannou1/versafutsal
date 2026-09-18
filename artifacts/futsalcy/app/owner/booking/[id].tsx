@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
-  Alert,
   Modal,
   TextInput,
 } from "react-native";
@@ -15,10 +14,13 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import {
   useGetOwnerBooking,
   useCancelBooking,
   useGetOwnerBookingAudit,
+  useConfirmOfflinePayment,
+  getGetOwnerBookingQueryKey,
 } from "@workspace/api-client-react";
 import type { AuditLogEntry } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -76,6 +78,8 @@ function getAuditActionMeta(action: string, previousValue: Record<string, unknow
       return { icon: "x-circle" as const, color: "#EF4444", label: "Booking cancelled" };
     case "BOOKING_CONFIRMED":
       return { icon: "check-circle" as const, color: "#00C851", label: "Booking confirmed" };
+    case "OFFLINE_PAYMENT_CONFIRMED":
+      return { icon: "check-circle" as const, color: "#00C851", label: "Offline payment confirmed" };
     case "BOOKING_REFUNDED":
       return { icon: "rotate-ccw" as const, color: "#6366F1", label: "Booking refunded" };
     case "REFUND_ISSUED":
@@ -227,6 +231,7 @@ export default function OwnerBookingDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { showDialog } = useAppDialog();
 
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -234,6 +239,7 @@ export default function OwnerBookingDetailScreen() {
   const { data, isLoading, error } = useGetOwnerBooking(id!);
   const booking = data?.booking;
   const cancelMutation = useCancelBooking();
+  const confirmOfflinePaymentMutation = useConfirmOfflinePayment();
 
   const { data: auditData, isLoading: auditLoading } = useGetOwnerBookingAudit(id ?? "");
   const auditEntries = auditData?.entries ?? [];
@@ -459,7 +465,7 @@ export default function OwnerBookingDetailScreen() {
   const player = booking.player as { name: string; email: string } | undefined;
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
-  const isManual = !!(booking as { guestName?: string | null }).guestName;
+  const isManual = booking.source === "MANUAL";
   const payment = (booking as {
     payment?: {
       amount: string;
@@ -493,6 +499,41 @@ export default function OwnerBookingDetailScreen() {
     ? booking.status === "CONFIRMED" || booking.status === "PENDING"
     : (booking.status === "CONFIRMED" || booking.status === "PENDING") && withinWindow;
   const canEdit = isUpcoming && (booking.status === "CONFIRMED" || booking.status === "PENDING");
+  const canConfirmOfflinePayment = isManual && booking.status === "PENDING";
+
+  function handleConfirmOfflinePayment() {
+    if (!id || !canConfirmOfflinePayment) return;
+    showDialog({
+      tone: "warning",
+      title: "Confirm offline payment",
+      message: "Only confirm after you have received the full payment outside the app. This will mark the manual booking as Confirmed and include it in manual revenue.",
+      actions: [
+        { label: "Not yet", kind: "secondary" },
+        {
+          label: "Payment received",
+          kind: "primary",
+          onPress: () => {
+            void (async () => {
+              try {
+                await confirmOfflinePaymentMutation.mutateAsync({ id });
+                await queryClient.invalidateQueries({ queryKey: ["/api/owner/bookings"] });
+                await queryClient.invalidateQueries({ queryKey: getGetOwnerBookingQueryKey(id) });
+                await queryClient.invalidateQueries({ queryKey: ["ownerBookingAudit", id] });
+              } catch (err: unknown) {
+                const message = (err as { data?: { error?: string } | null })?.data?.error ??
+                  "Failed to confirm offline payment.";
+                showDialog({
+                  tone: "danger",
+                  title: "Confirmation failed",
+                  message,
+                });
+              }
+            })();
+          },
+        },
+      ],
+    });
+  }
 
   async function handleConfirmCancel() {
     if (!id) return;
@@ -508,7 +549,11 @@ export default function OwnerBookingDetailScreen() {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
         "Failed to cancel booking.";
-      Alert.alert("Cancellation Failed", msg);
+      showDialog({
+        tone: "danger",
+        title: "Cancellation failed",
+        message: msg,
+      });
     }
   }
 
@@ -536,6 +581,17 @@ export default function OwnerBookingDetailScreen() {
           </View>
         </View>
 
+        {canConfirmOfflinePayment && (
+          <View style={[s.card, { borderColor: "#F59E0B" }]} accessibilityRole="alert">
+            <Text style={s.cardTitle}>Awaiting offline payment</Text>
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={s.rowValue}>
+                This manual booking is Pending and the slot is reserved. Confirm it only after the walk-in or phone customer has paid offline.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {booking.cancellationReason && (
           <View style={s.card}>
             <Text style={s.cardTitle}>Cancellation Reason</Text>
@@ -548,7 +604,7 @@ export default function OwnerBookingDetailScreen() {
         {isManual ? (
           <View style={s.card}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 }}>
-              <Text style={[s.cardTitle, { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 }]}>Walk-in / Phone Booking</Text>
+              <Text style={[s.cardTitle, { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0 }]}>Manual Booking</Text>
               <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
                 <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary }}>MANUAL</Text>
               </View>
@@ -619,6 +675,10 @@ export default function OwnerBookingDetailScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>Booking Details</Text>
           <View style={[s.row, s.rowFirst]}>
+            <Text style={s.rowLabel}>Source</Text>
+            <Text style={s.rowValue}>{isManual ? "Manual" : "Online"}</Text>
+          </View>
+          <View style={s.row}>
             <Text style={s.rowLabel}>Date</Text>
             <Text style={s.rowValue}>{formatDate(booking.startAt)}</Text>
           </View>
@@ -663,6 +723,22 @@ export default function OwnerBookingDetailScreen() {
       </ScrollView>
 
       <View style={s.bottomBar}>
+        {canConfirmOfflinePayment && (
+          <TouchableOpacity
+            style={s.editBtn}
+            onPress={handleConfirmOfflinePayment}
+            disabled={confirmOfflinePaymentMutation.isPending}
+            accessibilityRole="button"
+            accessibilityLabel="Confirm offline payment received"
+            activeOpacity={0.8}
+          >
+            {confirmOfflinePaymentMutation.isPending ? (
+              <ActivityIndicator color={colors.primaryForeground} />
+            ) : (
+              <Text style={s.editBtnText}>Confirm offline payment</Text>
+            )}
+          </TouchableOpacity>
+        )}
         {canEdit && (
           <TouchableOpacity
             style={s.editBtn}
@@ -696,7 +772,7 @@ export default function OwnerBookingDetailScreen() {
             <Text style={s.modalTitle}>Cancel Booking</Text>
             <Text style={s.modalSubtitle}>
               {isManual
-                ? "This is a walk-in booking with no payment on file. Cancelling it will free the slot immediately."
+                ? "This is a manual booking paid outside the app. Cancelling it will free the slot immediately; any offline refund must be handled separately."
                 : "Cancelling as venue owner. A refund will be issued automatically if payment was collected."}
             </Text>
 

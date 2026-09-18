@@ -20,6 +20,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Platform } from "react-native";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
+import { AppDialogProvider } from "@/context/AppDialogContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { MotionProvider, useMotion } from "@/context/MotionContext";
 import { useColors } from "@/hooks/useColors";
@@ -150,11 +151,13 @@ export default function RootLayout() {
             <ErrorBoundary>
               <QueryClientProvider client={queryClient}>
                 <AuthProvider>
-                  <GestureHandlerRootView>
-                    <KeyboardProvider>
-                      <RootLayoutNav />
-                    </KeyboardProvider>
-                  </GestureHandlerRootView>
+                  <AppDialogProvider>
+                    <GestureHandlerRootView>
+                      <KeyboardProvider>
+                        <RootLayoutNav />
+                      </KeyboardProvider>
+                    </GestureHandlerRootView>
+                  </AppDialogProvider>
                 </AuthProvider>
               </QueryClientProvider>
             </ErrorBoundary>

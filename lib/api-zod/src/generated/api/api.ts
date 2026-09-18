@@ -1042,6 +1042,8 @@ export const ListPlayerBookingsQueryParams = zod.object({
     .optional(),
 });
 
+export const listPlayerBookingsResponseBookingsItemOneGuestPhoneRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 export const listPlayerBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp =
   new RegExp("^\\+[1-9][0-9]{7,14}$");
 
@@ -1062,6 +1064,16 @@ export const ListPlayerBookingsResponse = zod.object({
           "REFUNDED",
           "NO_SHOW",
         ]),
+        source: zod.enum(["ONLINE", "MANUAL"]),
+        offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+        guestName: zod.string().nullish(),
+        guestPhone: zod
+          .string()
+          .regex(listPlayerBookingsResponseBookingsItemOneGuestPhoneRegExp)
+          .nullish()
+          .describe(
+            "Canonical E.164 phone number, or null for a legacy account.",
+          ),
         policySnapshot: zod.object({}).passthrough(),
         cancellationReason: zod.string().nullish(),
         createdAt: zod.coerce.date(),
@@ -1108,6 +1120,9 @@ export const GetPlayerBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const getPlayerBookingResponseBookingOneGuestPhoneRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
 export const getPlayerBookingResponseBookingTwoPlayerPhoneNumberRegExp =
   new RegExp("^\\+[1-9][0-9]{7,14}$");
 
@@ -1127,6 +1142,16 @@ export const GetPlayerBookingResponse = zod.object({
         "REFUNDED",
         "NO_SHOW",
       ]),
+      source: zod.enum(["ONLINE", "MANUAL"]),
+      offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+      guestName: zod.string().nullish(),
+      guestPhone: zod
+        .string()
+        .regex(getPlayerBookingResponseBookingOneGuestPhoneRegExp)
+        .nullish()
+        .describe(
+          "Canonical E.164 phone number, or null for a legacy account.",
+        ),
       policySnapshot: zod.object({}).passthrough(),
       cancellationReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
@@ -1185,6 +1210,8 @@ export const ListOwnerBookingsQueryParams = zod.object({
     .describe("Filter by a specific pitch"),
 });
 
+export const listOwnerBookingsResponseBookingsItemOneGuestPhoneRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 export const listOwnerBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp =
   new RegExp("^\\+[1-9][0-9]{7,14}$");
 
@@ -1205,6 +1232,16 @@ export const ListOwnerBookingsResponse = zod.object({
           "REFUNDED",
           "NO_SHOW",
         ]),
+        source: zod.enum(["ONLINE", "MANUAL"]),
+        offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+        guestName: zod.string().nullish(),
+        guestPhone: zod
+          .string()
+          .regex(listOwnerBookingsResponseBookingsItemOneGuestPhoneRegExp)
+          .nullish()
+          .describe(
+            "Canonical E.164 phone number, or null for a legacy account.",
+          ),
         policySnapshot: zod.object({}).passthrough(),
         cancellationReason: zod.string().nullish(),
         createdAt: zod.coerce.date(),
@@ -1280,6 +1317,8 @@ export const getOwnerStatsResponseByPitchItemCountMin = 0;
 
 export const getOwnerStatsResponseByStatusItemCountMin = 0;
 
+export const getOwnerStatsResponseBySourceItemCountMin = 0;
+
 export const getOwnerStatsResponsePremiumInsightsOneRetentionRateSampleSizeMin = 0;
 
 export const getOwnerStatsResponsePremiumInsightsOneRepeatCustomerRateSampleSizeMin = 0;
@@ -1338,6 +1377,13 @@ export const GetOwnerStatsResponse = zod.object({
     zod.object({
       status: zod.string(),
       count: zod.number().min(getOwnerStatsResponseByStatusItemCountMin),
+    }),
+  ),
+  bySource: zod.array(
+    zod.object({
+      source: zod.enum(["ONLINE", "MANUAL"]),
+      count: zod.number().min(getOwnerStatsResponseBySourceItemCountMin),
+      revenue: zod.number(),
     }),
   ),
   effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
@@ -1455,12 +1501,86 @@ export const GetOwnerStatsResponse = zod.object({
 });
 
 /**
+ * @summary Create a pending manual booking for offline payment (Pro or Elite)
+ */
+export const createManualBookingBodyGuestNameMax = 120;
+
+export const createManualBookingBodyGuestPhoneRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
+
+export const CreateManualBookingBody = zod.object({
+  pitchId: zod.string().uuid(),
+  startAt: zod.coerce.date(),
+  guestName: zod.string().min(1).max(createManualBookingBodyGuestNameMax),
+  guestPhone: zod
+    .string()
+    .regex(createManualBookingBodyGuestPhoneRegExp)
+    .describe("Canonical E.164 phone number."),
+});
+
+/**
+ * @summary Export privacy-safe owner booking revenue report as CSV
+ */
+export const ExportOwnerBookingsQueryParams = zod.object({
+  from: zod.date().optional(),
+  to: zod.date().optional(),
+  status: zod
+    .enum(["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"])
+    .optional(),
+});
+
+/**
+ * @summary Confirm offline payment for a pending manual booking
+ */
+export const ConfirmOfflinePaymentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const confirmOfflinePaymentResponseBookingGuestPhoneRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
+
+export const ConfirmOfflinePaymentResponse = zod.object({
+  booking: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    playerId: zod.string().uuid(),
+    startAt: zod.coerce.date(),
+    endAt: zod.coerce.date(),
+    status: zod.enum([
+      "PENDING",
+      "CONFIRMED",
+      "CANCELLED",
+      "REFUNDED",
+      "NO_SHOW",
+    ]),
+    source: zod.enum(["ONLINE", "MANUAL"]),
+    offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+    guestName: zod.string().nullish(),
+    guestPhone: zod
+      .string()
+      .regex(confirmOfflinePaymentResponseBookingGuestPhoneRegExp)
+      .nullish()
+      .describe("Canonical E.164 phone number, or null for a legacy account."),
+    policySnapshot: zod.object({}).passthrough(),
+    cancellationReason: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
  * @summary Get a specific booking for the venue owner
  */
 export const GetOwnerBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const getOwnerBookingResponseBookingOneOneGuestPhoneRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
 export const getOwnerBookingResponseBookingOneTwoPlayerPhoneNumberRegExp =
   new RegExp("^\\+[1-9][0-9]{7,14}$");
 
@@ -1480,6 +1600,16 @@ export const GetOwnerBookingResponse = zod.object({
         "REFUNDED",
         "NO_SHOW",
       ]),
+      source: zod.enum(["ONLINE", "MANUAL"]),
+      offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+      guestName: zod.string().nullish(),
+      guestPhone: zod
+        .string()
+        .regex(getOwnerBookingResponseBookingOneOneGuestPhoneRegExp)
+        .nullish()
+        .describe(
+          "Canonical E.164 phone number, or null for a legacy account.",
+        ),
       policySnapshot: zod.object({}).passthrough(),
       cancellationReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
@@ -1915,6 +2045,8 @@ export const AdminListBookingsQueryParams = zod.object({
   status: zod.coerce.string().optional(),
 });
 
+export const adminListBookingsResponseBookingsItemOneGuestPhoneRegExp =
+  new RegExp("^\\+[1-9][0-9]{7,14}$");
 export const adminListBookingsResponseBookingsItemTwoPlayerPhoneNumberRegExp =
   new RegExp("^\\+[1-9][0-9]{7,14}$");
 
@@ -1935,6 +2067,16 @@ export const AdminListBookingsResponse = zod.object({
           "REFUNDED",
           "NO_SHOW",
         ]),
+        source: zod.enum(["ONLINE", "MANUAL"]),
+        offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+        guestName: zod.string().nullish(),
+        guestPhone: zod
+          .string()
+          .regex(adminListBookingsResponseBookingsItemOneGuestPhoneRegExp)
+          .nullish()
+          .describe(
+            "Canonical E.164 phone number, or null for a legacy account.",
+          ),
         policySnapshot: zod.object({}).passthrough(),
         cancellationReason: zod.string().nullish(),
         createdAt: zod.coerce.date(),
@@ -1975,12 +2117,26 @@ export const AdminListBookingsResponse = zod.object({
 });
 
 /**
+ * @summary Export privacy-safe source-aware booking revenue report as CSV
+ */
+export const ExportAdminBookingsQueryParams = zod.object({
+  from: zod.date().optional(),
+  to: zod.date().optional(),
+  status: zod
+    .enum(["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"])
+    .optional(),
+});
+
+/**
  * @summary Get a single booking detail (admin only)
  */
 export const AdminGetBookingParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const adminGetBookingResponseBookingOneGuestPhoneRegExp = new RegExp(
+  "^\\+[1-9][0-9]{7,14}$",
+);
 export const adminGetBookingResponseBookingTwoPlayerPhoneNumberRegExp =
   new RegExp("^\\+[1-9][0-9]{7,14}$");
 
@@ -2000,6 +2156,16 @@ export const AdminGetBookingResponse = zod.object({
         "REFUNDED",
         "NO_SHOW",
       ]),
+      source: zod.enum(["ONLINE", "MANUAL"]),
+      offlinePaymentReceivedAt: zod.coerce.date().nullish(),
+      guestName: zod.string().nullish(),
+      guestPhone: zod
+        .string()
+        .regex(adminGetBookingResponseBookingOneGuestPhoneRegExp)
+        .nullish()
+        .describe(
+          "Canonical E.164 phone number, or null for a legacy account.",
+        ),
       policySnapshot: zod.object({}).passthrough(),
       cancellationReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),

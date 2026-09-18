@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,20 +7,28 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
-  Alert,
   Platform,
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import {
   useListOwnerVenues,
   useGetOwnerVenue,
   useGetPitchAvailability,
   useCreateManualBooking,
+  useGetOwnerSubscription,
+  getGetOwnerVenueQueryKey,
+  getGetPitchAvailabilityQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  hasManualBookingEntitlement,
+  isEntitlementRequired,
+  showManualBookingUpgrade,
+} from "@/components/ManualBookingEntitlement";
 
 const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTH_NAMES = [
@@ -80,6 +88,31 @@ export default function OwnerBookingNewScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { showDialog } = useAppDialog();
+  const subscriptionQuery = useGetOwnerSubscription();
+  const entitlementDialogShown = useRef(false);
+  const canCreateManualBooking = hasManualBookingEntitlement(
+    subscriptionQuery.data?.subscription,
+  );
+
+  useEffect(() => {
+    if (
+      !subscriptionQuery.isLoading &&
+      !subscriptionQuery.isFetching &&
+      !subscriptionQuery.isError &&
+      !canCreateManualBooking &&
+      !entitlementDialogShown.current
+    ) {
+      entitlementDialogShown.current = true;
+      showManualBookingUpgrade(showDialog, () => router.replace("/(owner)/plans"));
+    }
+  }, [
+    canCreateManualBooking,
+    router,
+    subscriptionQuery.isError,
+    subscriptionQuery.isFetching,
+    subscriptionQuery.isLoading,
+  ]);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -109,7 +142,12 @@ export default function OwnerBookingNewScreen() {
   // Load selected venue's detail (with pitches) when a venue is chosen
   const { data: venueDetailData, isLoading: venueDetailLoading } = useGetOwnerVenue(
     selectedVenue?.id ?? "",
-    { query: { enabled: !!selectedVenue } },
+    {
+      query: {
+        enabled: !!selectedVenue,
+        queryKey: getGetOwnerVenueQueryKey(selectedVenue?.id ?? ""),
+      },
+    },
   );
   const venuePitches = venueDetailData?.venue?.pitches ?? [];
 
@@ -118,7 +156,16 @@ export default function OwnerBookingNewScreen() {
     selectedVenue?.id ?? "",
     selectedPitch?.id ?? "",
     { date: selectedDateStr },
-    { query: { enabled: !!selectedDate && !!selectedVenue && !!selectedPitch } },
+    {
+      query: {
+        enabled: !!selectedDate && !!selectedVenue && !!selectedPitch,
+        queryKey: getGetPitchAvailabilityQueryKey(
+          selectedVenue?.id ?? "",
+          selectedPitch?.id ?? "",
+          { date: selectedDateStr },
+        ),
+      },
+    },
   );
   const slots = availData?.slots ?? [];
 
@@ -161,7 +208,10 @@ export default function OwnerBookingNewScreen() {
   }
 
   async function handleConfirm() {
-    if (!selectedPitch || !selectedSlot) return;
+    if (!selectedPitch || !selectedSlot || !canCreateManualBooking) {
+      showManualBookingUpgrade(showDialog, () => router.replace("/(owner)/plans"));
+      return;
+    }
     try {
       const result = await createBooking.mutateAsync({
         pitchId: selectedPitch.id,
@@ -172,10 +222,17 @@ export default function OwnerBookingNewScreen() {
       await queryClient.invalidateQueries({ queryKey: ["/api/owner/bookings"] });
       router.replace(`/owner/booking/${result.booking.id}`);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+      if (isEntitlementRequired(err)) {
+        showManualBookingUpgrade(showDialog, () => router.replace("/(owner)/plans"));
+        return;
+      }
+      const msg = (err as { data?: { error?: string } | null })?.data?.error ??
         "Failed to create booking. Please try again.";
-      Alert.alert("Booking Failed", msg);
+      showDialog({
+        tone: "danger",
+        title: "Booking failed",
+        message: msg,
+      });
     }
   }
 
@@ -392,6 +449,18 @@ export default function OwnerBookingNewScreen() {
       color: colors.mutedForeground,
       textAlign: "center",
     },
+    introCard: {
+      marginHorizontal: 16,
+      marginTop: 4,
+      marginBottom: 14,
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary + "50",
+      backgroundColor: colors.primary + "10",
+    },
+    introTitle: { fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
+    introText: { marginTop: 4, fontSize: 12, lineHeight: 18, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground },
   });
 
   const approvedVenues = venues.filter(v => v.status === "APPROVED");
@@ -414,6 +483,12 @@ export default function OwnerBookingNewScreen() {
 
     return (
       <ScrollView contentContainerStyle={{ paddingTop: 8, paddingBottom: 16 }}>
+        <View style={s.introCard} accessibilityRole="summary">
+          <Text style={s.introTitle}>Manual booking</Text>
+          <Text style={s.introText}>
+            Use this flow only for walk-ins, phone reservations, and offline payments. The new booking will be Pending and hold the slot until you confirm that offline payment was received.
+          </Text>
+        </View>
         <Text style={s.sectionTitle}>Select Venue</Text>
         {approvedVenues.map(venue => (
           <TouchableOpacity
@@ -637,11 +712,42 @@ export default function OwnerBookingNewScreen() {
         )}
         <View style={s.reviewRow}>
           <Text style={s.reviewLabel}>Payment</Text>
-          <Text style={[s.reviewValue, { color: colors.primary }]}>Cash / In-person</Text>
+          <Text style={[s.reviewValue, { color: colors.primary }]}>Offline · awaiting confirmation</Text>
+        </View>
+        <View style={[s.reviewRow, { marginHorizontal: 16 }]}>
+          <Text style={s.reviewValue}>This booking will be created as Pending until you confirm receipt of offline payment.</Text>
         </View>
       </View>
     </ScrollView>
   );
+
+  if (subscriptionQuery.isLoading || subscriptionQuery.isFetching) {
+    return <View style={s.center}><ActivityIndicator color={colors.primary} /></View>;
+  }
+
+  if (subscriptionQuery.isError) {
+    return (
+      <View style={s.center}>
+        <Text style={s.noVenuesText}>We could not verify your plan. Try again before creating a manual booking.</Text>
+        <TouchableOpacity style={[s.secondaryBtn, { alignSelf: "stretch", marginTop: 16 }]} onPress={() => subscriptionQuery.refetch()}>
+          <Text style={s.secondaryBtnText}>Try again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!canCreateManualBooking) {
+    return (
+      <View style={s.center} accessibilityRole="alert">
+        <FeatherIcons name="lock" size={32} color={colors.mutedForeground} />
+        <Text style={[s.sectionTitle, { paddingTop: 16, textAlign: "center" }]}>Manual Bookings require Pro</Text>
+        <Text style={s.noVenuesText}>Upgrade to Pro to add walk-ins, phone bookings and offline payments.</Text>
+        <TouchableOpacity style={[s.primaryBtn, { alignSelf: "stretch", marginTop: 18 }]} onPress={() => router.replace("/(owner)/plans")}>
+          <Text style={s.primaryBtnText}>View Pro plans</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={s.container}>

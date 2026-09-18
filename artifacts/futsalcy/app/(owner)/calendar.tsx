@@ -12,8 +12,10 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
-import { useListOwnerBookings, useListOwnerVenues, useListBlocksForVenues } from "@workspace/api-client-react";
+import { useAppDialog } from "@/context/AppDialogContext";
+import { useListOwnerBookings, useListOwnerVenues, useListBlocksForVenues, useGetOwnerSubscription } from "@workspace/api-client-react";
 import type { AvailabilityBlock } from "@workspace/api-client-react";
+import { hasManualBookingEntitlement, showManualBookingUpgrade } from "@/components/ManualBookingEntitlement";
 
 type ViewMode = "day" | "month";
 
@@ -98,6 +100,7 @@ type Booking = {
   startAt: string;
   endAt: string;
   status: string;
+  source: "ONLINE" | "MANUAL";
   createdAt?: string;
   guestName?: string | null;
   pitch?: { id?: string; name?: string } | null;
@@ -119,7 +122,7 @@ function BookingRow({
   const venue = booking.venue as { name: string } | undefined;
   const player = booking.player as { name: string; email: string } | undefined;
   const guestName = booking.guestName ?? null;
-  const isManual = !!guestName;
+  const isManual = booking.source === "MANUAL";
 
   const bs = StyleSheet.create({
     card: {
@@ -152,11 +155,9 @@ function BookingRow({
             {formatTime(booking.startAt)} – {formatTime(booking.endAt)}
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            {isManual && (
-              <View style={bs.manualBadge}>
-                <Text style={bs.manualBadgeText}>MANUAL</Text>
-              </View>
-            )}
+            <View style={bs.manualBadge}>
+              <Text style={bs.manualBadgeText}>{isManual ? "MANUAL" : "ONLINE"}</Text>
+            </View>
             <View style={[bs.badge, { backgroundColor: statusColor + "20" }]}>
               <Text style={[bs.badgeText, { color: statusColor }]}>
                 {STATUS_LABELS[booking.status] ?? booking.status}
@@ -181,6 +182,24 @@ export default function OwnerCalendarScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showDialog } = useAppDialog();
+  const subscriptionQuery = useGetOwnerSubscription();
+  const openNewBooking = () => {
+    if (subscriptionQuery.isLoading || subscriptionQuery.isFetching) return;
+    if (subscriptionQuery.isError) {
+      showDialog({
+        tone: "warning",
+        title: "Plan unavailable",
+        message: "We could not verify your current plan. Refresh and try again.",
+      });
+      return;
+    }
+    if (hasManualBookingEntitlement(subscriptionQuery.data?.subscription)) {
+      router.push("/owner/booking-new");
+    } else {
+      showManualBookingUpgrade(showDialog, () => router.push("/(owner)/plans"));
+    }
+  };
 
   const today = useMemo(() => {
     const d = new Date();
@@ -505,7 +524,9 @@ export default function OwnerCalendarScreen() {
                       const sc = STATUS_COLORS[b.status] ?? colors.primary;
                       return (
                         <View key={b.id} style={[s.monthDot, { backgroundColor: sc }]}>
-                          <Text style={s.monthDotText} numberOfLines={1}>{formatTime(b.startAt)}</Text>
+                           <Text style={s.monthDotText} numberOfLines={1}>
+                             {b.source === "MANUAL" ? "M" : "O"} · {formatTime(b.startAt)}
+                           </Text>
                         </View>
                       );
                     })}
@@ -537,7 +558,9 @@ export default function OwnerCalendarScreen() {
     <View style={s.container}>
       {/* Floating Action Button: New Booking */}
       <TouchableOpacity
-        onPress={() => router.push("/owner/booking-new")}
+        onPress={openNewBooking}
+        accessibilityRole="button"
+        accessibilityLabel="New manual booking"
         activeOpacity={0.85}
         style={{
           position: "absolute",

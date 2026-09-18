@@ -24,6 +24,7 @@ import { computeCollectedRevenue, computePremiumAnalytics } from "../lib/owner-a
 import { paymentProvider } from "../lib/payment-provider";
 import { logBookingAuditFireAndForget, logBookingAudit } from "../lib/audit";
 import { reconcileSmsReminder } from "../lib/sms-reminders";
+import { canConfirmOfflinePayment, canUsePaymentProvider, bookingExportCsv, recognizesBookingRevenue, bookingSnapshotRevenue } from "../lib/manual-bookings";
 
 const router: IRouter = Router();
 
@@ -128,6 +129,7 @@ function enrichBooking(row: BookingRow) {
     endAt: row.booking.endAt.toISOString(),
     createdAt: row.booking.createdAt.toISOString(),
     updatedAt: row.booking.updatedAt.toISOString(),
+    offlinePaymentReceivedAt: row.booking.offlinePaymentReceivedAt?.toISOString() ?? null,
     venue: row.venue,
     pitch: row.pitch,
     player: row.player,
@@ -432,6 +434,7 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
             startAt: startDate,
             endAt: endDate,
             status: "PENDING",
+            source: "ONLINE",
             policySnapshot,
           })
           .returning();
@@ -481,7 +484,7 @@ router.post("/bookings", requireAuth, requireRole("PLAYER"), async (req, res) =>
       actorRole: "PLAYER",
       action: "BOOKING_CREATED",
       newValue: { status: "PENDING", pitchId, startAt: booking.startAt.toISOString() },
-      metadata: { actorEmail: req.user!.email },
+      metadata: { source: "ONLINE" },
     });
 
     res.status(201).json({
@@ -638,10 +641,21 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
       res.status(400).json({ error: "pitchId, startAt, guestName, and guestPhone are required" });
       return;
     }
+    if (
+      guestName.trim().length > 120 ||
+      !/^\+[1-9][0-9]{7,14}$/.test(guestPhone.trim())
+    ) {
+      res.status(400).json({ error: "Guest details are invalid" });
+      return;
+    }
 
     const startDate = new Date(startAt);
     if (isNaN(startDate.getTime())) {
       res.status(400).json({ error: "startAt must be a valid ISO 8601 timestamp" });
+      return;
+    }
+    if (startDate <= new Date()) {
+      res.status(400).json({ error: "startAt must be in the future" });
       return;
     }
 
@@ -712,7 +726,7 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
 
     const endDate = new Date(startDate.getTime() + pitchRow.slotDurationMinutes * 60_000);
 
-    // Atomic transaction: conflict check + insert as CONFIRMED.
+    // Atomic transaction: conflict check + insert as PENDING.
     // SERIALIZABLE isolation prevents the classic read-then-write race where two
     // concurrent requests both pass the conflict check before either commits.
     // PostgreSQL will abort one of them with error code 40001 (serialization_failure).
@@ -720,6 +734,17 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
     try {
       const result = await db.transaction(
         async (tx) => {
+          const avBlocks = await getAvailabilityBlocksForDate(venueId, pitchId, dateStr);
+          if (
+            avBlocks.length > 0 &&
+            isSlotBlockedByAvailabilityBlock(
+              { startAt: startDate.toISOString(), endAt: endDate.toISOString() },
+              avBlocks,
+            )
+          ) {
+            throw Object.assign(new Error("availability_blocked"), { _type: "availability_blocked" });
+          }
+
           // Maintenance block check
           const conflictingBlock = await tx
             .select({ id: maintenanceBlocksTable.id })
@@ -774,12 +799,27 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
               playerId: req.user!.userId,
               startAt: startDate,
               endAt: endDate,
-              status: "CONFIRMED",
+              status: "PENDING",
+              source: "MANUAL",
               policySnapshot,
               guestName: guestName.trim(),
               guestPhone: guestPhone.trim(),
             })
             .returning();
+
+          await logBookingAudit(tx, {
+            bookingId: inserted!.id,
+            actorUserId: req.user!.userId,
+            actorRole: "VENUE_OWNER",
+            action: "MANUAL_BOOKING_CREATED",
+            newValue: {
+              status: "PENDING",
+              source: "MANUAL",
+              pitchId,
+              startAt: inserted!.startAt.toISOString(),
+            },
+            metadata: { source: "MANUAL" },
+          });
 
           return inserted!;
         },
@@ -790,6 +830,10 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
     } catch (err: unknown) {
       if ((err as { _type?: string })?._type === "maintenance_blocked") {
         res.status(409).json({ error: "This slot is blocked for maintenance. Please choose another time." });
+        return;
+      }
+      if ((err as { _type?: string })?._type === "availability_blocked") {
+        res.status(409).json({ error: "This slot is not available. Please choose another time." });
         return;
       }
       if ((err as { _type?: string })?._type === "slot_taken") {
@@ -806,21 +850,6 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
       }
       throw err;
     }
-
-    // Write audit log entry — fire-and-forget so a log failure never blocks the response
-    logBookingAuditFireAndForget(db, {
-      bookingId: booking.id,
-      actorUserId: req.user!.userId,
-      actorRole: "VENUE_OWNER",
-      action: "MANUAL_BOOKING_CREATED",
-      newValue: { status: "CONFIRMED", pitchId, startAt: booking.startAt.toISOString() },
-      notes: `Walk-in/phone booking for ${guestName.trim()}`,
-      metadata: {
-        guestName: guestName.trim(),
-        guestPhone: guestPhone.trim(),
-        actorEmail: req.user!.email,
-      },
-    });
 
     try {
       await reconcileSmsReminder(booking.id);
@@ -855,6 +884,98 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// POST /owner/bookings/:id/confirm-offline-payment — owner records offline payment.
+router.post<{ id: string }>(
+  "/owner/bookings/:id/confirm-offline-payment",
+  requireAuth,
+  requireRole("VENUE_OWNER"),
+  async (req, res) => {
+    try {
+      const receivedAt = new Date();
+      const updated = await db.transaction(async (tx) => {
+        const [booking] = await tx
+          .select({
+            id: bookingsTable.id,
+            venueId: bookingsTable.venueId,
+            status: bookingsTable.status,
+            source: bookingsTable.source,
+            ownerId: venuesTable.ownerId,
+          })
+          .from(bookingsTable)
+          .innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+          .where(eq(bookingsTable.id, req.params.id))
+          .limit(1);
+
+        if (!booking || booking.ownerId !== req.user!.userId) {
+          throw Object.assign(new Error("not_found"), { _type: "not_found" });
+        }
+        if (!canConfirmOfflinePayment(booking.source, booking.status)) {
+          throw Object.assign(new Error("invalid_transition"), {
+            _type: "invalid_transition",
+            status: booking.status,
+            source: booking.source,
+          });
+        }
+
+        const [confirmed] = await tx
+          .update(bookingsTable)
+          .set({
+            status: "CONFIRMED",
+            offlinePaymentReceivedAt: receivedAt,
+            updatedAt: receivedAt,
+          })
+          .where(
+            and(
+              eq(bookingsTable.id, booking.id),
+              eq(bookingsTable.source, "MANUAL"),
+              eq(bookingsTable.status, "PENDING"),
+            ),
+          )
+          .returning();
+        if (!confirmed) {
+          throw Object.assign(new Error("invalid_transition"), { _type: "invalid_transition" });
+        }
+
+        await logBookingAudit(tx, {
+          bookingId: booking.id,
+          actorUserId: req.user!.userId,
+          actorRole: "VENUE_OWNER",
+          action: "OFFLINE_PAYMENT_CONFIRMED",
+          previousValue: { status: "PENDING", offlinePaymentReceived: false },
+          newValue: { status: "CONFIRMED", offlinePaymentReceived: true },
+          metadata: { source: "MANUAL" },
+        });
+        return confirmed;
+      });
+
+      res.json({
+        booking: {
+          ...updated,
+          startAt: updated.startAt.toISOString(),
+          endAt: updated.endAt.toISOString(),
+          offlinePaymentReceivedAt: updated.offlinePaymentReceivedAt!.toISOString(),
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      });
+    } catch (err) {
+      if ((err as { _type?: string })?._type === "not_found") {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+      if ((err as { _type?: string })?._type === "invalid_transition") {
+        res.status(409).json({
+          error: "Only pending manual bookings can have offline payment confirmed",
+          code: "INVALID_BOOKING_TRANSITION",
+        });
+        return;
+      }
+      req.log.error({ err, bookingId: req.params.id }, "Confirm offline payment failed");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // ─── Owner Stats ──────────────────────────────────────────────────────────────
 
@@ -935,6 +1056,8 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
         playerId: bookingsTable.playerId,
         pitchId: bookingsTable.pitchId,
         policySnapshot: bookingsTable.policySnapshot,
+        source: bookingsTable.source,
+        offlinePaymentReceivedAt: bookingsTable.offlinePaymentReceivedAt,
         pitchName: pitchesTable.name,
       })
       .from(bookingsTable)
@@ -970,8 +1093,11 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
 
     // ── Financial revenue: persisted successful payments, less successful refunds ──
     const totalBookings = rows.length;
-    const confirmedRows = rows.filter((r) => r.status === "CONFIRMED");
+    const confirmedRows = rows.filter((r) =>
+      recognizesBookingRevenue(r.source, r.status, r.offlinePaymentReceivedAt)
+    );
     const bookingIds = rows.map((r) => r.id);
+    const onlineBookingIds = rows.filter((r) => r.source === "ONLINE").map((r) => r.id);
     const paymentRows = bookingIds.length
       ? await db
           .select({
@@ -982,7 +1108,7 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
             status: paymentsTable.status,
           })
           .from(paymentsTable)
-          .where(inArray(paymentsTable.bookingId, bookingIds))
+          .where(inArray(paymentsTable.bookingId, onlineBookingIds))
       : [];
     const paymentIds = paymentRows.map((payment) => payment.id);
     const successfulRefunds = paymentIds.length
@@ -1008,7 +1134,16 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       status: payment.status,
       refundedAmount: refundedByPayment.get(payment.id) ?? 0,
     })));
-    const { totalRevenue, platformFees, netRevenue } = financials;
+    const manualRevenueByBooking = new Map(
+      rows
+        .filter((row) => recognizesBookingRevenue(row.source, row.status, row.offlinePaymentReceivedAt))
+        .filter((row) => row.source === "MANUAL")
+        .map((row) => [row.id, bookingSnapshotRevenue(row.policySnapshot)]),
+    );
+    const manualRevenue = Array.from(manualRevenueByBooking.values()).reduce((sum, amount) => sum + amount, 0);
+    const totalRevenue = financials.totalRevenue + manualRevenue;
+    const { platformFees } = financials;
+    const netRevenue = totalRevenue - platformFees;
     // Average remains per confirmed booking, so unpaid/manual confirmations are zero-valued.
     const avgRevenue = confirmedRows.length > 0 ? totalRevenue / confirmedRows.length : 0;
 
@@ -1049,7 +1184,7 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       pitchMap.set(r.pitchId, {
         pitchName: r.pitchName,
         count: prev.count + 1,
-          revenue: prev.revenue + (financials.revenueByBooking.get(r.id) ?? 0),
+          revenue: prev.revenue + (financials.revenueByBooking.get(r.id) ?? manualRevenueByBooking.get(r.id) ?? 0),
       });
     }
     const byPitch = Array.from(pitchMap.entries())
@@ -1087,6 +1222,23 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
     const premiumInsights = premiumAnalytics.locked
       ? null
       : toPremiumInsights(premiumAnalytics.metrics);
+    const bySource = (["ONLINE", "MANUAL"] as const).map((source) => {
+      const sourceRows = rows.filter((row) => row.source === source);
+      return {
+        source,
+        count: sourceRows.length,
+        revenue: Math.round(
+          sourceRows.reduce(
+            (sum, row) => sum + (
+              row.source === "MANUAL"
+                ? manualRevenueByBooking.get(row.id) ?? 0
+                : financials.revenueByBooking.get(row.id) ?? 0
+            ),
+            0,
+          ) * 100,
+        ) / 100,
+      };
+    });
 
     res.json({
       totalBookings,
@@ -1099,6 +1251,7 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       byDayOfWeek,
       byPitch,
       byStatus,
+      bySource,
       effectivePlan: entitlements.effectivePlan,
       premiumAccess,
       premiumInsights,
@@ -1257,6 +1410,45 @@ router.get("/owner/bookings", requireAuth, requireRole("VENUE_OWNER"), async (re
     res.json({ bookings: rows.map(enrichBooking) });
   } catch (err) {
     console.error("GET /owner/bookings error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /owner/bookings/export.csv — privacy-safe source-aware owner report.
+router.get("/owner/bookings/export.csv", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
+  try {
+    const { from, to, status } = req.query as { from?: string; to?: string; status?: string };
+    const venues = await db.select({ id: venuesTable.id }).from(venuesTable)
+      .where(eq(venuesTable.ownerId, req.user!.userId));
+    if (!venues.length) {
+      res.type("text/csv").attachment("bookings.csv").send(bookingExportCsv([]));
+      return;
+    }
+    const conditions: ReturnType<typeof eq | typeof inArray | typeof gte | typeof lte>[] = [
+      inArray(bookingsTable.venueId, venues.map((venue) => venue.id)),
+    ];
+    if (status && ["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"].includes(status)) {
+      conditions.push(eq(bookingsTable.status, status as typeof bookingsTable.$inferSelect["status"]));
+    }
+    if (from && !isNaN(new Date(from).getTime())) conditions.push(gte(bookingsTable.startAt, new Date(from)));
+    if (to && !isNaN(new Date(to).getTime())) conditions.push(lte(bookingsTable.startAt, new Date(to)));
+    const rows = await db.select({
+      booking: bookingsTable, venueName: venuesTable.name, pitchName: pitchesTable.name,
+    }).from(bookingsTable).innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+      .innerJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id)).where(and(...conditions))
+      .orderBy(desc(bookingsTable.startAt));
+    const payments = rows.length ? await db.select({
+      bookingId: paymentsTable.bookingId, feeAmount: paymentsTable.feeAmount, status: paymentsTable.status,
+    }).from(paymentsTable).where(inArray(paymentsTable.bookingId, rows.map((row) => row.booking.id))) : [];
+    const fees = new Map<string, number>();
+    for (const payment of payments) if (payment.status === "SUCCEEDED" || payment.status === "PARTIALLY_REFUNDED") {
+      fees.set(payment.bookingId, (fees.get(payment.bookingId) ?? 0) + (parseFloat(payment.feeAmount) || 0));
+    }
+    res.type("text/csv").attachment("bookings.csv").send(bookingExportCsv(rows.map((row) => ({
+      ...row.booking, venueName: row.venueName, pitchName: row.pitchName, platformFee: fees.get(row.booking.id) ?? 0,
+    }))));
+  } catch (err) {
+    req.log.error({ err }, "Owner booking export failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -1610,7 +1802,7 @@ router.put<{ id: string }>(
                 venueId: newVenueId,
                 startAt: newStartDate,
                 endAt: newEndDate,
-                ...(existing.guestName != null
+                ...(existing.source === "MANUAL"
                   ? {
                       guestName: guestName?.trim() ?? existing.guestName,
                       guestPhone: guestPhone?.trim() ?? existing.guestPhone,
@@ -1620,6 +1812,28 @@ router.put<{ id: string }>(
               })
               .where(eq(bookingsTable.id, bookingId))
               .returning();
+
+            const previousValue: Record<string, unknown> = {};
+            const newValue: Record<string, unknown> = {};
+            if (existing.pitchId !== result!.pitchId) {
+              previousValue.pitchId = existing.pitchId;
+              newValue.pitchId = result!.pitchId;
+            }
+            if (existing.startAt.toISOString() !== result!.startAt.toISOString()) {
+              previousValue.startAt = existing.startAt.toISOString();
+              newValue.startAt = result!.startAt.toISOString();
+            }
+            if (existing.guestName !== result!.guestName) newValue.guestNameChanged = true;
+            if (existing.guestPhone !== result!.guestPhone) newValue.guestPhoneChanged = true;
+            await logBookingAudit(tx, {
+              bookingId: result!.id,
+              actorUserId: req.user!.userId,
+              actorRole: "VENUE_OWNER",
+              action: "BOOKING_EDITED",
+              previousValue: Object.keys(previousValue).length > 0 ? previousValue : null,
+              newValue: Object.keys(newValue).length > 0 ? newValue : null,
+              metadata: { source: result!.source },
+            });
 
             return result!;
           },
@@ -1766,7 +1980,7 @@ router.post<{ id: string }>(
 
       // Owners must provide a reason for regular bookings (audit quality).
       // Manual (walk-in) bookings are exempt — no payment was collected.
-      const isManual = !!booking.guestName;
+      const isManual = booking.source === "MANUAL";
       if (actorRole === "VENUE_OWNER" && !isManual && !reason?.trim()) {
         res.status(400).json({ error: "A cancellation reason is required for owner-initiated cancellations." });
         return;
@@ -1809,20 +2023,23 @@ router.post<{ id: string }>(
         });
         return;
       }
-      // Within window (or manual booking): refund is always issued if a payment exists
-      const refundEligible = true;
+      // Online bookings within the window may use the provider refund path.
+      // Manual bookings are always settled and reversed outside the provider.
+      const refundEligible = !isManual;
 
       // ── Find succeeded payment (if any) ───────────────────────────────────
-      const [payment] = await db
-        .select()
-        .from(paymentsTable)
-        .where(
-          and(
-            eq(paymentsTable.bookingId, bookingId),
-            eq(paymentsTable.status, "SUCCEEDED"),
-          ),
-        )
-        .limit(1);
+      const [payment] = !canUsePaymentProvider(booking.source)
+        ? []
+        : await db
+            .select()
+            .from(paymentsTable)
+            .where(
+              and(
+                eq(paymentsTable.bookingId, bookingId),
+                eq(paymentsTable.status, "SUCCEEDED"),
+              ),
+            )
+            .limit(1);
 
       // ── Call payment provider first (outside tx) ──────────────────────────
       // The mock provider always succeeds and does not write to DB, so calling
@@ -1929,8 +2146,8 @@ router.post<{ id: string }>(
             action: "BOOKING_CANCELLED",
             previousValue: { status: booking.status },
             newValue: { status: "CANCELLED" },
-            notes: reason ?? null,
-            metadata: { cancelledBy: actorRole, refunded: false },
+            notes: isManual ? null : reason ?? null,
+            metadata: { cancelledBy: actorRole, refunded: false, source: booking.source },
           });
           await logBookingAudit(tx, {
             bookingId,
@@ -1939,7 +2156,7 @@ router.post<{ id: string }>(
             action: "BOOKING_STATUS_CHANGED",
             previousValue: { status: booking.status },
             newValue: { status: "CANCELLED" },
-            notes: reason ?? null,
+            notes: isManual ? null : reason ?? null,
             metadata: {
               cancelledBy: actorRole,
               noRefund: !payment || !refundEligible,

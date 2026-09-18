@@ -9,12 +9,14 @@ import {
   RefreshControl,
   TextInput,
   ScrollView,
+  Platform,
+  Share,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
-import { useAdminListBookings } from "@workspace/api-client-react";
+import { exportAdminBookings, useAdminListBookings } from "@workspace/api-client-react";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -64,6 +66,9 @@ export default function AdminBookingsScreen() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [selectedSource, setSelectedSource] = useState<"ALL" | "ONLINE" | "MANUAL">("ALL");
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Only treat input as a valid date when it matches YYYY-MM-DD exactly, preventing
   // RangeError crashes from intermediate typing states like "2026-0" or "2026-06-".
@@ -87,6 +92,29 @@ export default function AdminBookingsScreen() {
 
   const { data, isLoading, refetch, isRefetching } = useAdminListBookings(params);
   const bookings = data?.bookings ?? [];
+
+  async function handleExportCsv() {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const csv = await exportAdminBookings(params);
+      if (Platform.OS === "web") {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "admin-bookings.csv";
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({ title: "Booking CSV export", message: csv });
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export bookings. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   // Derive unique venues and players for explicit filter dropdowns
   const venues = useMemo(() => {
@@ -112,6 +140,7 @@ export default function AdminBookingsScreen() {
 
       // Venue chip filter
       if (selectedVenueId !== "ALL" && venue?.id !== selectedVenueId) return false;
+      if (selectedSource !== "ALL" && b.source !== selectedSource) return false;
 
       // Venue text search — evaluated independently from player search (AND semantics)
       if (search.trim()) {
@@ -135,15 +164,18 @@ export default function AdminBookingsScreen() {
 
       return true;
     });
-  }, [bookings, selectedVenueId, search, selectedPlayerSearch]);
+  }, [bookings, selectedVenueId, selectedSource, search, selectedPlayerSearch]);
 
   const hasActiveFilters =
     selectedStatus !== "All" ||
     dateFrom !== "" ||
     dateTo !== "" ||
     selectedVenueId !== "ALL" ||
+    selectedSource !== "ALL" ||
     search !== "" ||
     selectedPlayerSearch !== "";
+  const onlineCount = bookings.filter((booking) => booking.source === "ONLINE").length;
+  const manualCount = bookings.filter((booking) => booking.source === "MANUAL").length;
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -249,6 +281,17 @@ export default function AdminBookingsScreen() {
       alignSelf: "flex-end",
     },
     clearBtnText: { fontSize: 12, fontFamily: "PlusJakartaSans_500Medium", color: colors.destructive },
+    exportButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 8,
+      backgroundColor: colors.primary,
+    },
+    exportText: { fontSize: 12, fontFamily: "PlusJakartaSans_600SemiBold", color: "#fff" },
+    exportError: { paddingHorizontal: 16, paddingBottom: 6, color: colors.destructive, fontSize: 12, fontFamily: "PlusJakartaSans_400Regular" },
     resultRow: {
       paddingHorizontal: 16,
       paddingVertical: 8,
@@ -369,6 +412,23 @@ export default function AdminBookingsScreen() {
             </ScrollView>
           </View>
 
+          <View>
+            <Text style={s.filterLabel}>Source</Text>
+            <View style={s.chipRow}>
+              {(["ALL", "ONLINE", "MANUAL"] as const).map((source) => (
+                <TouchableOpacity
+                  key={source}
+                  style={[s.chip, selectedSource === source && s.chipActive]}
+                  onPress={() => setSelectedSource(source)}
+                >
+                  <Text style={[s.chipText, selectedSource === source && s.chipTextActive]}>
+                    {source === "ALL" ? "All Sources" : source === "ONLINE" ? "Online" : "Manual"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           {/* Venue filter — derived from actual data */}
           {venues.length > 0 && (
             <View>
@@ -463,6 +523,7 @@ export default function AdminBookingsScreen() {
                 setDateTo("");
                 setSearch("");
                 setSelectedPlayerSearch("");
+                setSelectedSource("ALL");
               }}
             >
               <Text style={s.clearBtnText}>Clear all filters</Text>
@@ -475,8 +536,20 @@ export default function AdminBookingsScreen() {
       <View style={s.resultRow}>
         <Text style={s.resultText}>
           {isLoading ? "Loading…" : `${filtered.length} booking${filtered.length !== 1 ? "s" : ""}`}
+          {!isLoading ? ` · ${onlineCount} online · ${manualCount} manual` : ""}
         </Text>
+        <TouchableOpacity
+          style={[s.exportButton, isExporting && { opacity: 0.65 }]}
+          onPress={handleExportCsv}
+          disabled={isExporting}
+          accessibilityRole="button"
+          accessibilityLabel="Export filtered bookings as CSV"
+        >
+          {isExporting ? <ActivityIndicator size="small" color="#fff" /> : <FeatherIcons name="download" size={14} color="#fff" />}
+          <Text style={s.exportText}>{isExporting ? "Exporting…" : "Export CSV"}</Text>
+        </TouchableOpacity>
       </View>
+      {exportError ? <Text accessibilityRole="alert" style={s.exportError}>{exportError}</Text> : null}
 
       {isLoading ? (
         <View style={s.center}>
@@ -507,6 +580,7 @@ export default function AdminBookingsScreen() {
             const venue = item.venue as { name: string; district: string } | undefined;
             const player = item.player as { name: string; email: string } | undefined;
             const pitch = item.pitch as { name: string } | undefined;
+            const isManual = item.source === "MANUAL";
             return (
               <TouchableOpacity
                 style={s.card}
@@ -524,9 +598,15 @@ export default function AdminBookingsScreen() {
                   </View>
                 </View>
                 <View style={s.metaRow}>
+                  <FeatherIcons name={isManual ? "phone" : "globe"} size={12} color={colors.primary} />
+                  <Text style={[s.metaText, { color: colors.primary, fontFamily: "PlusJakartaSans_600SemiBold" }]}>
+                    {isManual ? "Manual" : "Online"}
+                  </Text>
+                </View>
+                <View style={s.metaRow}>
                   <FeatherIcons name="user" size={12} color={colors.mutedForeground} />
                   <Text style={s.metaText}>
-                    {player?.name ?? player?.email ?? "Player"}
+                    {isManual ? (item.guestName ?? "Manual guest") : (player?.name ?? player?.email ?? "Player")}
                   </Text>
                 </View>
                 <View style={s.metaRow}>

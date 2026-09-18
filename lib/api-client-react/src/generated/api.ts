@@ -38,14 +38,18 @@ import type {
   CheckoutFeeResponse,
   CheckoutRequest,
   CheckoutResponse,
+  ConfirmOfflinePayment200,
   CreateBooking201,
   CreateBookingRequest,
   CreateMaintenanceBlock201,
   CreateMaintenanceBlockRequest,
+  CreateManualBooking201,
   CreatePitch201,
   CreatePitchRequest,
   CreateVenue201,
   CreateVenueRequest,
+  ExportAdminBookingsParams,
+  ExportOwnerBookingsParams,
   GetAdminSettings200,
   GetBookingPayment200,
   GetCheckoutFeeParams,
@@ -70,6 +74,7 @@ import type {
   ListVenues200,
   ListVenuesParams,
   LoginRequest,
+  ManualBookingInput,
   MeResponse,
   OwnerStatsResponse,
   OwnerSubscriptionAdminDetail,
@@ -2864,6 +2869,282 @@ export function useGetOwnerStats<
 }
 
 /**
+ * @summary Create a pending manual booking for offline payment (Pro or Elite)
+ */
+export const getCreateManualBookingUrl = () => {
+  return `/api/owner/bookings/manual`;
+};
+
+export const createManualBooking = async (
+  manualBookingInput: ManualBookingInput,
+  options?: RequestInit,
+): Promise<CreateManualBooking201> => {
+  return customFetch<CreateManualBooking201>(getCreateManualBookingUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(manualBookingInput),
+  });
+};
+
+export const getCreateManualBookingMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createManualBooking>>,
+    TError,
+    { data: BodyType<ManualBookingInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createManualBooking>>,
+  TError,
+  { data: BodyType<ManualBookingInput> },
+  TContext
+> => {
+  const mutationKey = ["createManualBooking"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createManualBooking>>,
+    { data: BodyType<ManualBookingInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createManualBooking(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateManualBookingMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createManualBooking>>
+>;
+export type CreateManualBookingMutationBody = BodyType<ManualBookingInput>;
+export type CreateManualBookingMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Create a pending manual booking for offline payment (Pro or Elite)
+ */
+export const useCreateManualBooking = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createManualBooking>>,
+    TError,
+    { data: BodyType<ManualBookingInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createManualBooking>>,
+  TError,
+  { data: BodyType<ManualBookingInput> },
+  TContext
+> => {
+  return useMutation(getCreateManualBookingMutationOptions(options));
+};
+
+/**
+ * @summary Export privacy-safe owner booking revenue report as CSV
+ */
+export const getExportOwnerBookingsUrl = (
+  params?: ExportOwnerBookingsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/owner/bookings/export.csv?${stringifiedParams}`
+    : `/api/owner/bookings/export.csv`;
+};
+
+export const exportOwnerBookings = async (
+  params?: ExportOwnerBookingsParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportOwnerBookingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportOwnerBookingsQueryKey = (
+  params?: ExportOwnerBookingsParams,
+) => {
+  return [
+    `/api/owner/bookings/export.csv`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getExportOwnerBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportOwnerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportOwnerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportOwnerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportOwnerBookingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportOwnerBookings>>
+  > = ({ signal }) =>
+    exportOwnerBookings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportOwnerBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportOwnerBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportOwnerBookings>>
+>;
+export type ExportOwnerBookingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Export privacy-safe owner booking revenue report as CSV
+ */
+
+export function useExportOwnerBookings<
+  TData = Awaited<ReturnType<typeof exportOwnerBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportOwnerBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportOwnerBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportOwnerBookingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Confirm offline payment for a pending manual booking
+ */
+export const getConfirmOfflinePaymentUrl = (id: string) => {
+  return `/api/owner/bookings/${id}/confirm-offline-payment`;
+};
+
+export const confirmOfflinePayment = async (
+  id: string,
+  options?: RequestInit,
+): Promise<ConfirmOfflinePayment200> => {
+  return customFetch<ConfirmOfflinePayment200>(
+    getConfirmOfflinePaymentUrl(id),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getConfirmOfflinePaymentMutationOptions = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmOfflinePayment>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof confirmOfflinePayment>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["confirmOfflinePayment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof confirmOfflinePayment>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return confirmOfflinePayment(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConfirmOfflinePaymentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof confirmOfflinePayment>>
+>;
+
+export type ConfirmOfflinePaymentMutationError = ErrorType<ApiError>;
+
+/**
+ * @summary Confirm offline payment for a pending manual booking
+ */
+export const useConfirmOfflinePayment = <
+  TError = ErrorType<ApiError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof confirmOfflinePayment>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof confirmOfflinePayment>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getConfirmOfflinePaymentMutationOptions(options));
+};
+
+/**
  * @summary Get a specific booking for the venue owner
  */
 export const getGetOwnerBookingUrl = (id: string) => {
@@ -3955,6 +4236,109 @@ export function useAdminListBookings<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getAdminListBookingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Export privacy-safe source-aware booking revenue report as CSV
+ */
+export const getExportAdminBookingsUrl = (
+  params?: ExportAdminBookingsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/bookings/export.csv?${stringifiedParams}`
+    : `/api/admin/bookings/export.csv`;
+};
+
+export const exportAdminBookings = async (
+  params?: ExportAdminBookingsParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportAdminBookingsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportAdminBookingsQueryKey = (
+  params?: ExportAdminBookingsParams,
+) => {
+  return [
+    `/api/admin/bookings/export.csv`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getExportAdminBookingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportAdminBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportAdminBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportAdminBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getExportAdminBookingsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof exportAdminBookings>>
+  > = ({ signal }) =>
+    exportAdminBookings(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportAdminBookings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportAdminBookingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportAdminBookings>>
+>;
+export type ExportAdminBookingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Export privacy-safe source-aware booking revenue report as CSV
+ */
+
+export function useExportAdminBookings<
+  TData = Awaited<ReturnType<typeof exportAdminBookings>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportAdminBookingsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportAdminBookings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportAdminBookingsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

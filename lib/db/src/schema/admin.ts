@@ -50,6 +50,7 @@ export const auditActionEnum = pgEnum("audit_action", [
   "FEE_WAIVED",
   "USER_CREATED",
   "MANUAL_BOOKING_CREATED",
+  "OFFLINE_PAYMENT_CONFIRMED",
   "BOOKING_EDITED",
   "NOTIFICATION_SENT",
 ]);

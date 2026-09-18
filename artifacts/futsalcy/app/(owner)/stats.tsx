@@ -6,10 +6,12 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
-import { useGetOwnerStats } from "@workspace/api-client-react";
+import { exportOwnerBookings, useGetOwnerStats } from "@workspace/api-client-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -329,10 +331,36 @@ export default function StatsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState<Period>("thisMonth");
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const { from, to, label: periodLabel } = useMemo(() => getPeriodDates(period), [period]);
 
   const { data, isLoading } = useGetOwnerStats({ from, to });
+
+  async function handleExportCsv() {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const csv = await exportOwnerBookings({ from, to });
+      const filename = `owner-bookings-${periodLabel.replace(/\s+/g, "-").toLowerCase()}.csv`;
+      if (Platform.OS === "web") {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else {
+        await Share.share({ title: "Booking CSV export", message: csv });
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export bookings. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -376,6 +404,29 @@ export default function StatsScreen() {
       color: colors.mutedForeground,
     },
     pillTextActive: { color: "#fff" },
+    exportButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginHorizontal: 20,
+      marginBottom: 16,
+      paddingVertical: 11,
+      borderRadius: 10,
+      backgroundColor: colors.primary,
+    },
+    exportText: {
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      fontSize: 13,
+      color: colors.primaryForeground,
+    },
+    exportError: {
+      marginHorizontal: 20,
+      marginBottom: 12,
+      fontFamily: "PlusJakartaSans_400Regular",
+      fontSize: 12,
+      color: colors.destructive,
+    },
     card: {
       marginHorizontal: 20,
       marginBottom: 12,
@@ -500,6 +551,7 @@ export default function StatsScreen() {
     byDayOfWeek: [],
     byPitch: [],
     byStatus: [],
+    bySource: [],
   };
   const premiumStats = stats as typeof stats & PremiumStatsCompatibility;
   const premiumAccess = premiumStats.premiumAccess;
@@ -541,6 +593,17 @@ export default function StatsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        <TouchableOpacity
+          style={[s.exportButton, isExporting && { opacity: 0.65 }]}
+          onPress={handleExportCsv}
+          disabled={isExporting}
+          accessibilityRole="button"
+          accessibilityLabel={`Export ${periodLabel} bookings as CSV`}
+        >
+          {isExporting ? <ActivityIndicator size="small" color="#fff" /> : null}
+          <Text style={s.exportText}>{isExporting ? "Exporting CSV…" : "Export CSV"}</Text>
+        </TouchableOpacity>
+        {exportError ? <Text accessibilityRole="alert" style={s.exportError}>{exportError}</Text> : null}
 
         {/* Overview */}
         <View style={s.card}>
@@ -617,6 +680,25 @@ export default function StatsScreen() {
               </Text>
             </View>
           </View>
+        </View>
+
+        {/* Status Breakdown */}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>Bookings & Revenue by Source</Text>
+          {stats.bySource.length === 0 ? (
+            <EmptySection label="No bookings in this period" color={colors.mutedForeground} />
+          ) : (
+            stats.bySource.map((item, i) => (
+              <View key={item.source} style={[s.listRow, i === 0 && { borderTopWidth: 0 }]}>
+                <View style={[s.dot, { backgroundColor: item.source === "MANUAL" ? colors.primary : "#6366F1" }]} />
+                <Text style={s.listLabel}>{item.source === "MANUAL" ? "Manual" : "Online"}</Text>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={s.listCount}>{item.count} bookings</Text>
+                  <Text style={s.listSub}>{formatEuro(item.revenue)} revenue</Text>
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Status Breakdown */}

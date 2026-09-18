@@ -457,6 +457,7 @@ export default function AdminSettingsScreen() {
               const player = booking.player as { name: string; email: string } | undefined;
               const venue = booking.venue as { name: string } | undefined;
               const pitch = booking.pitch as { name: string } | undefined;
+              const isManual = booking.source === "MANUAL";
               return (
                 <TouchableOpacity
                   key={booking.id}
@@ -467,8 +468,13 @@ export default function AdminSettingsScreen() {
                   <View style={{ flex: 1, gap: 2 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <Text style={s.rowLabel} numberOfLines={1}>
-                        {player?.name ?? player?.email ?? "Player"}
+                        {isManual ? (booking.guestName ?? "Manual guest") : (player?.name ?? player?.email ?? "Player")}
                       </Text>
+                      <View style={[s.overrideChip, { backgroundColor: colors.primary + "20" }]}>
+                        <Text style={[s.overrideChipText, { color: colors.primary }]}>
+                          {isManual ? "MANUAL" : "ONLINE"}
+                        </Text>
+                      </View>
                       <View style={[s.overrideChip, { backgroundColor: statusColor + "20" }]}>
                         <Text style={[s.overrideChipText, { color: statusColor }]}>
                           {booking.status}

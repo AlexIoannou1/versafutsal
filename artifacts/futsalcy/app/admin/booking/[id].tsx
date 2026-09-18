@@ -76,6 +76,8 @@ function getAuditActionMeta(action: string, previousValue: Record<string, unknow
       return { icon: "x-circle" as const, color: "#EF4444", label: "Booking cancelled" };
     case "BOOKING_CONFIRMED":
       return { icon: "check-circle" as const, color: "#00C851", label: "Booking confirmed" };
+    case "OFFLINE_PAYMENT_CONFIRMED":
+      return { icon: "check-circle" as const, color: "#00C851", label: "Offline payment confirmed" };
     case "BOOKING_REFUNDED":
       return { icon: "rotate-ccw" as const, color: "#6366F1", label: "Booking refunded" };
     case "REFUND_ISSUED":
@@ -461,10 +463,11 @@ export default function AdminBookingDetailScreen() {
   const player = booking.player as { name: string; email: string } | undefined;
   const venue = booking.venue as { name: string; district: string; address: string } | undefined;
   const pitch = booking.pitch as { name: string; type: string; size: string } | undefined;
+  const isManual = booking.source === "MANUAL";
 
   // Admin can refund any booking with a refundable payment — including CANCELLED ones
   // (e.g. owner cancelled outside window, auto-refund not issued). Only block REFUNDED.
-  const canRefund = booking.status !== "REFUNDED";
+  const canRefund = !isManual && booking.status !== "REFUNDED";
 
   async function handleConfirmRefund() {
     if (!id) return;
@@ -512,6 +515,15 @@ export default function AdminBookingDetailScreen() {
           </View>
         </View>
 
+        {isManual && booking.status === "PENDING" && (
+          <View style={[s.card, { borderColor: "#F59E0B" }]}>
+            <Text style={s.cardTitle}>Awaiting offline payment</Text>
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={s.rowValue}>This manual booking reserves the slot but does not count as revenue until the venue owner confirms offline payment.</Text>
+            </View>
+          </View>
+        )}
+
         {booking.cancellationReason && (
           <View style={s.card}>
             <Text style={s.cardTitle}>Cancellation Reason</Text>
@@ -522,14 +534,14 @@ export default function AdminBookingDetailScreen() {
         )}
 
         <View style={s.card}>
-          <Text style={s.cardTitle}>Player</Text>
+          <Text style={s.cardTitle}>{isManual ? "Manual Guest" : "Player"}</Text>
           <View style={[s.row, s.rowFirst]}>
             <Text style={s.rowLabel}>Name</Text>
-            <Text style={s.rowValue}>{player?.name ?? "—"}</Text>
+            <Text style={s.rowValue}>{isManual ? (booking.guestName ?? "—") : (player?.name ?? "—")}</Text>
           </View>
           <View style={s.row}>
-            <Text style={s.rowLabel}>Email</Text>
-            <Text style={s.rowValue}>{player?.email ?? "—"}</Text>
+            <Text style={s.rowLabel}>{isManual ? "Phone" : "Email"}</Text>
+            <Text style={s.rowValue}>{isManual ? (booking.guestPhone ?? "—") : (player?.email ?? "—")}</Text>
           </View>
         </View>
 
@@ -552,6 +564,10 @@ export default function AdminBookingDetailScreen() {
         <View style={s.card}>
           <Text style={s.cardTitle}>Booking Details</Text>
           <View style={[s.row, s.rowFirst]}>
+            <Text style={s.rowLabel}>Source</Text>
+            <Text style={s.rowValue}>{isManual ? "Manual" : "Online"}</Text>
+          </View>
+          <View style={s.row}>
             <Text style={s.rowLabel}>Date</Text>
             <Text style={s.rowValue}>{formatDate(booking.startAt)}</Text>
           </View>
@@ -612,7 +628,7 @@ export default function AdminBookingDetailScreen() {
 
         {!canRefund && (
           <Text style={s.alreadyNote}>
-            This booking has already been refunded.
+            {isManual ? "Manual bookings are paid and refunded outside the app." : "This booking has already been refunded."}
           </Text>
         )}
 

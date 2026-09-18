@@ -18,6 +18,7 @@ import { paymentProvider } from "../lib/payment-provider";
 import { sendNotification } from "../lib/notifications";
 import { logBookingAudit } from "../lib/audit";
 import { reconcileSmsReminder } from "../lib/sms-reminders";
+import { bookingExportCsv, canUsePaymentProvider } from "../lib/manual-bookings";
 
 const router: IRouter = Router();
 
@@ -370,6 +371,38 @@ router.get("/admin/bookings", requireAuth, requireRole("ADMIN"), async (req, res
   }
 });
 
+// GET /admin/bookings/export.csv — source-aware, privacy-safe booking report.
+router.get("/admin/bookings/export.csv", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { from, to, status } = req.query as { from?: string; to?: string; status?: string };
+    const conditions: ReturnType<typeof eq | typeof gte | typeof lte>[] = [];
+    if (status && ["PENDING", "CONFIRMED", "CANCELLED", "REFUNDED", "NO_SHOW"].includes(status)) {
+      conditions.push(eq(bookingsTable.status, status as typeof bookingsTable.$inferSelect["status"]));
+    }
+    if (from && !isNaN(new Date(from).getTime())) conditions.push(gte(bookingsTable.startAt, new Date(from)));
+    if (to && !isNaN(new Date(to).getTime())) conditions.push(lte(bookingsTable.startAt, new Date(to)));
+    const rows = await db.select({
+      booking: bookingsTable, venueName: venuesTable.name, pitchName: pitchesTable.name,
+    }).from(bookingsTable).innerJoin(venuesTable, eq(bookingsTable.venueId, venuesTable.id))
+      .innerJoin(pitchesTable, eq(bookingsTable.pitchId, pitchesTable.id))
+      .where(conditions.length ? and(...(conditions as Parameters<typeof and>)) : undefined)
+      .orderBy(desc(bookingsTable.startAt));
+    const payments = rows.length ? await db.select({
+      bookingId: paymentsTable.bookingId, feeAmount: paymentsTable.feeAmount, status: paymentsTable.status,
+    }).from(paymentsTable).where(inArray(paymentsTable.bookingId, rows.map((row) => row.booking.id))) : [];
+    const fees = new Map<string, number>();
+    for (const payment of payments) if (payment.status === "SUCCEEDED" || payment.status === "PARTIALLY_REFUNDED") {
+      fees.set(payment.bookingId, (fees.get(payment.bookingId) ?? 0) + (parseFloat(payment.feeAmount) || 0));
+    }
+    res.type("text/csv").attachment("admin-bookings.csv").send(bookingExportCsv(rows.map((row) => ({
+      ...row.booking, venueName: row.venueName, pitchName: row.pitchName, platformFee: fees.get(row.booking.id) ?? 0,
+    }))));
+  } catch (err) {
+    req.log.error({ err }, "Admin booking export failed");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /admin/bookings/:id — Single booking detail for admin
 router.get<{ id: string }>("/admin/bookings/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
@@ -437,6 +470,14 @@ router.post<{ id: string }>(
 
       if (!booking) {
         res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+
+      if (!canUsePaymentProvider(booking.source)) {
+        res.status(400).json({
+          error: "Manual bookings are paid offline and cannot be provider-refunded.",
+          code: "MANUAL_BOOKING_OFFLINE_ONLY",
+        });
         return;
       }
 

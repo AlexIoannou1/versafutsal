@@ -17,10 +17,12 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
+import { useAppDialog } from "@/context/AppDialogContext";
 import { useAuth } from "@/context/AuthContext";
-import { useListOwnerBookings, useListOwnerVenues } from "@workspace/api-client-react";
+import { useListOwnerBookings, useListOwnerVenues, useGetOwnerSubscription } from "@workspace/api-client-react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ONBOARDING_STATUS_KEY, type OnboardingStatus } from "../owner/onboarding";
+import { hasManualBookingEntitlement, showManualBookingUpgrade } from "@/components/ManualBookingEntitlement";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -136,7 +138,25 @@ export default function OwnerDashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showDialog } = useAppDialog();
   const { user } = useAuth();
+  const subscriptionQuery = useGetOwnerSubscription();
+  const openNewBooking = () => {
+    if (subscriptionQuery.isLoading || subscriptionQuery.isFetching) return;
+    if (subscriptionQuery.isError) {
+      showDialog({
+        tone: "warning",
+        title: "Plan unavailable",
+        message: "We could not verify your current plan. Refresh and try again.",
+      });
+      return;
+    }
+    if (hasManualBookingEntitlement(subscriptionQuery.data?.subscription)) {
+      router.push("/owner/booking-new");
+    } else {
+      showManualBookingUpgrade(showDialog, () => router.push("/(owner)/plans"));
+    }
+  };
 
   const { data, isLoading, refetch, isRefetching } = useListOwnerBookings();
   const bookings = data?.bookings ?? [];
@@ -362,8 +382,8 @@ export default function OwnerDashboardScreen() {
     const player = item.player as { name: string; email: string } | undefined;
     const pitch = item.pitch as { name: string } | undefined;
     const venue = item.venue as { name: string } | undefined;
-    const guestName = (item as { guestName?: string | null }).guestName ?? null;
-    const isManual = !!guestName;
+    const guestName = item.guestName ?? null;
+    const isManual = item.source === "MANUAL";
     return (
       <TouchableOpacity
         style={s.card}
@@ -375,11 +395,9 @@ export default function OwnerDashboardScreen() {
             <Text style={[s.playerName, { flex: 1, marginRight: 0, minWidth: 0 }]} numberOfLines={1}>
               {isManual ? guestName : (player?.name ?? player?.email ?? "Player")}
             </Text>
-            {isManual && (
-              <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 }}>
-                <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary }}>MANUAL</Text>
-              </View>
-            )}
+            <View style={{ backgroundColor: colors.primary + "18", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 }}>
+              <Text style={{ fontSize: 10, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary }}>{isManual ? "MANUAL" : "ONLINE"}</Text>
+            </View>
           </View>
           <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
             <Text style={[s.statusText, { color: statusColor }]}>
@@ -486,7 +504,9 @@ export default function OwnerDashboardScreen() {
           </View>
           <View style={s.statCard}>
             <Text style={s.statNum}>{bookings.length}</Text>
-            <Text style={s.statLabel}>Total</Text>
+              <Text style={s.statLabel}>
+                Online {bookings.filter((b) => b.source === "ONLINE").length} · Manual {bookings.filter((b) => b.source === "MANUAL").length}
+              </Text>
           </View>
         </View>
       ),
@@ -699,7 +719,9 @@ export default function OwnerDashboardScreen() {
 
       {/* Floating Action Button: New Booking */}
       <TouchableOpacity
-        onPress={() => router.push("/owner/booking-new")}
+        onPress={openNewBooking}
+        accessibilityRole="button"
+        accessibilityLabel="New manual booking"
         activeOpacity={0.85}
         style={{
           position: "absolute",

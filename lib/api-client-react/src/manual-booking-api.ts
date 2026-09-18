@@ -1,60 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customFetch } from "./custom-fetch";
-import type { AuditEntry } from "./generated/api.schemas";
-import { adminGetBookingAudit } from "./generated/api";
-
-export interface CreateManualBookingRequest {
-  pitchId: string;
-  startAt: string;
-  guestName: string;
-  guestPhone: string;
-}
-
-export interface CreateManualBookingResponse {
-  booking: {
-    id: string;
-    venueId: string;
-    pitchId: string;
-    startAt: string;
-    endAt: string;
-    status: string;
-    guestName: string | null;
-    guestPhone: string | null;
-    createdAt: string;
-    venue: { id: string; name: string; district: string; address: string };
-    pitch: { id: string; name: string; type: string; size: string; slotDurationMinutes: number };
-  };
-}
-
-async function createManualBooking(
-  data: CreateManualBookingRequest,
-): Promise<CreateManualBookingResponse> {
-  return customFetch<CreateManualBookingResponse>("/api/owner/bookings/manual", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
+import type {
+  AuditEntry,
+  CreateManualBooking201,
+  ManualBookingInput,
+  OwnerBookingUpdate,
+  OwnerStatsResponse as GeneratedOwnerStatsResponse,
+} from "./generated/api.schemas";
+import {
+  adminGetBookingAudit,
+  useCreateManualBooking as useGeneratedCreateManualBooking,
+} from "./generated/api";
 
 export function useCreateManualBooking() {
+  const generatedMutation = useGeneratedCreateManualBooking();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateManualBookingRequest) => createManualBooking(data),
+    mutationFn: (data: CreateManualBookingRequest) =>
+      generatedMutation.mutateAsync({ data }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["/api/owner/bookings"] });
     },
   });
 }
 
-// ─── Update booking ────────────────────────────────────────────────────────────
-
-export interface UpdateOwnerBookingRequest {
-  id: string;
-  pitchId: string;
-  startAt: string;
-  guestName?: string;
-  guestPhone?: string;
-}
-
+export type UpdateOwnerBookingRequest = OwnerBookingUpdate & { id: string };
 async function updateOwnerBooking(
   { id, ...body }: UpdateOwnerBookingRequest,
 ): Promise<CreateManualBookingResponse> {
@@ -108,3 +78,9 @@ export function useGetAdminBookingAudit(bookingId: string) {
     enabled: !!bookingId,
   });
 }
+
+export type CreateManualBookingRequest = ManualBookingInput;
+
+export type CreateManualBookingResponse = CreateManualBooking201;
+
+export type OwnerStatsResponse = GeneratedOwnerStatsResponse;

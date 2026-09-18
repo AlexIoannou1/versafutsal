@@ -569,6 +569,20 @@ export type OwnerStatsResponseByStatusItem = {
   count: number;
 };
 
+export type BookingSource = (typeof BookingSource)[keyof typeof BookingSource];
+
+export const BookingSource = {
+  ONLINE: "ONLINE",
+  MANUAL: "MANUAL",
+} as const;
+
+export type OwnerStatsResponseBySourceItem = {
+  source: BookingSource;
+  /** @minimum 0 */
+  count: number;
+  revenue: number;
+};
+
 export interface OwnerStatsResponse {
   /** @minimum 0 */
   totalBookings: number;
@@ -581,6 +595,7 @@ export interface OwnerStatsResponse {
   byDayOfWeek: OwnerStatsResponseByDayOfWeekItem[];
   byPitch: OwnerStatsResponseByPitchItem[];
   byStatus: OwnerStatsResponseByStatusItem[];
+  bySource: OwnerStatsResponseBySourceItem[];
   effectivePlan: SubscriptionPlan;
   premiumAccess: OwnerPremiumAccess;
   premiumInsights: OwnerPremiumInsights | null;
@@ -788,6 +803,10 @@ export interface BookingRecord {
   startAt: string;
   endAt: string;
   status: BookingStatus;
+  source: BookingSource;
+  offlinePaymentReceivedAt?: string | null;
+  guestName?: string | null;
+  guestPhone?: PhoneNumberNullable | null;
   policySnapshot: BookingRecordPolicySnapshot;
   cancellationReason?: string | null;
   createdAt: string;
@@ -975,6 +994,33 @@ export interface VenueFeeOverrideRequest {
   feeEnabled?: boolean | null;
 }
 
+export type ManualBookingWithDetails = BookingRecord & {
+  venue: BookingVenueSummary;
+  pitch: BookingPitchSummary;
+};
+
+export interface ManualBookingInput {
+  pitchId: string;
+  startAt: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  guestName: string;
+  guestPhone: PhoneNumber;
+}
+
+export interface OwnerBookingUpdate {
+  pitchId: string;
+  startAt: string;
+  /**
+   * @minLength 1
+   * @maxLength 120
+   */
+  guestName?: string;
+  guestPhone?: PhoneNumber;
+}
+
 export type ListVenuesParams = {
   district?: string;
   type?: ListVenuesType;
@@ -1105,6 +1151,20 @@ export type GetOwnerStatsParams = {
   to?: string;
 };
 
+export type CreateManualBooking201 = {
+  booking: ManualBookingWithDetails;
+};
+
+export type ExportOwnerBookingsParams = {
+  from?: string;
+  to?: string;
+  status?: BookingStatus;
+};
+
+export type ConfirmOfflinePayment200 = {
+  booking: BookingRecord;
+};
+
 export type GetOwnerBooking200Booking = BookingWithDetails & {
   payment?: PaymentRecord | null;
 };
@@ -1180,6 +1240,12 @@ export type AdminListBookingsParams = {
 
 export type AdminListBookings200 = {
   bookings: BookingWithDetails[];
+};
+
+export type ExportAdminBookingsParams = {
+  from?: string;
+  to?: string;
+  status?: BookingStatus;
 };
 
 export type AdminGetBooking200 = {

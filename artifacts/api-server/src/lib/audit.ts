@@ -21,6 +21,7 @@ export type AuditAction =
   | "FEE_WAIVED"
   | "USER_CREATED"
   | "MANUAL_BOOKING_CREATED"
+  | "OFFLINE_PAYMENT_CONFIRMED"
   | "NOTIFICATION_SENT";
 
 export interface LogBookingAuditParams {
@@ -32,6 +33,21 @@ export interface LogBookingAuditParams {
   newValue?: Record<string, unknown> | null;
   notes?: string | null;
   metadata?: Record<string, unknown>;
+}
+
+const PRIVATE_AUDIT_KEY = /(?:guest|contact|name|phone|email)/i;
+
+/** Removes contact/guest fields before operational data reaches the audit table. */
+export function sanitizeBookingAuditData(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeBookingAuditData);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => !PRIVATE_AUDIT_KEY.test(key))
+    .map(([key, item]) => [key, sanitizeBookingAuditData(item)]));
+}
+
+export function sanitizeBookingAuditNotes(note: string | null | undefined): string | null {
+  return note ? "[redacted operational note]" : null;
 }
 
 export function logBookingAudit(
@@ -47,10 +63,10 @@ export function logBookingAudit(
       entityType: "BOOKING",
       entityId: params.bookingId,
       action: params.action as typeof auditLogTable.$inferInsert["action"],
-      previousValue: params.previousValue ?? null,
-      newValue: params.newValue ?? null,
-      notes: params.notes ?? null,
-      metadata: params.metadata ?? {},
+      previousValue: sanitizeBookingAuditData(params.previousValue) as Record<string, unknown> | null,
+      newValue: sanitizeBookingAuditData(params.newValue) as Record<string, unknown> | null,
+      notes: sanitizeBookingAuditNotes(params.notes),
+      metadata: (sanitizeBookingAuditData(params.metadata) as Record<string, unknown> | null) ?? {},
     })
     .then(() => void 0);
 }

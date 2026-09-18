@@ -23,6 +23,8 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "NO_SHOW",
 ]);
 
+export const bookingSourceEnum = pgEnum("booking_source", ["ONLINE", "MANUAL"]);
+
 export const bookingsTable = pgTable(
   "bookings",
   {
@@ -39,6 +41,8 @@ export const bookingsTable = pgTable(
     startAt: timestamp("start_at").notNull(),
     endAt: timestamp("end_at").notNull(),
     status: bookingStatusEnum("status").notNull().default("PENDING"),
+    source: bookingSourceEnum("source").notNull().default("ONLINE"),
+    offlinePaymentReceivedAt: timestamp("offline_payment_received_at", { withTimezone: true }),
     policySnapshot: jsonb("policy_snapshot").notNull().default({}),
     cancellationReason: text("cancellation_reason"),
     guestName: text("guest_name"),
@@ -88,4 +92,5 @@ export type BookingStatus =
   | "CANCELLED"
   | "REFUNDED"
   | "NO_SHOW";
+export type BookingSource = "ONLINE" | "MANUAL";
 export type MaintenanceBlock = typeof maintenanceBlocksTable.$inferSelect;

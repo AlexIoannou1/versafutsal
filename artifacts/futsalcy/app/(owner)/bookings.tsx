@@ -97,6 +97,7 @@ type Booking = {
   startAt: string;
   endAt: string;
   status: string;
+  source: "ONLINE" | "MANUAL";
   player?: { name: string; email: string; phoneNumber?: string | null };
   venue?: { id: string; name: string };
   pitch?: { name: string };
@@ -110,7 +111,7 @@ function normalizePhone(value: string | null | undefined): string {
   return value.replace(/\D/g, "");
 }
 
-type CardStyles = ReturnType<typeof StyleSheet.create>;
+type CardStyles = Record<string, any>;
 
 function BookingCard({
   item,
@@ -128,7 +129,7 @@ function BookingCard({
   const pitch = item.pitch as { name: string } | undefined;
   const venue = item.venue as { name: string } | undefined;
   const guestName = item.guestName ?? null;
-  const isManual = !!guestName;
+  const isManual = item.source === "MANUAL";
   const displayName = isManual ? guestName : (player?.name ?? player?.email ?? "Player");
 
   return (
@@ -136,11 +137,9 @@ function BookingCard({
       <View style={s.cardHeader}>
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 6, marginRight: 8, minWidth: 0 }}>
           <Text style={s.playerName} numberOfLines={1}>{displayName}</Text>
-          {isManual && (
-            <View style={[s.manualBadge, { backgroundColor: colors.primary + "18" }]}>
-              <Text style={[s.manualBadgeText, { color: colors.primary }]}>MANUAL</Text>
-            </View>
-          )}
+          <View style={[s.manualBadge, { backgroundColor: colors.primary + "18" }]}>
+            <Text style={[s.manualBadgeText, { color: colors.primary }]}>{isManual ? "MANUAL" : "ONLINE"}</Text>
+          </View>
         </View>
         <View style={[s.statusBadge, { backgroundColor: statusColor + "20" }]}>
           <Text style={[s.statusText, { color: statusColor }]}>

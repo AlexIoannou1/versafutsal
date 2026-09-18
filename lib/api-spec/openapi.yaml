@@ -993,6 +993,117 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiError"
 
+  /owner/bookings/manual:
+    post:
+      operationId: createManualBooking
+      tags: [bookings]
+      summary: Create a pending manual booking for offline payment (Pro or Elite)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManualBookingInput"
+      responses:
+        "201":
+          description: Pending manual booking created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [booking]
+                properties:
+                  booking:
+                    $ref: "#/components/schemas/ManualBookingWithDetails"
+        "400":
+          description: Invalid guest or slot input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Owner lacks the MANUAL_BOOKING entitlement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Slot is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+  /owner/bookings/export.csv:
+    get:
+      operationId: exportOwnerBookings
+      tags: [bookings]
+      summary: Export privacy-safe owner booking revenue report as CSV
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+      responses:
+        "200":
+          description: CSV booking export without guest contact details
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /owner/bookings/{id}/confirm-offline-payment:
+    post:
+      operationId: confirmOfflinePayment
+      tags: [bookings]
+      summary: Confirm offline payment for a pending manual booking
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Offline payment recorded and booking confirmed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [booking]
+                properties:
+                  booking:
+                    $ref: "#/components/schemas/BookingRecord"
+        "404":
+          description: Booking not found or not owned by the current owner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "409":
+          description: Booking is not a pending manual booking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /owner/bookings/{id}:
     get:
       operationId: getOwnerBooking
@@ -1480,6 +1591,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiError"
+
+  /admin/bookings/export.csv:
+    get:
+      operationId: exportAdminBookings
+      tags: [admin]
+      summary: Export privacy-safe source-aware booking revenue report as CSV
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BookingStatus"
+      responses:
+        "200":
+          description: CSV booking export without guest contact details
+          content:
+            text/csv:
+              schema:
+                type: string
 
   /admin/bookings/{id}:
     get:
@@ -2874,6 +3015,19 @@ components:
                 type: integer
                 minimum: 0
             required: [status, count]
+        bySource:
+          type: array
+          items:
+            type: object
+            properties:
+              source:
+                $ref: "#/components/schemas/BookingSource"
+              count:
+                type: integer
+                minimum: 0
+              revenue:
+                type: number
+            required: [source, count, revenue]
         effectivePlan:
           $ref: "#/components/schemas/SubscriptionPlan"
         premiumAccess:
@@ -2884,7 +3038,7 @@ components:
             - $ref: "#/components/schemas/OwnerPremiumInsights"
         premiumAnalytics:
           $ref: "#/components/schemas/OwnerPremiumAnalytics"
-      required: [totalBookings, totalRevenue, avgRevenue, platformFees, netRevenue, byDay, byHour, byDayOfWeek, byPitch, byStatus, effectivePlan, premiumAccess, premiumInsights, premiumAnalytics]
+      required: [totalBookings, totalRevenue, avgRevenue, platformFees, netRevenue, byDay, byHour, byDayOfWeek, byPitch, byStatus, bySource, effectivePlan, premiumAccess, premiumInsights, premiumAnalytics]
 
     AdminUserRecord:
       type: object
@@ -3181,6 +3335,17 @@ components:
           format: date-time
         status:
           $ref: "#/components/schemas/BookingStatus"
+        source:
+          $ref: "#/components/schemas/BookingSource"
+        offlinePaymentReceivedAt:
+          type: string
+          format: date-time
+          nullable: true
+        guestName:
+          type: string
+          nullable: true
+        guestPhone:
+          $ref: "#/components/schemas/PhoneNumberNullable"
         policySnapshot:
           type: object
         cancellationReason:
@@ -3192,7 +3357,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, venueId, pitchId, playerId, startAt, endAt, status, policySnapshot, createdAt, updatedAt]
+      required: [id, venueId, pitchId, playerId, startAt, endAt, status, source, policySnapshot, createdAt, updatedAt]
 
     BookingVenueSummary:
       type: object
@@ -3481,3 +3646,55 @@ components:
           type: boolean
           nullable: true
           description: "true = fee on, false = fee off, null = remove override"
+
+    BookingSource:
+      type: string
+      enum: [ONLINE, MANUAL]
+
+
+    ManualBookingWithDetails:
+      allOf:
+        - $ref: "#/components/schemas/BookingRecord"
+        - type: object
+          properties:
+            venue:
+              $ref: "#/components/schemas/BookingVenueSummary"
+            pitch:
+              $ref: "#/components/schemas/BookingPitchSummary"
+          required: [venue, pitch]
+
+
+    ManualBookingInput:
+      type: object
+      properties:
+        pitchId:
+          type: string
+          format: uuid
+        startAt:
+          type: string
+          format: date-time
+        guestName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        guestPhone:
+          $ref: "#/components/schemas/PhoneNumber"
+      required: [pitchId, startAt, guestName, guestPhone]
+
+
+    OwnerBookingUpdate:
+      type: object
+      properties:
+        pitchId:
+          type: string
+          format: uuid
+        startAt:
+          type: string
+          format: date-time
+        guestName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        guestPhone:
+          $ref: "#/components/schemas/PhoneNumber"
+      required: [pitchId, startAt]

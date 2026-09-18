@@ -18,6 +18,7 @@ import { logBookingAudit, logBookingAuditFireAndForget } from "../lib/audit";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import { reconcileSmsReminder } from "../lib/sms-reminders";
+import { canUsePaymentProvider } from "../lib/manual-bookings";
 
 const router: IRouter = Router();
 
@@ -72,7 +73,30 @@ router.post<{ bookingId: string }>(
       // Idempotency: if a payment already exists with this key and is SUCCEEDED, return 200
       const effectiveKey = idempotencyKey ?? `${bookingId}:${paymentType}:${req.user!.userId}`;
 
-      // Idempotency: scope the lookup to THIS booking + key to prevent cross-booking leakage
+      const [sourceCheck] = await db
+        .select({
+          id: bookingsTable.id,
+          playerId: bookingsTable.playerId,
+          source: bookingsTable.source,
+          status: bookingsTable.status,
+          pitchId: bookingsTable.pitchId,
+          startAt: bookingsTable.startAt,
+          endAt: bookingsTable.endAt,
+        })
+        .from(bookingsTable)
+        .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)))
+        .limit(1);
+      if (!sourceCheck) {
+        res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+      if (!canUsePaymentProvider(sourceCheck.source)) {
+        res.status(400).json({
+          error: "Manual bookings must be paid offline",
+          code: "MANUAL_BOOKING_OFFLINE_ONLY",
+        });
+        return;
+      }
       const [existingPayment] = await db
         .select()
         .from(paymentsTable)
@@ -120,7 +144,7 @@ router.post<{ bookingId: string }>(
         } else if (existingPayment.status === "PENDING" && existingPayment.provider === "STRIPE") {
           // Stripe payment is PENDING — client may need to re-present the payment sheet.
           // Return the existing providerPaymentId so client can retrieve the client_secret if needed.
-          const publishableKey = process.env.STRIPE_TEST_PK ?? null;
+        const publishableKey = process.env.STRIPE_TEST_PK ?? null;
           res.status(202).json({
             requiresClientAction: true,
             providerPaymentId: existingPayment.providerPaymentId,
@@ -138,22 +162,7 @@ router.post<{ bookingId: string }>(
       }
 
       // Fetch booking + pitch + venue
-      const [booking] = await db
-        .select()
-        .from(bookingsTable)
-        .where(
-          and(
-            eq(bookingsTable.id, bookingId),
-            eq(bookingsTable.playerId, req.user!.userId),
-          ),
-        )
-        .limit(1);
-
-      if (!booking) {
-        res.status(404).json({ error: "Booking not found" });
-        return;
-      }
-
+      const booking = sourceCheck;
       if (booking.status === "CONFIRMED") {
         res.status(409).json({ error: "Booking is already confirmed" });
         return;
@@ -351,7 +360,7 @@ router.post<{ bookingId: string }>(
       const [payment] = await db
         .select()
         .from(paymentsTable)
-        .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId))
+        .where(eq(paymentsTable.bookingId, bookingId))
         .limit(1);
 
       res.json({
@@ -377,15 +386,18 @@ router.post<{ bookingId: string }>(
     try {
       const { bookingId } = req.params;
 
-      // Verify booking belongs to this player
       const [booking] = await db
-        .select()
+        .select({
+          id: bookingsTable.id,
+          pitchId: bookingsTable.pitchId,
+          startAt: bookingsTable.startAt,
+          endAt: bookingsTable.endAt,
+          playerId: bookingsTable.playerId,
+          source: bookingsTable.source,
+        })
         .from(bookingsTable)
         .where(
-          and(
-            eq(bookingsTable.id, bookingId),
-            eq(bookingsTable.playerId, req.user!.userId),
-          ),
+          and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)),
         )
         .limit(1);
 
@@ -393,33 +405,15 @@ router.post<{ bookingId: string }>(
         res.status(404).json({ error: "Booking not found" });
         return;
       }
-
-      if (booking.status === "CONFIRMED") {
-        // Already confirmed (idempotent)
-        try {
-          await reconcileSmsReminder(bookingId);
-        } catch (error) {
-          req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
-        }
-        res.json({ booking: { id: bookingId, status: "CONFIRMED" } });
+      if (!canUsePaymentProvider(booking.source)) {
+        res.status(400).json({ error: "Manual bookings must be paid offline", code: "MANUAL_BOOKING_OFFLINE_ONLY" });
         return;
       }
 
-      if (booking.status !== "PENDING") {
-        res.status(400).json({ error: `Booking cannot be captured in status: ${booking.status}` });
-        return;
-      }
-
-      // Find the PENDING payment record for this booking
       const [payment] = await db
         .select()
         .from(paymentsTable)
-        .where(
-          and(
-            eq(paymentsTable.bookingId, bookingId),
-            eq(paymentsTable.status, "PENDING"),
-          ),
-        )
+        .where(eq(paymentsTable.bookingId, bookingId))
         .limit(1);
 
       if (!payment) {
@@ -548,6 +542,7 @@ async function confirmBookingAfterPayment(opts: {
         and(
           eq(bookingsTable.id, bookingId),
           eq(bookingsTable.status, "PENDING"),
+          eq(bookingsTable.source, "ONLINE"),
         ),
       )
       .returning({ id: bookingsTable.id });
@@ -666,7 +661,7 @@ router.get<{ bookingId: string }>(
       const { bookingId } = req.params;
 
       const [booking] = await db
-        .select({ id: bookingsTable.id, playerId: bookingsTable.playerId })
+        .select({ id: bookingsTable.id, playerId: bookingsTable.playerId, source: bookingsTable.source })
         .from(bookingsTable)
         .where(
           and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)),
@@ -675,6 +670,10 @@ router.get<{ bookingId: string }>(
 
       if (!booking) {
         res.status(404).json({ error: "Booking not found" });
+        return;
+      }
+      if (!canUsePaymentProvider(booking.source)) {
+        res.status(400).json({ error: "Manual bookings must be paid offline", code: "MANUAL_BOOKING_OFFLINE_ONLY" });
         return;
       }
 
@@ -734,28 +733,14 @@ router.get("/admin/settings", requireAuth, requireRole("ADMIN"), async (_req, re
 });
 
 // ─── PATCH /admin/settings ───────────────────────────────────────────────────
-
 router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { feeEnabled, feePercent } = req.body as {
-      feeEnabled?: boolean;
-      feePercent?: string;
-    };
-
+    const { feeEnabled, feePercent } = req.body as { feeEnabled?: boolean; feePercent?: string };
     const settings = await getOrSeedAdminSettings();
-
-    const updates: Partial<typeof adminSettingsTable.$inferSelect> = {
-      updatedAt: new Date(),
-    };
+    const updates: Partial<typeof adminSettingsTable.$inferSelect> = { updatedAt: new Date() };
     if (typeof feeEnabled === "boolean") updates.feeEnabled = feeEnabled;
     if (feePercent !== undefined) updates.feePercent = feePercent;
-
-    const [updated] = await db
-      .update(adminSettingsTable)
-      .set(updates)
-      .where(eq(adminSettingsTable.id, settings.id))
-      .returning();
-
+    const [updated] = await db.update(adminSettingsTable).set(updates).where(eq(adminSettingsTable.id, settings.id)).returning();
     res.json({ settings: updated });
   } catch (err) {
     console.error("PATCH /admin/settings error:", err);
@@ -764,61 +749,32 @@ router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, r
 });
 
 // ─── PATCH /admin/settings/venues/:venueId ───────────────────────────────────
-// Set or clear per-venue fee override
-
-router.patch<{ venueId: string }>(
-  "/admin/settings/venues/:venueId",
-  requireAuth,
-  requireRole("ADMIN"),
-  async (req, res) => {
-    try {
-      const { venueId } = req.params;
-      const { feeEnabled } = req.body as { feeEnabled?: boolean | null };
-
-      const settings = await getOrSeedAdminSettings();
-      const overrides = { ...(settings.perVenueOverrides ?? {}) };
-
-      if (feeEnabled === null || feeEnabled === undefined) {
-        delete overrides[venueId];
-      } else {
-        overrides[venueId] = feeEnabled;
-      }
-
-      const [updated] = await db
-        .update(adminSettingsTable)
-        .set({ perVenueOverrides: overrides, updatedAt: new Date() })
-        .where(eq(adminSettingsTable.id, settings.id))
-        .returning();
-
-      res.json({ settings: updated });
-    } catch (err) {
-      console.error("PATCH /admin/settings/venues/:venueId error:", err);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  },
-);
+router.patch<{ venueId: string }>("/admin/settings/venues/:venueId", requireAuth, requireRole("ADMIN"), async (req, res) => {
+  try {
+    const venueId = req.params.venueId as string;
+    const { feeEnabled } = req.body as { feeEnabled?: boolean | null };
+    const settings = await getOrSeedAdminSettings();
+    const overrides = { ...(settings.perVenueOverrides ?? {}) } as Record<string, boolean>;
+    if (feeEnabled === null || feeEnabled === undefined) delete overrides[venueId]; else overrides[venueId] = feeEnabled;
+    const [updated] = await db.update(adminSettingsTable).set({ perVenueOverrides: overrides, updatedAt: new Date() }).where(eq(adminSettingsTable.id, settings.id)).returning();
+    res.json({ settings: updated });
+  } catch (err) {
+    console.error("PATCH /admin/settings/venues/:venueId error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // ─── GET /checkout/fee ────────────────────────────────────────────────────────
-// Preview: get current fee to display on checkout
-
 router.get("/checkout/fee", requireAuth, async (req, res) => {
   try {
     const { venueId } = req.query as { venueId?: string };
-
     const settings = await getOrSeedAdminSettings();
-
     let feeEnabled = settings.feeEnabled;
     if (venueId) {
       const overrides = (settings.perVenueOverrides ?? {}) as Record<string, boolean>;
-      if (Object.prototype.hasOwnProperty.call(overrides, venueId)) {
-        feeEnabled = overrides[venueId];
-      }
+      if (Object.prototype.hasOwnProperty.call(overrides, venueId)) feeEnabled = overrides[venueId];
     }
-
-    res.json({
-      feeEnabled,
-      feePercent: feeEnabled ? settings.feePercent : "0.00",
-    });
+    res.json({ feeEnabled, feePercent: feeEnabled ? settings.feePercent : "0.00" });
   } catch (err) {
     console.error("GET /checkout/fee error:", err);
     res.status(500).json({ error: "Internal server error" });
