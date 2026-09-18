@@ -15,6 +15,26 @@ import { useGetOwnerStats } from "@workspace/api-client-react";
 
 type Period = "thisMonth" | "lastMonth" | "thisYear";
 
+type PremiumMetric = {
+  value?: unknown;
+  confidence?: string | number | null;
+  explanation?: string | null;
+};
+
+type PremiumStatsCompatibility = {
+  premiumAccess?: {
+    eligible?: boolean;
+    effectivePlan?: string | null;
+    upgradeMessage?: string | null;
+  } | null;
+  premiumInsights?: {
+    retentionRate?: PremiumMetric | null;
+    repeatCustomerRate?: PremiumMetric | null;
+    cancellationTrend?: PremiumMetric | null;
+    revenueForecast?: PremiumMetric | null;
+  } | null;
+};
+
 const PERIOD_LABELS: Record<Period, string> = {
   thisMonth: "This Month",
   lastMonth: "Last Month",
@@ -80,6 +100,41 @@ function formatHour(hour: number) {
   if (hour < 12) return `${hour} AM`;
   if (hour === 12) return "12 PM";
   return `${hour - 12} PM`;
+}
+
+function numericValue(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[€,%\s]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function metricSeries(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (typeof entry === "number") return entry;
+      if (entry && typeof entry === "object") {
+        const candidate = entry as { value?: unknown; count?: unknown; rate?: unknown };
+        return numericValue(candidate.value ?? candidate.count ?? candidate.rate);
+      }
+      return numericValue(entry);
+    })
+    .filter((entry): entry is number => entry != null);
+}
+
+function formatMetricValue(metric: PremiumMetric | null | undefined, kind: "percent" | "currency" | "trend") {
+  const raw = metric?.value;
+  const number = numericValue(raw);
+  if (number != null) {
+    if (kind === "currency") return formatEuro(number);
+    if (kind === "percent") return `${number.toFixed(number % 1 === 0 ? 0 : 1)}%`;
+    return `${number > 0 ? "+" : ""}${number.toFixed(number % 1 === 0 ? 0 : 1)}%`;
+  }
+  if (typeof raw === "string" && raw.trim()) return raw;
+  return "Not enough data";
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -190,6 +245,81 @@ function TrendBars({
         ))}
       </View>
     </ScrollView>
+  );
+}
+
+function PremiumInsightCard({
+  title,
+  metric,
+  kind,
+  accent,
+  colors,
+}: {
+  title: string;
+  metric?: PremiumMetric | null;
+  kind: "percent" | "currency" | "trend";
+  accent: string;
+  colors: ReturnType<typeof useColors>;
+}) {
+  const series = metricSeries(metric?.value);
+  const numeric = numericValue(metric?.value);
+  const max = Math.max(...series.map((value) => Math.abs(value)), 1);
+  const confidence =
+    metric?.confidence == null || metric.confidence === ""
+      ? null
+      : typeof metric.confidence === "number"
+        ? `${Math.round(metric.confidence <= 1 ? metric.confidence * 100 : metric.confidence)}% confidence`
+        : `${metric.confidence} confidence`;
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${title}: ${formatMetricValue(metric, kind)}. ${confidence ?? "Confidence unavailable"}. ${metric?.explanation ?? "Explanation unavailable"}`}
+      style={{
+        backgroundColor: colors.background,
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: accent,
+      }}
+    >
+      <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 12, color: colors.mutedForeground }}>
+        {title}
+      </Text>
+      <Text style={{ fontFamily: "PlusJakartaSans_700Bold", fontSize: 23, color: colors.foreground, marginTop: 4 }}>
+        {formatMetricValue(metric, kind)}
+      </Text>
+      {series.length > 1 ? (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ height: 38, flexDirection: "row", alignItems: "flex-end", gap: 4, marginTop: 10 }}
+        >
+          {series.slice(-12).map((value, index) => (
+            <View
+              key={index}
+              style={{
+                flex: 1,
+                minWidth: 4,
+                height: Math.max(4, Math.round((Math.abs(value) / max) * 38)),
+                borderRadius: 3,
+                backgroundColor: accent,
+                opacity: 0.45 + (index / series.slice(-12).length) * 0.55,
+              }}
+            />
+          ))}
+        </View>
+      ) : numeric != null && kind === "percent" ? (
+        <MiniBar value={Math.max(0, numeric)} max={100} color={accent} />
+      ) : null}
+      <Text style={{ fontFamily: "PlusJakartaSans_500Medium", fontSize: 11, color: accent, marginTop: 10 }}>
+        {confidence ?? "Confidence unavailable"}
+      </Text>
+      <Text style={{ fontFamily: "PlusJakartaSans_400Regular", fontSize: 12, lineHeight: 17, color: colors.mutedForeground, marginTop: 4 }}>
+        {metric?.explanation?.trim() || "An explanation will appear when enough booking history is available."}
+      </Text>
+    </View>
   );
 }
 
@@ -311,6 +441,43 @@ export default function StatsScreen() {
       marginTop: 10,
     },
     dot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+    premiumHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+    planBadge: {
+      backgroundColor: colors.primary + "18",
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.primary + "45",
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+    },
+    planBadgeText: {
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      fontSize: 10,
+      color: colors.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    upgradeCard: {
+      marginHorizontal: 20,
+      marginBottom: 12,
+      backgroundColor: colors.primary + "0D",
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.primary + "45",
+      padding: 18,
+    },
+    upgradeTitle: {
+      fontFamily: "PlusJakartaSans_700Bold",
+      fontSize: 16,
+      color: colors.foreground,
+      marginBottom: 6,
+    },
+    upgradeText: {
+      fontFamily: "PlusJakartaSans_400Regular",
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.mutedForeground,
+    },
   });
 
   if (isLoading) {
@@ -334,6 +501,11 @@ export default function StatsScreen() {
     byPitch: [],
     byStatus: [],
   };
+  const premiumStats = stats as typeof stats & PremiumStatsCompatibility;
+  const premiumAccess = premiumStats.premiumAccess;
+  const premiumInsights = premiumStats.premiumInsights;
+  const hasPremiumAccess = premiumAccess?.eligible === true;
+  const effectivePlan = premiumAccess?.effectivePlan?.trim() || "Free";
 
   const topHours = [...stats.byHour].sort((a, b) => b.count - a.count).slice(0, 6);
   const maxHour = Math.max(...topHours.map((h) => h.count), 1);
@@ -388,6 +560,41 @@ export default function StatsScreen() {
             </View>
           </View>
         </View>
+
+        {/* Premium insights augment, but never replace, the basic dashboard. */}
+        {hasPremiumAccess ? (
+          <View style={s.card}>
+            <View style={s.premiumHeader}>
+              <Text style={[s.cardTitle, { marginBottom: 0 }]}>Premium Insights</Text>
+              <View style={s.planBadge} accessible accessibilityLabel={`${effectivePlan} plan`}>
+                <Text style={s.planBadgeText}>{effectivePlan}</Text>
+              </View>
+            </View>
+            {premiumInsights ? (
+              <>
+                <PremiumInsightCard title="Customer retention" metric={premiumInsights.retentionRate} kind="percent" accent={colors.primary} colors={colors} />
+                <PremiumInsightCard title="Repeat customers" metric={premiumInsights.repeatCustomerRate} kind="percent" accent={colors.primary} colors={colors} />
+                <PremiumInsightCard title="Cancellation trend" metric={premiumInsights.cancellationTrend} kind="trend" accent={colors.destructive} colors={colors} />
+                <PremiumInsightCard title="Revenue forecast" metric={premiumInsights.revenueForecast} kind="currency" accent={colors.primary} colors={colors} />
+              </>
+            ) : (
+              <EmptySection label="Premium insights will appear as booking history builds." color={colors.mutedForeground} />
+            )}
+          </View>
+        ) : (
+          <View style={s.upgradeCard} accessible accessibilityLabel={`Premium insights locked. ${premiumAccess?.upgradeMessage ?? "Upgrade from Free to unlock retention, customer, cancellation, and revenue forecasts."}`}>
+            <View style={s.premiumHeader}>
+              <Text style={s.upgradeTitle}>Unlock Premium Insights</Text>
+              <View style={s.planBadge}>
+                <Text style={s.planBadgeText}>{effectivePlan}</Text>
+              </View>
+            </View>
+            <Text style={s.upgradeText}>
+              {premiumAccess?.upgradeMessage?.trim() ||
+                "Upgrade from Free to see retention, repeat customer, cancellation, and revenue forecasts."}
+            </Text>
+          </View>
+        )}
 
         {/* Revenue Breakdown */}
         <View style={s.card}>

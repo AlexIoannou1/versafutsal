@@ -26,6 +26,11 @@ import {
 } from "@workspace/api-client-react";
 
 type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
+type VenuePlanCompatibility = {
+  effectivePlan?: string | null;
+  planBadgeLabel?: string | null;
+  photos?: Array<{ id: string; url: string }> | null;
+};
 
 const DISTRICTS = [
   { key: "", label: "All" },
@@ -398,6 +403,23 @@ export default function PlayerVenuesScreen() {
       flex: 1,
       marginBottom: 4,
     },
+    nameRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 7, marginRight: 8 },
+    verifiedBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.primary + "45",
+      backgroundColor: colors.primary + "10",
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+    },
+    verifiedBadgeText: {
+      fontSize: 10,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.primary,
+    },
     heartBtn: {
       padding: 4,
       marginLeft: 8,
@@ -661,10 +683,16 @@ export default function PlayerVenuesScreen() {
           }
           renderItem={({ item }) => {
             const navigateToVenue = () => router.push(`/player/venue/${item.id}`);
+            const planVenue = item as VenueSummary & VenuePlanCompatibility;
+            const plan = planVenue.effectivePlan?.toUpperCase();
+            const badgeLabel =
+              plan === "PRO" || plan === "ELITE"
+                ? planVenue.planBadgeLabel?.trim() || `Verified ${plan === "PRO" ? "Pro" : "Elite"}`
+                : null;
             return (
               <View style={s.card}>
                 {/* Carousel lives outside TouchableOpacity so swipe reaches ScrollView directly */}
-                <VenueCardCarousel photos={item.photos ?? []} onPress={navigateToVenue} />
+                <VenueCardCarousel photos={planVenue.photos ?? []} onPress={navigateToVenue} />
                 <TouchableOpacity
                   onPress={navigateToVenue}
                   activeOpacity={0.85}
@@ -673,9 +701,17 @@ export default function PlayerVenuesScreen() {
                 >
                   <View style={s.cardBody}>
                     <View style={s.cardHeader}>
-                      <Text style={s.cardName} numberOfLines={1}>
-                        {item.name}
-                      </Text>
+                      <View style={s.nameRow}>
+                        <Text style={s.cardName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        {badgeLabel ? (
+                          <View style={s.verifiedBadge} accessible accessibilityLabel={badgeLabel}>
+                            <FeatherIcons name="check-circle" size={11} color={colors.primary} />
+                            <Text style={s.verifiedBadgeText}>{badgeLabel}</Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <TouchableOpacity
                         style={s.heartBtn}
                         onPress={() =>

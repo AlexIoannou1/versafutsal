@@ -16,6 +16,8 @@ import { paymentProvider } from "../lib/payment-provider";
 import { sendBookingConfirmedNotifications } from "../lib/notifications";
 import { logBookingAudit, logBookingAuditFireAndForget } from "../lib/audit";
 import { randomUUID } from "crypto";
+import type { Logger } from "pino";
+import { reconcileSmsReminder } from "../lib/sms-reminders";
 
 const router: IRouter = Router();
 
@@ -94,6 +96,14 @@ router.post<{ bookingId: string }>(
               ),
             )
             .limit(1);
+
+          if (alreadyBooking?.status === "CONFIRMED") {
+            try {
+              await reconcileSmsReminder(bookingId);
+            } catch (error) {
+              req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
+            }
+          }
 
           res.json({
             alreadyProcessed: true,
@@ -335,6 +345,7 @@ router.post<{ bookingId: string }>(
         intent,
         pitchRow,
         booking,
+        log: req.log,
       });
 
       const [payment] = await db
@@ -385,6 +396,11 @@ router.post<{ bookingId: string }>(
 
       if (booking.status === "CONFIRMED") {
         // Already confirmed (idempotent)
+        try {
+          await reconcileSmsReminder(bookingId);
+        } catch (error) {
+          req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
+        }
         res.json({ booking: { id: bookingId, status: "CONFIRMED" } });
         return;
       }
@@ -469,6 +485,7 @@ router.post<{ bookingId: string }>(
         intent: intentForCapture,
         pitchRow: pitchRow ?? null,
         booking,
+        log: req.log,
       });
 
       const [updatedPayment] = await db
@@ -517,8 +534,9 @@ async function confirmBookingAfterPayment(opts: {
     endAt: Date;
     playerId: string;
   };
+  log: Logger;
 }) {
-  const { bookingId, actorUserId, providerPaymentId, intent, pitchRow, booking } = opts;
+  const { bookingId, actorUserId, providerPaymentId, intent, pitchRow, booking, log } = opts;
 
   let alreadyConfirmedConcurrently = false;
 
@@ -596,6 +614,14 @@ async function confirmBookingAfterPayment(opts: {
       metadata: { via: "capture", concurrent: alreadyConfirmedConcurrently },
     });
   });
+
+  if (!alreadyConfirmedConcurrently) {
+    try {
+      await reconcileSmsReminder(bookingId);
+    } catch (error) {
+      log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
+    }
+  }
 
   if (!alreadyConfirmedConcurrently && pitchRow) {
     try {

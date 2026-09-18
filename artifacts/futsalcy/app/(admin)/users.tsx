@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  getAdminListUsersQueryKey,
   getGetOwnerSubscriptionAdminQueryKey,
   useAdminListUsers,
   useGetOwnerSubscriptionAdmin,
@@ -176,6 +177,7 @@ function OwnerSubscriptionPanel({
 
   const invalidate = useCallback(async () => {
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: getAdminListUsersQueryKey() }),
       queryClient.invalidateQueries({ queryKey: getGetOwnerSubscriptionAdminQueryKey(user.id) }),
       queryClient.invalidateQueries({
         predicate: (query) => String(query.queryKey[0]).startsWith("/api/admin/subscriptions/owners"),

@@ -56,7 +56,6 @@ export {
   useUpdateOwnerBooking,
   useGetOwnerBookingAudit,
   useGetAdminBookingAudit,
-  useGetOwnerStats,
 } from "./manual-booking-api";
 export type {
   CreateManualBookingRequest,
@@ -65,9 +64,8 @@ export type {
   AuditLogEntry,
   GetOwnerBookingAuditResponse,
   GetAdminBookingAuditResponse,
-  OwnerStatsParams,
-  OwnerStatsResponse,
 } from "./manual-booking-api";
+export type { GetOwnerStatsParams as OwnerStatsParams } from "./generated/api.schemas";
 export {
   useListFavourites,
   useFavouriteIds,

@@ -32,6 +32,7 @@ export type OwnerSubscriptionCapabilitiesItem =
 
 export const OwnerSubscriptionCapabilitiesItem = {
   MANUAL_BOOKING: "MANUAL_BOOKING",
+  ADVANCED_ANALYTICS: "ADVANCED_ANALYTICS",
 } as const;
 
 export interface OwnerSubscription {
@@ -409,6 +410,18 @@ export interface PricingRuleInput {
   depositAmount?: string | null;
 }
 
+export interface VenueRankingMetadata {
+  /**
+   * @minimum 0
+   * @maximum 2
+   */
+  planBoost: number;
+  /** @minimum 0 */
+  minPlanBoost: number;
+  /** @minimum 0 */
+  maxPlanBoost: number;
+}
+
 export interface VenueSummary {
   id: string;
   name: string;
@@ -422,6 +435,17 @@ export interface VenueSummary {
   pitchTypes: PitchType[];
   status: VenueStatus;
   createdAt: string;
+  effectivePlan: SubscriptionPlan;
+  planBadgeLabel: string | null;
+  /** Compatibility field indicating whether the venue has a verified paid-plan badge. */
+  verified?: boolean;
+  /**
+   * Compatibility field exposing the venue's plan-based discovery boost.
+   * @minimum 0
+   */
+  discoveryBoost?: number;
+  badgeLabel: string | null;
+  rankingMetadata: VenueRankingMetadata;
 }
 
 export type OwnerVenueSummary = VenueSummary & {
@@ -430,10 +454,138 @@ export type OwnerVenueSummary = VenueSummary & {
 };
 
 export type VenueDetail = VenueRecord & {
+  effectivePlan: SubscriptionPlan;
+  planBadgeLabel: string | null;
+  /** Compatibility field indicating whether the venue has a verified paid-plan badge. */
+  verified?: boolean;
+  /**
+   * Compatibility field exposing the venue's plan-based discovery boost.
+   * @minimum 0
+   */
+  discoveryBoost?: number;
+  badgeLabel: string | null;
+  rankingMetadata: VenueRankingMetadata;
   photos: VenuePhoto[];
   pitches: PitchWithPricing[];
   openingHours: OpeningHoursRecord[];
 };
+
+export type OwnerStatsMetricConfidence =
+  (typeof OwnerStatsMetricConfidence)[keyof typeof OwnerStatsMetricConfidence];
+
+export const OwnerStatsMetricConfidence = {
+  insufficient: "insufficient",
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export interface OwnerStatsMetric {
+  value: number | null;
+  confidence: OwnerStatsMetricConfidence;
+  explanation: string;
+  definition: string;
+  /** @minimum 0 */
+  sampleSize: number;
+}
+
+export interface OwnerPremiumInsights {
+  retentionRate: OwnerStatsMetric;
+  repeatCustomerRate: OwnerStatsMetric;
+  cancellationTrend: OwnerStatsMetric;
+  revenueForecast: OwnerStatsMetric;
+}
+
+export interface OwnerPremiumMetrics {
+  retention: OwnerStatsMetric;
+  repeatCustomers: OwnerStatsMetric;
+  cancellationTrend: OwnerStatsMetric;
+  revenueForecast: OwnerStatsMetric;
+}
+
+export type OwnerPremiumAccessRequiredPlan =
+  (typeof OwnerPremiumAccessRequiredPlan)[keyof typeof OwnerPremiumAccessRequiredPlan];
+
+export const OwnerPremiumAccessRequiredPlan = {
+  PRO: "PRO",
+} as const;
+
+export interface OwnerPremiumAccess {
+  eligible: boolean;
+  effectivePlan: SubscriptionPlan;
+  locked: boolean;
+  requiredPlan: OwnerPremiumAccessRequiredPlan;
+  upgradeMessage: string | null;
+}
+
+export type OwnerPremiumAnalytics =
+  | {
+      locked: boolean;
+      requiredPlan: "PRO";
+      explanation: string;
+    }
+  | {
+      locked: boolean;
+      metrics: OwnerPremiumMetrics;
+    };
+
+export type OwnerStatsResponseByDayItem = {
+  date: string;
+  /** @minimum 0 */
+  count: number;
+};
+
+export type OwnerStatsResponseByHourItem = {
+  /**
+   * @minimum 0
+   * @maximum 23
+   */
+  hour: number;
+  /** @minimum 0 */
+  count: number;
+};
+
+export type OwnerStatsResponseByDayOfWeekItem = {
+  /**
+   * @minimum 0
+   * @maximum 6
+   */
+  day: number;
+  /** @minimum 0 */
+  count: number;
+};
+
+export type OwnerStatsResponseByPitchItem = {
+  pitchId: string;
+  pitchName: string;
+  /** @minimum 0 */
+  count: number;
+  revenue: number;
+};
+
+export type OwnerStatsResponseByStatusItem = {
+  status: string;
+  /** @minimum 0 */
+  count: number;
+};
+
+export interface OwnerStatsResponse {
+  /** @minimum 0 */
+  totalBookings: number;
+  totalRevenue: number;
+  avgRevenue: number;
+  platformFees: number;
+  netRevenue: number;
+  byDay: OwnerStatsResponseByDayItem[];
+  byHour: OwnerStatsResponseByHourItem[];
+  byDayOfWeek: OwnerStatsResponseByDayOfWeekItem[];
+  byPitch: OwnerStatsResponseByPitchItem[];
+  byStatus: OwnerStatsResponseByStatusItem[];
+  effectivePlan: SubscriptionPlan;
+  premiumAccess: OwnerPremiumAccess;
+  premiumInsights: OwnerPremiumInsights | null;
+  premiumAnalytics: OwnerPremiumAnalytics;
+}
 
 export interface AdminUserRecord {
   id: string;
@@ -940,6 +1092,17 @@ export type ListOwnerBookingsParams = {
 
 export type ListOwnerBookings200 = {
   bookings: BookingWithDetails[];
+};
+
+export type GetOwnerStatsParams = {
+  /**
+   * ISO 8601 datetime string. Include bookings starting at or after this value.
+   */
+  from?: string;
+  /**
+   * ISO 8601 datetime string. Include bookings starting at or before this value.
+   */
+  to?: string;
 };
 
 export type GetOwnerBooking200Booking = BookingWithDetails & {

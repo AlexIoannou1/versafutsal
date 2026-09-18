@@ -17,6 +17,7 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
 import { sendNotification } from "../lib/notifications";
 import { logBookingAudit } from "../lib/audit";
+import { reconcileSmsReminder } from "../lib/sms-reminders";
 
 const router: IRouter = Router();
 
@@ -565,6 +566,12 @@ router.post<{ id: string }>(
           metadata: { providerPaymentId: payment?.providerPaymentId },
         });
       });
+
+      try {
+        await reconcileSmsReminder(bookingId);
+      } catch (error) {
+        req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
+      }
 
       res.json({
         booking: {

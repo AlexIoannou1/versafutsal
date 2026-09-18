@@ -15,9 +15,15 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, lt, gt, inArray, desc, ne, or, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
-import { requireOwnerCapability } from "../lib/entitlements";
+import {
+  getOwnerEntitlements,
+  planHasCapability,
+  requireOwnerCapability,
+} from "../lib/entitlements";
+import { computeCollectedRevenue, computePremiumAnalytics } from "../lib/owner-analytics";
 import { paymentProvider } from "../lib/payment-provider";
 import { logBookingAuditFireAndForget, logBookingAudit } from "../lib/audit";
+import { reconcileSmsReminder } from "../lib/sms-reminders";
 
 const router: IRouter = Router();
 
@@ -816,6 +822,12 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
       },
     });
 
+    try {
+      await reconcileSmsReminder(booking.id);
+    } catch (error) {
+      req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId: booking.id }, "SMS reminder reconciliation failed");
+    }
+
     res.status(201).json({
       booking: {
         ...booking,
@@ -850,6 +862,25 @@ router.post("/owner/bookings/manual", requireAuth, requireRole("VENUE_OWNER"), r
 router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
     const { from, to } = req.query as { from?: string; to?: string };
+    const entitlements = await getOwnerEntitlements(req.user!.userId);
+    const hasAdvancedAnalytics = planHasCapability(
+      entitlements.effectivePlan,
+      "ADVANCED_ANALYTICS",
+    );
+    const lockedAnalytics = {
+      locked: true as const,
+      requiredPlan: "PRO" as const,
+      explanation: "Upgrade to Pro or Elite to access retention, repeat customer, cancellation trend, and revenue forecast metrics.",
+    };
+    const premiumAccess = {
+      eligible: hasAdvancedAnalytics,
+      effectivePlan: entitlements.effectivePlan,
+      locked: !hasAdvancedAnalytics,
+      requiredPlan: "PRO" as const,
+      upgradeMessage: hasAdvancedAnalytics
+        ? null
+        : "Upgrade to Pro or Elite to access retention, repeat customer, cancellation trend, and revenue forecast metrics.",
+    };
 
     const ownerVenues = await db
       .select({ id: venuesTable.id })
@@ -869,6 +900,14 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       byDayOfWeek: [] as { day: number; count: number }[],
       byPitch: [] as { pitchId: string; pitchName: string; count: number; revenue: number }[],
       byStatus: [] as { status: string; count: number }[],
+      effectivePlan: entitlements.effectivePlan,
+      premiumAccess,
+      premiumInsights: hasAdvancedAnalytics
+        ? toPremiumInsights(computePremiumAnalytics([], []))
+        : null,
+      premiumAnalytics: hasAdvancedAnalytics
+        ? { locked: false as const, metrics: computePremiumAnalytics([], []) }
+        : lockedAnalytics,
     };
 
     if (venueIds.length === 0) {
@@ -893,6 +932,7 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
         id: bookingsTable.id,
         startAt: bookingsTable.startAt,
         status: bookingsTable.status,
+        playerId: bookingsTable.playerId,
         pitchId: bookingsTable.pitchId,
         policySnapshot: bookingsTable.policySnapshot,
         pitchName: pitchesTable.name,
@@ -902,43 +942,75 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       .where(and(...conditions));
 
     if (rows.length === 0) {
-      res.json(emptyStats);
+      if (!hasAdvancedAnalytics) {
+        res.json(emptyStats);
+        return;
+      }
+      const historyRows = await db
+        .select({
+          id: bookingsTable.id,
+          playerId: bookingsTable.playerId,
+          guestPhone: bookingsTable.guestPhone,
+          startAt: bookingsTable.startAt,
+          status: bookingsTable.status,
+        })
+        .from(bookingsTable)
+        .where(inArray(bookingsTable.venueId, venueIds));
+      const metrics = await buildPremiumAnalytics(historyRows);
+      res.json({
+        ...emptyStats,
+        premiumInsights: toPremiumInsights(metrics),
+        premiumAnalytics: {
+          locked: false,
+          metrics,
+        },
+      });
       return;
     }
 
-    // ── Compute revenue ──────────────────────────────────────────────────────
-    function computeRevenue(row: (typeof rows)[0]): number {
-      const snapshot = row.policySnapshot as {
-        pricePerHour?: string | number | null;
-        slotDurationMinutes?: number;
-      } | null;
-      const price = parseFloat(String(snapshot?.pricePerHour ?? "0")) || 0;
-      const durationHours = ((snapshot?.slotDurationMinutes ?? 60)) / 60;
-      return price * durationHours;
-    }
-
-    // ── Total / avg ──────────────────────────────────────────────────────────
+    // ── Financial revenue: persisted successful payments, less successful refunds ──
     const totalBookings = rows.length;
     const confirmedRows = rows.filter((r) => r.status === "CONFIRMED");
-    const totalRevenue = confirmedRows.reduce((sum, r) => sum + computeRevenue(r), 0);
-    const avgRevenue = confirmedRows.length > 0 ? totalRevenue / confirmedRows.length : 0;
-
-    // ── Platform fees (from stored payment records, not recalculated) ────────
     const bookingIds = rows.map((r) => r.id);
     const paymentRows = bookingIds.length
       ? await db
           .select({
+            id: paymentsTable.id,
             bookingId: paymentsTable.bookingId,
+            amount: paymentsTable.amount,
             feeAmount: paymentsTable.feeAmount,
             status: paymentsTable.status,
           })
           .from(paymentsTable)
           .where(inArray(paymentsTable.bookingId, bookingIds))
       : [];
-    const platformFees = paymentRows
-      .filter((p) => p.status === "SUCCEEDED" || p.status === "PARTIALLY_REFUNDED")
-      .reduce((sum, p) => sum + (parseFloat(p.feeAmount) || 0), 0);
-    const netRevenue = totalRevenue - platformFees;
+    const paymentIds = paymentRows.map((payment) => payment.id);
+    const successfulRefunds = paymentIds.length
+      ? await db
+          .select({ paymentId: refundsTable.paymentId, amount: refundsTable.amount })
+          .from(refundsTable)
+          .where(and(
+            inArray(refundsTable.paymentId, paymentIds),
+            eq(refundsTable.status, "SUCCEEDED"),
+          ))
+      : [];
+    const refundedByPayment = new Map<string, number>();
+    for (const refund of successfulRefunds) {
+      refundedByPayment.set(
+        refund.paymentId,
+        (refundedByPayment.get(refund.paymentId) ?? 0) + (parseFloat(refund.amount) || 0),
+      );
+    }
+    const financials = computeCollectedRevenue(paymentRows.map((payment) => ({
+      bookingId: payment.bookingId,
+      amount: parseFloat(payment.amount) || 0,
+      feeAmount: parseFloat(payment.feeAmount) || 0,
+      status: payment.status,
+      refundedAmount: refundedByPayment.get(payment.id) ?? 0,
+    })));
+    const { totalRevenue, platformFees, netRevenue } = financials;
+    // Average remains per confirmed booking, so unpaid/manual confirmations are zero-valued.
+    const avgRevenue = confirmedRows.length > 0 ? totalRevenue / confirmedRows.length : 0;
 
     // ── By day (YYYY-MM-DD) ──────────────────────────────────────────────────
     const dayMap = new Map<string, number>();
@@ -977,7 +1049,7 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       pitchMap.set(r.pitchId, {
         pitchName: r.pitchName,
         count: prev.count + 1,
-        revenue: prev.revenue + (r.status === "CONFIRMED" ? computeRevenue(r) : 0),
+          revenue: prev.revenue + (financials.revenueByBooking.get(r.id) ?? 0),
       });
     }
     const byPitch = Array.from(pitchMap.entries())
@@ -993,6 +1065,29 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       .map(([status, count]) => ({ status, count }))
       .sort((a, b) => b.count - a.count);
 
+    let premiumAnalytics:
+      | typeof lockedAnalytics
+      | { locked: false; metrics: ReturnType<typeof computePremiumAnalytics> } = lockedAnalytics;
+    if (hasAdvancedAnalytics) {
+      const historyRows = await db
+        .select({
+          id: bookingsTable.id,
+          playerId: bookingsTable.playerId,
+          guestPhone: bookingsTable.guestPhone,
+          startAt: bookingsTable.startAt,
+          status: bookingsTable.status,
+        })
+        .from(bookingsTable)
+        .where(inArray(bookingsTable.venueId, venueIds));
+      premiumAnalytics = {
+        locked: false,
+        metrics: await buildPremiumAnalytics(historyRows),
+      };
+    }
+    const premiumInsights = premiumAnalytics.locked
+      ? null
+      : toPremiumInsights(premiumAnalytics.metrics);
+
     res.json({
       totalBookings,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
@@ -1004,10 +1099,81 @@ router.get("/owner/stats", requireAuth, requireRole("VENUE_OWNER"), async (req, 
       byDayOfWeek,
       byPitch,
       byStatus,
+      effectivePlan: entitlements.effectivePlan,
+      premiumAccess,
+      premiumInsights,
+      premiumAnalytics,
     });
   } catch (err) {
-    console.error("GET /owner/stats error:", err);
+    req.log.error({ err, ownerId: req.user?.userId }, "GET /owner/stats failed");
     res.status(500).json({ error: "Internal server error" });
+  }
+
+  async function buildPremiumAnalytics(
+    historyRows: {
+      id: string;
+      playerId: string;
+      guestPhone: string | null;
+      startAt: Date;
+      status: string;
+    }[],
+  ) {
+    const bookingIds = historyRows.map((row) => row.id);
+    if (bookingIds.length === 0) return computePremiumAnalytics([], []);
+    const historyPayments = await db
+      .select({
+        id: paymentsTable.id,
+        bookingId: paymentsTable.bookingId,
+        createdAt: paymentsTable.createdAt,
+        amount: paymentsTable.amount,
+        feeAmount: paymentsTable.feeAmount,
+        status: paymentsTable.status,
+      })
+      .from(paymentsTable)
+      .where(inArray(paymentsTable.bookingId, bookingIds));
+    const paymentIds = historyPayments.map((payment) => payment.id);
+    const successfulRefunds = paymentIds.length
+      ? await db
+          .select({
+            paymentId: refundsTable.paymentId,
+            amount: refundsTable.amount,
+          })
+          .from(refundsTable)
+          .where(and(
+            inArray(refundsTable.paymentId, paymentIds),
+            eq(refundsTable.status, "SUCCEEDED"),
+          ))
+      : [];
+    const refundedByPayment = new Map<string, number>();
+    for (const refund of successfulRefunds) {
+      refundedByPayment.set(
+        refund.paymentId,
+        (refundedByPayment.get(refund.paymentId) ?? 0) + (parseFloat(refund.amount) || 0),
+      );
+    }
+    return computePremiumAnalytics(
+      historyRows.map((row) => ({
+        ...row,
+        customerId: row.guestPhone
+          ? `guest:${row.guestPhone.replace(/\s+/g, "")}`
+          : `player:${row.playerId}`,
+      })),
+      historyPayments.map((payment) => ({
+        ...payment,
+        amount: parseFloat(payment.amount) || 0,
+        feeAmount: parseFloat(payment.feeAmount) || 0,
+        refundedAmount: refundedByPayment.get(payment.id) ?? 0,
+      })),
+    );
+  }
+
+  function toPremiumInsights(metrics: ReturnType<typeof computePremiumAnalytics>) {
+    return {
+      retentionRate: metrics.retention,
+      repeatCustomerRate: metrics.repeatCustomers,
+      cancellationTrend: metrics.cancellationTrend,
+      revenueForecast: metrics.revenueForecast,
+    };
   }
 });
 
@@ -1538,6 +1704,12 @@ router.put<{ id: string }>(
         metadata: { actorEmail: req.user!.email },
       });
 
+      try {
+        await reconcileSmsReminder(updated.id);
+      } catch (error) {
+        req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId: updated.id }, "SMS reminder reconciliation failed");
+      }
+
       res.json({ booking: enrichBooking(fullRow!) });
     } catch (err) {
       console.error("PUT /owner/bookings/:id error:", err);
@@ -1776,6 +1948,12 @@ router.post<{ id: string }>(
           });
         }
       });
+
+      try {
+        await reconcileSmsReminder(bookingId);
+      } catch (error) {
+        req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
+      }
 
       res.json({
         booking: {

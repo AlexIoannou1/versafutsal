@@ -7,3 +7,4 @@ export * from "./notifications";
 export * from "./login-rate-limit";
 export * from "./password-reset-tokens";
 export * from "./subscriptions";
+export * from "./sms-reminders";

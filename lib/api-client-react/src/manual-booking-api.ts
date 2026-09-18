@@ -108,38 +108,3 @@ export function useGetAdminBookingAudit(bookingId: string) {
     enabled: !!bookingId,
   });
 }
-
-// ─── Owner Stats ──────────────────────────────────────────────────────────────
-
-export interface OwnerStatsParams {
-  from?: string;
-  to?: string;
-}
-
-export interface OwnerStatsResponse {
-  totalBookings: number;
-  totalRevenue: number;
-  avgRevenue: number;
-  platformFees: number;
-  netRevenue: number;
-  byDay: { date: string; count: number }[];
-  byHour: { hour: number; count: number }[];
-  byDayOfWeek: { day: number; count: number }[];
-  byPitch: { pitchId: string; pitchName: string; count: number; revenue: number }[];
-  byStatus: { status: string; count: number }[];
-}
-
-async function getOwnerStats(params: OwnerStatsParams): Promise<OwnerStatsResponse> {
-  const qs = new URLSearchParams();
-  if (params.from) qs.set("from", params.from);
-  if (params.to) qs.set("to", params.to);
-  const query = qs.toString();
-  return customFetch<OwnerStatsResponse>(`/api/owner/stats${query ? `?${query}` : ""}`);
-}
-
-export function useGetOwnerStats(params: OwnerStatsParams) {
-  return useQuery({
-    queryKey: ["ownerStats", params.from, params.to],
-    queryFn: () => getOwnerStats(params),
-  });
-}

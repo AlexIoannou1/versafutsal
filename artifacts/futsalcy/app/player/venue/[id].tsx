@@ -52,6 +52,10 @@ function formatSlotTime(iso: string): string {
 }
 
 type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
+type VenuePlanCompatibility = {
+  effectivePlan?: string | null;
+  planBadgeLabel?: string | null;
+};
 
 const TYPE_ICONS: Record<string, FeatherName> = {
   INDOOR: "home",
@@ -535,6 +539,24 @@ export default function PlayerVenueDetailScreen() {
       justifyContent: "space-between",
     },
     venueTitleFlex: { flex: 1 },
+    venueNameRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
+    verifiedBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.primary + "45",
+      backgroundColor: colors.primary + "10",
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginBottom: 6,
+    },
+    verifiedBadgeText: {
+      fontSize: 11,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.primary,
+    },
     heartBtn: {
       padding: 6,
       marginLeft: 12,
@@ -592,6 +614,12 @@ export default function PlayerVenueDetailScreen() {
     isClosed: boolean;
   }>) ?? [];
   const amenities = (venue.amenities as string[]) ?? [];
+  const planVenue = venue as VenueDetail & VenuePlanCompatibility;
+  const effectivePlan = planVenue.effectivePlan?.toUpperCase();
+  const planBadgeLabel =
+    effectivePlan === "PRO" || effectivePlan === "ELITE"
+      ? planVenue.planBadgeLabel?.trim() || `Verified ${effectivePlan === "PRO" ? "Pro" : "Elite"}`
+      : null;
   const safePhotoIndex = Math.max(0, Math.min(photoIndex, photos.length - 1));
   const currentPhoto = photos[safePhotoIndex];
 
@@ -657,7 +685,15 @@ export default function PlayerVenueDetailScreen() {
         <View style={s.body}>
           <View style={s.venueHeaderRow}>
             <View style={s.venueTitleFlex}>
-              <Text style={s.venueName}>{String(venue.name)}</Text>
+              <View style={s.venueNameRow}>
+                <Text style={s.venueName}>{String(venue.name)}</Text>
+                {planBadgeLabel ? (
+                  <View style={s.verifiedBadge} accessible accessibilityLabel={planBadgeLabel}>
+                    <FeatherIcons name="check-circle" size={12} color={colors.primary} />
+                    <Text style={s.verifiedBadgeText}>{planBadgeLabel}</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
             <MotionPressable
               style={s.heartBtn}

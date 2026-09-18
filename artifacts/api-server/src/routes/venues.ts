@@ -13,6 +13,7 @@ import {
   maintenanceBlocksTable,
   availabilityBlocksTable,
   bookingsTable,
+  ownerSubscriptionsTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, inArray, sql, gt, or, isNull, asc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -28,6 +29,11 @@ import {
   removeVenuePhoto,
   saveVenuePhoto,
 } from "../lib/venue-photo-storage";
+import { resolveEffectivePlan } from "../lib/entitlements";
+import {
+  getVenueDiscoveryMetadata,
+  rankVenuesWithBoundedPlanBoost,
+} from "../lib/venue-discovery";
 
 const router: IRouter = Router();
 
@@ -183,7 +189,7 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
 
   if (!venue) return null;
 
-  const [photos, pitches, hours] = await Promise.all([
+  const [photos, pitches, hours, subscriptions] = await Promise.all([
     db
       .select()
       .from(venuePhotosTable)
@@ -191,6 +197,7 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
       .orderBy(asc(venuePhotosTable.sortOrder), asc(venuePhotosTable.createdAt)),
     db.select().from(pitchesTable).where(eq(pitchesTable.venueId, venueId)),
     db.select().from(openingHoursTable).where(eq(openingHoursTable.venueId, venueId)),
+    db.select().from(ownerSubscriptionsTable).where(eq(ownerSubscriptionsTable.ownerId, venue.ownerId)).limit(1),
   ]);
 
   const pitchIds = pitches.map((p) => p.id);
@@ -218,7 +225,8 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
   }));
 
   const signedPhotos = await signPhotoList(photos, ownerPreviewForId);
-  return { ...venue, photos: signedPhotos, pitches: pitchesWithPricing, openingHours: hours };
+  const discovery = getVenueDiscoveryMetadata(resolveEffectivePlan(subscriptions[0]));
+  return { ...venue, ...discovery, photos: signedPhotos, pitches: pitchesWithPricing, openingHours: hours };
 }
 
 function assertOwnsVenue(venueOwnerId: string, userId: string, res: Response): boolean {
@@ -270,6 +278,17 @@ router.get("/venues", async (req, res) => {
     }
 
     const venueIds = filteredVenues.map((v) => v.id);
+    const ownerIds = [...new Set(filteredVenues.map((v) => v.ownerId))];
+    const subscriptions = await db
+      .select()
+      .from(ownerSubscriptionsTable)
+      .where(inArray(ownerSubscriptionsTable.ownerId, ownerIds));
+    const planByOwner = new Map(
+      subscriptions.map((subscription) => [
+        subscription.ownerId,
+        resolveEffectivePlan(subscription),
+      ]),
+    );
 
     // Get photos (first photo per venue)
     const photos = await db
@@ -318,6 +337,7 @@ router.get("/venues", async (req, res) => {
       const priceRange = priceRangeMap.get(v.id);
       return {
         ...v,
+        ...getVenueDiscoveryMetadata(planByOwner.get(v.ownerId) ?? "FREE"),
         coverPhoto: photoMap.get(v.id) ?? null,
         photos: photosGroupMap.get(v.id) ?? [],
         minPrice: priceRange?.minPrice ? parseFloat(priceRange.minPrice) : null,
@@ -334,6 +354,7 @@ router.get("/venues", async (req, res) => {
       const max = parseFloat(maxPrice);
       venues = venues.filter((v) => v.minPrice !== null && v.minPrice <= max);
     }
+    venues = rankVenuesWithBoundedPlanBoost(venues);
 
     // Sign cover photo URLs and all photo URLs for object-storage photos
     const signedVenues = await Promise.all(
@@ -350,7 +371,7 @@ router.get("/venues", async (req, res) => {
 
     res.json({ venues: signedVenues });
   } catch (err) {
-    console.error("GET /venues error:", err);
+    req.log.error({ err }, "GET /venues failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -369,7 +390,7 @@ router.get<{ id: string }>("/venues/:id", async (req, res) => {
     }
     res.json({ venue });
   } catch (err) {
-    console.error("GET /venues/:id error:", err);
+    req.log.error({ err, venueId: req.params.id }, "GET /venues/:id failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -433,10 +454,16 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
       return;
     }
 
-    const [photos, pitches] = await Promise.all([
+    const [photos, pitches, subscription] = await Promise.all([
       db.select().from(venuePhotosTable).where(inArray(venuePhotosTable.venueId, venueIds)),
       db.select().from(pitchesTable).where(inArray(pitchesTable.venueId, venueIds)),
+      db
+        .select()
+        .from(ownerSubscriptionsTable)
+        .where(eq(ownerSubscriptionsTable.ownerId, req.user!.userId))
+        .limit(1),
     ]);
+    const discovery = getVenueDiscoveryMetadata(resolveEffectivePlan(subscription[0]));
 
     const photoMap = new Map<string, string>();
     for (const p of photos.sort((a, b) => a.sortOrder - b.sortOrder)) {
@@ -452,6 +479,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
         const rawCover = photoMap.get(v.id) ?? null;
         return {
           ...v,
+          ...discovery,
           coverPhoto: rawCover
             ? await signPhotoUrl(
                 photos.find((photo) => photo.venueId === v.id && photo.url === rawCover)!,
@@ -464,7 +492,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
     );
     res.json({ venues: signedOwnerVenues });
   } catch (err) {
-    console.error("GET /owner/venues error:", err);
+    req.log.error({ err, ownerId: req.user?.userId }, "GET /owner/venues failed");
     res.status(500).json({ error: "Internal server error" });
   }
 });

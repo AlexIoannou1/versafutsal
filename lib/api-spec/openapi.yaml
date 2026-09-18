@@ -955,6 +955,44 @@ paths:
                       $ref: "#/components/schemas/BookingWithDetails"
                 required: [bookings]
 
+  /owner/stats:
+    get:
+      operationId: getOwnerStats
+      tags: [bookings]
+      summary: Get booking and revenue analytics for the current venue owner
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+          description: ISO 8601 datetime string. Include bookings starting at or after this value.
+        - name: to
+          in: query
+          schema:
+            type: string
+          description: ISO 8601 datetime string. Include bookings starting at or before this value.
+      responses:
+        "200":
+          description: Owner booking and revenue analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerStatsResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Venue owner role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
   /owner/bookings/{id}:
     get:
       operationId: getOwnerBooking
@@ -2018,7 +2056,7 @@ components:
           type: array
           items:
             type: string
-            enum: [MANUAL_BOOKING]
+            enum: [MANUAL_BOOKING, ADVANCED_ANALYTICS]
         billingConfigured:
           type: boolean
       required: [plan, effectivePlan, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, overridePlan, overrideReason, overrideStartsAt, overrideEndsAt, capabilities, billingConfigured]
@@ -2592,7 +2630,24 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, name, district, address, amenities, photos, pitchTypes, status, createdAt]
+        effectivePlan:
+          $ref: "#/components/schemas/SubscriptionPlan"
+        planBadgeLabel:
+          type: string
+          nullable: true
+        verified:
+          type: boolean
+          description: Compatibility field indicating whether the venue has a verified paid-plan badge.
+        discoveryBoost:
+          type: integer
+          minimum: 0
+          description: Compatibility field exposing the venue's plan-based discovery boost.
+        badgeLabel:
+          type: string
+          nullable: true
+        rankingMetadata:
+          $ref: "#/components/schemas/VenueRankingMetadata"
+      required: [id, name, district, address, amenities, photos, pitchTypes, status, createdAt, effectivePlan, planBadgeLabel, badgeLabel, rankingMetadata]
 
     OwnerVenueSummary:
       allOf:
@@ -2611,6 +2666,23 @@ components:
         - $ref: "#/components/schemas/VenueRecord"
         - type: object
           properties:
+            effectivePlan:
+              $ref: "#/components/schemas/SubscriptionPlan"
+            planBadgeLabel:
+              type: string
+              nullable: true
+            verified:
+              type: boolean
+              description: Compatibility field indicating whether the venue has a verified paid-plan badge.
+            discoveryBoost:
+              type: integer
+              minimum: 0
+              description: Compatibility field exposing the venue's plan-based discovery boost.
+            badgeLabel:
+              type: string
+              nullable: true
+            rankingMetadata:
+              $ref: "#/components/schemas/VenueRankingMetadata"
             photos:
               type: array
               items:
@@ -2623,7 +2695,196 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/OpeningHoursRecord"
-          required: [photos, pitches, openingHours]
+          required: [effectivePlan, planBadgeLabel, badgeLabel, rankingMetadata, photos, pitches, openingHours]
+
+    VenueRankingMetadata:
+      type: object
+      properties:
+        planBoost:
+          type: integer
+          minimum: 0
+          maximum: 2
+        minPlanBoost:
+          type: integer
+          minimum: 0
+        maxPlanBoost:
+          type: integer
+          minimum: 0
+      required: [planBoost, minPlanBoost, maxPlanBoost]
+
+    OwnerStatsMetric:
+      type: object
+      properties:
+        value:
+          type: number
+          nullable: true
+        confidence:
+          type: string
+          enum: [insufficient, low, medium, high]
+        explanation:
+          type: string
+        definition:
+          type: string
+        sampleSize:
+          type: integer
+          minimum: 0
+      required: [value, confidence, explanation, definition, sampleSize]
+
+    OwnerPremiumInsights:
+      type: object
+      properties:
+        retentionRate:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+        repeatCustomerRate:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+        cancellationTrend:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+        revenueForecast:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+      required: [retentionRate, repeatCustomerRate, cancellationTrend, revenueForecast]
+
+    OwnerPremiumMetrics:
+      type: object
+      properties:
+        retention:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+        repeatCustomers:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+        cancellationTrend:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+        revenueForecast:
+          $ref: "#/components/schemas/OwnerStatsMetric"
+      required: [retention, repeatCustomers, cancellationTrend, revenueForecast]
+
+    OwnerPremiumAccess:
+      type: object
+      properties:
+        eligible:
+          type: boolean
+        effectivePlan:
+          $ref: "#/components/schemas/SubscriptionPlan"
+        locked:
+          type: boolean
+        requiredPlan:
+          type: string
+          enum: [PRO]
+        upgradeMessage:
+          type: string
+          nullable: true
+      required: [eligible, effectivePlan, locked, requiredPlan, upgradeMessage]
+
+    OwnerPremiumAnalytics:
+      oneOf:
+        - type: object
+          properties:
+            locked:
+              type: boolean
+              enum: [true]
+            requiredPlan:
+              type: string
+              enum: [PRO]
+            explanation:
+              type: string
+          required: [locked, requiredPlan, explanation]
+        - type: object
+          properties:
+            locked:
+              type: boolean
+              enum: [false]
+            metrics:
+              $ref: "#/components/schemas/OwnerPremiumMetrics"
+          required: [locked, metrics]
+
+    OwnerStatsResponse:
+      type: object
+      properties:
+        totalBookings:
+          type: integer
+          minimum: 0
+        totalRevenue:
+          type: number
+        avgRevenue:
+          type: number
+        platformFees:
+          type: number
+        netRevenue:
+          type: number
+        byDay:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+                minimum: 0
+            required: [date, count]
+        byHour:
+          type: array
+          items:
+            type: object
+            properties:
+              hour:
+                type: integer
+                minimum: 0
+                maximum: 23
+              count:
+                type: integer
+                minimum: 0
+            required: [hour, count]
+        byDayOfWeek:
+          type: array
+          items:
+            type: object
+            properties:
+              day:
+                type: integer
+                minimum: 0
+                maximum: 6
+              count:
+                type: integer
+                minimum: 0
+            required: [day, count]
+        byPitch:
+          type: array
+          items:
+            type: object
+            properties:
+              pitchId:
+                type: string
+                format: uuid
+              pitchName:
+                type: string
+              count:
+                type: integer
+                minimum: 0
+              revenue:
+                type: number
+            required: [pitchId, pitchName, count, revenue]
+        byStatus:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+                minimum: 0
+            required: [status, count]
+        effectivePlan:
+          $ref: "#/components/schemas/SubscriptionPlan"
+        premiumAccess:
+          $ref: "#/components/schemas/OwnerPremiumAccess"
+        premiumInsights:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/OwnerPremiumInsights"
+        premiumAnalytics:
+          $ref: "#/components/schemas/OwnerPremiumAnalytics"
+      required: [totalBookings, totalRevenue, avgRevenue, platformFees, netRevenue, byDay, byHour, byDayOfWeek, byPitch, byStatus, effectivePlan, premiumAccess, premiumInsights, premiumAnalytics]
 
     AdminUserRecord:
       type: object

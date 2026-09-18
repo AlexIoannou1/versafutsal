@@ -51,6 +51,7 @@ import type {
   GetCheckoutFeeParams,
   GetOwnerBooking200,
   GetOwnerBookingAudit200,
+  GetOwnerStatsParams,
   GetOwnerSubscription200,
   GetOwnerVenue200,
   GetPitchAvailability200,
@@ -70,6 +71,7 @@ import type {
   ListVenuesParams,
   LoginRequest,
   MeResponse,
+  OwnerStatsResponse,
   OwnerSubscriptionAdminDetail,
   PasswordChangeRequest,
   PasswordChangeResponse,
@@ -2759,6 +2761,100 @@ export function useListOwnerBookings<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListOwnerBookingsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get booking and revenue analytics for the current venue owner
+ */
+export const getGetOwnerStatsUrl = (params?: GetOwnerStatsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/owner/stats?${stringifiedParams}`
+    : `/api/owner/stats`;
+};
+
+export const getOwnerStats = async (
+  params?: GetOwnerStatsParams,
+  options?: RequestInit,
+): Promise<OwnerStatsResponse> => {
+  return customFetch<OwnerStatsResponse>(getGetOwnerStatsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOwnerStatsQueryKey = (params?: GetOwnerStatsParams) => {
+  return [`/api/owner/stats`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetOwnerStatsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerStats>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: GetOwnerStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOwnerStatsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getOwnerStats>>> = ({
+    signal,
+  }) => getOwnerStats(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerStats>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerStatsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerStats>>
+>;
+export type GetOwnerStatsQueryError = ErrorType<ApiError>;
+
+/**
+ * @summary Get booking and revenue analytics for the current venue owner
+ */
+
+export function useGetOwnerStats<
+  TData = Awaited<ReturnType<typeof getOwnerStats>>,
+  TError = ErrorType<ApiError>,
+>(
+  params?: GetOwnerStatsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getOwnerStats>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerStatsQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

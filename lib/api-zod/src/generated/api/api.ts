@@ -226,6 +226,15 @@ export const ListVenuesQueryParams = zod.object({
   maxPrice: zod.coerce.number().optional(),
 });
 
+export const listVenuesResponseVenuesItemDiscoveryBoostMin = 0;
+
+export const listVenuesResponseVenuesItemRankingMetadataPlanBoostMin = 0;
+export const listVenuesResponseVenuesItemRankingMetadataPlanBoostMax = 2;
+
+export const listVenuesResponseVenuesItemRankingMetadataMinPlanBoostMin = 0;
+
+export const listVenuesResponseVenuesItemRankingMetadataMaxPlanBoostMin = 0;
+
 export const ListVenuesResponse = zod.object({
   venues: zod.array(
     zod.object({
@@ -249,6 +258,34 @@ export const ListVenuesResponse = zod.object({
       pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
       status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
       createdAt: zod.coerce.date(),
+      effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+      planBadgeLabel: zod.string().nullable(),
+      verified: zod
+        .boolean()
+        .optional()
+        .describe(
+          "Compatibility field indicating whether the venue has a verified paid-plan badge.",
+        ),
+      discoveryBoost: zod
+        .number()
+        .min(listVenuesResponseVenuesItemDiscoveryBoostMin)
+        .optional()
+        .describe(
+          "Compatibility field exposing the venue's plan-based discovery boost.",
+        ),
+      badgeLabel: zod.string().nullable(),
+      rankingMetadata: zod.object({
+        planBoost: zod
+          .number()
+          .min(listVenuesResponseVenuesItemRankingMetadataPlanBoostMin)
+          .max(listVenuesResponseVenuesItemRankingMetadataPlanBoostMax),
+        minPlanBoost: zod
+          .number()
+          .min(listVenuesResponseVenuesItemRankingMetadataMinPlanBoostMin),
+        maxPlanBoost: zod
+          .number()
+          .min(listVenuesResponseVenuesItemRankingMetadataMaxPlanBoostMin),
+      }),
     }),
   ),
 });
@@ -259,6 +296,15 @@ export const ListVenuesResponse = zod.object({
 export const GetVenueParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
+
+export const getVenueResponseVenueTwoDiscoveryBoostMin = 0;
+
+export const getVenueResponseVenueTwoRankingMetadataPlanBoostMin = 0;
+export const getVenueResponseVenueTwoRankingMetadataPlanBoostMax = 2;
+
+export const getVenueResponseVenueTwoRankingMetadataMinPlanBoostMin = 0;
+
+export const getVenueResponseVenueTwoRankingMetadataMaxPlanBoostMin = 0;
 
 export const getVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin = 0;
 export const getVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax = 6;
@@ -283,6 +329,34 @@ export const GetVenueResponse = zod.object({
     })
     .and(
       zod.object({
+        effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+        planBadgeLabel: zod.string().nullable(),
+        verified: zod
+          .boolean()
+          .optional()
+          .describe(
+            "Compatibility field indicating whether the venue has a verified paid-plan badge.",
+          ),
+        discoveryBoost: zod
+          .number()
+          .min(getVenueResponseVenueTwoDiscoveryBoostMin)
+          .optional()
+          .describe(
+            "Compatibility field exposing the venue's plan-based discovery boost.",
+          ),
+        badgeLabel: zod.string().nullable(),
+        rankingMetadata: zod.object({
+          planBoost: zod
+            .number()
+            .min(getVenueResponseVenueTwoRankingMetadataPlanBoostMin)
+            .max(getVenueResponseVenueTwoRankingMetadataPlanBoostMax),
+          minPlanBoost: zod
+            .number()
+            .min(getVenueResponseVenueTwoRankingMetadataMinPlanBoostMin),
+          maxPlanBoost: zod
+            .number()
+            .min(getVenueResponseVenueTwoRankingMetadataMaxPlanBoostMin),
+        }),
         photos: zod.array(
           zod.object({
             id: zod.string().uuid(),
@@ -348,6 +422,15 @@ export const GetVenueResponse = zod.object({
 /**
  * @summary List venues owned by current user
  */
+export const listOwnerVenuesResponseVenuesItemOneDiscoveryBoostMin = 0;
+
+export const listOwnerVenuesResponseVenuesItemOneRankingMetadataPlanBoostMin = 0;
+export const listOwnerVenuesResponseVenuesItemOneRankingMetadataPlanBoostMax = 2;
+
+export const listOwnerVenuesResponseVenuesItemOneRankingMetadataMinPlanBoostMin = 0;
+
+export const listOwnerVenuesResponseVenuesItemOneRankingMetadataMaxPlanBoostMin = 0;
+
 export const ListOwnerVenuesResponse = zod.object({
   venues: zod.array(
     zod
@@ -372,6 +455,42 @@ export const ListOwnerVenuesResponse = zod.object({
         pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
         status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
         createdAt: zod.coerce.date(),
+        effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+        planBadgeLabel: zod.string().nullable(),
+        verified: zod
+          .boolean()
+          .optional()
+          .describe(
+            "Compatibility field indicating whether the venue has a verified paid-plan badge.",
+          ),
+        discoveryBoost: zod
+          .number()
+          .min(listOwnerVenuesResponseVenuesItemOneDiscoveryBoostMin)
+          .optional()
+          .describe(
+            "Compatibility field exposing the venue's plan-based discovery boost.",
+          ),
+        badgeLabel: zod.string().nullable(),
+        rankingMetadata: zod.object({
+          planBoost: zod
+            .number()
+            .min(
+              listOwnerVenuesResponseVenuesItemOneRankingMetadataPlanBoostMin,
+            )
+            .max(
+              listOwnerVenuesResponseVenuesItemOneRankingMetadataPlanBoostMax,
+            ),
+          minPlanBoost: zod
+            .number()
+            .min(
+              listOwnerVenuesResponseVenuesItemOneRankingMetadataMinPlanBoostMin,
+            ),
+          maxPlanBoost: zod
+            .number()
+            .min(
+              listOwnerVenuesResponseVenuesItemOneRankingMetadataMaxPlanBoostMin,
+            ),
+        }),
       })
       .and(
         zod.object({
@@ -431,6 +550,15 @@ export const GetOwnerVenueParams = zod.object({
   id: zod.coerce.string().uuid(),
 });
 
+export const getOwnerVenueResponseVenueTwoDiscoveryBoostMin = 0;
+
+export const getOwnerVenueResponseVenueTwoRankingMetadataPlanBoostMin = 0;
+export const getOwnerVenueResponseVenueTwoRankingMetadataPlanBoostMax = 2;
+
+export const getOwnerVenueResponseVenueTwoRankingMetadataMinPlanBoostMin = 0;
+
+export const getOwnerVenueResponseVenueTwoRankingMetadataMaxPlanBoostMin = 0;
+
 export const getOwnerVenueResponseVenueTwoOpeningHoursItemDayOfWeekMin = 0;
 export const getOwnerVenueResponseVenueTwoOpeningHoursItemDayOfWeekMax = 6;
 
@@ -454,6 +582,34 @@ export const GetOwnerVenueResponse = zod.object({
     })
     .and(
       zod.object({
+        effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+        planBadgeLabel: zod.string().nullable(),
+        verified: zod
+          .boolean()
+          .optional()
+          .describe(
+            "Compatibility field indicating whether the venue has a verified paid-plan badge.",
+          ),
+        discoveryBoost: zod
+          .number()
+          .min(getOwnerVenueResponseVenueTwoDiscoveryBoostMin)
+          .optional()
+          .describe(
+            "Compatibility field exposing the venue's plan-based discovery boost.",
+          ),
+        badgeLabel: zod.string().nullable(),
+        rankingMetadata: zod.object({
+          planBoost: zod
+            .number()
+            .min(getOwnerVenueResponseVenueTwoRankingMetadataPlanBoostMin)
+            .max(getOwnerVenueResponseVenueTwoRankingMetadataPlanBoostMax),
+          minPlanBoost: zod
+            .number()
+            .min(getOwnerVenueResponseVenueTwoRankingMetadataMinPlanBoostMin),
+          maxPlanBoost: zod
+            .number()
+            .min(getOwnerVenueResponseVenueTwoRankingMetadataMaxPlanBoostMin),
+        }),
         photos: zod.array(
           zod.object({
             id: zod.string().uuid(),
@@ -1086,6 +1242,216 @@ export const ListOwnerBookingsResponse = zod.object({
         }),
       ),
   ),
+});
+
+/**
+ * @summary Get booking and revenue analytics for the current venue owner
+ */
+export const GetOwnerStatsQueryParams = zod.object({
+  from: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "ISO 8601 datetime string. Include bookings starting at or after this value.",
+    ),
+  to: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "ISO 8601 datetime string. Include bookings starting at or before this value.",
+    ),
+});
+
+export const getOwnerStatsResponseTotalBookingsMin = 0;
+
+export const getOwnerStatsResponseByDayItemCountMin = 0;
+
+export const getOwnerStatsResponseByHourItemHourMin = 0;
+export const getOwnerStatsResponseByHourItemHourMax = 23;
+
+export const getOwnerStatsResponseByHourItemCountMin = 0;
+
+export const getOwnerStatsResponseByDayOfWeekItemDayMin = 0;
+export const getOwnerStatsResponseByDayOfWeekItemDayMax = 6;
+
+export const getOwnerStatsResponseByDayOfWeekItemCountMin = 0;
+
+export const getOwnerStatsResponseByPitchItemCountMin = 0;
+
+export const getOwnerStatsResponseByStatusItemCountMin = 0;
+
+export const getOwnerStatsResponsePremiumInsightsOneRetentionRateSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumInsightsOneRepeatCustomerRateSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumInsightsOneCancellationTrendSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumInsightsOneRevenueForecastSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumAnalyticsTwoMetricsRetentionSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumAnalyticsTwoMetricsRepeatCustomersSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumAnalyticsTwoMetricsCancellationTrendSampleSizeMin = 0;
+
+export const getOwnerStatsResponsePremiumAnalyticsTwoMetricsRevenueForecastSampleSizeMin = 0;
+
+export const GetOwnerStatsResponse = zod.object({
+  totalBookings: zod.number().min(getOwnerStatsResponseTotalBookingsMin),
+  totalRevenue: zod.number(),
+  avgRevenue: zod.number(),
+  platformFees: zod.number(),
+  netRevenue: zod.number(),
+  byDay: zod.array(
+    zod.object({
+      date: zod.coerce.date(),
+      count: zod.number().min(getOwnerStatsResponseByDayItemCountMin),
+    }),
+  ),
+  byHour: zod.array(
+    zod.object({
+      hour: zod
+        .number()
+        .min(getOwnerStatsResponseByHourItemHourMin)
+        .max(getOwnerStatsResponseByHourItemHourMax),
+      count: zod.number().min(getOwnerStatsResponseByHourItemCountMin),
+    }),
+  ),
+  byDayOfWeek: zod.array(
+    zod.object({
+      day: zod
+        .number()
+        .min(getOwnerStatsResponseByDayOfWeekItemDayMin)
+        .max(getOwnerStatsResponseByDayOfWeekItemDayMax),
+      count: zod.number().min(getOwnerStatsResponseByDayOfWeekItemCountMin),
+    }),
+  ),
+  byPitch: zod.array(
+    zod.object({
+      pitchId: zod.string().uuid(),
+      pitchName: zod.string(),
+      count: zod.number().min(getOwnerStatsResponseByPitchItemCountMin),
+      revenue: zod.number(),
+    }),
+  ),
+  byStatus: zod.array(
+    zod.object({
+      status: zod.string(),
+      count: zod.number().min(getOwnerStatsResponseByStatusItemCountMin),
+    }),
+  ),
+  effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+  premiumAccess: zod.object({
+    eligible: zod.boolean(),
+    effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
+    locked: zod.boolean(),
+    requiredPlan: zod.enum(["PRO"]),
+    upgradeMessage: zod.string().nullable(),
+  }),
+  premiumInsights: zod
+    .object({
+      retentionRate: zod.object({
+        value: zod.number().nullable(),
+        confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+        explanation: zod.string(),
+        definition: zod.string(),
+        sampleSize: zod
+          .number()
+          .min(
+            getOwnerStatsResponsePremiumInsightsOneRetentionRateSampleSizeMin,
+          ),
+      }),
+      repeatCustomerRate: zod.object({
+        value: zod.number().nullable(),
+        confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+        explanation: zod.string(),
+        definition: zod.string(),
+        sampleSize: zod
+          .number()
+          .min(
+            getOwnerStatsResponsePremiumInsightsOneRepeatCustomerRateSampleSizeMin,
+          ),
+      }),
+      cancellationTrend: zod.object({
+        value: zod.number().nullable(),
+        confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+        explanation: zod.string(),
+        definition: zod.string(),
+        sampleSize: zod
+          .number()
+          .min(
+            getOwnerStatsResponsePremiumInsightsOneCancellationTrendSampleSizeMin,
+          ),
+      }),
+      revenueForecast: zod.object({
+        value: zod.number().nullable(),
+        confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+        explanation: zod.string(),
+        definition: zod.string(),
+        sampleSize: zod
+          .number()
+          .min(
+            getOwnerStatsResponsePremiumInsightsOneRevenueForecastSampleSizeMin,
+          ),
+      }),
+    })
+    .nullable(),
+  premiumAnalytics: zod.union([
+    zod.object({
+      locked: zod.literal(true),
+      requiredPlan: zod.enum(["PRO"]),
+      explanation: zod.string(),
+    }),
+    zod.object({
+      locked: zod.literal(false),
+      metrics: zod.object({
+        retention: zod.object({
+          value: zod.number().nullable(),
+          confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+          explanation: zod.string(),
+          definition: zod.string(),
+          sampleSize: zod
+            .number()
+            .min(
+              getOwnerStatsResponsePremiumAnalyticsTwoMetricsRetentionSampleSizeMin,
+            ),
+        }),
+        repeatCustomers: zod.object({
+          value: zod.number().nullable(),
+          confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+          explanation: zod.string(),
+          definition: zod.string(),
+          sampleSize: zod
+            .number()
+            .min(
+              getOwnerStatsResponsePremiumAnalyticsTwoMetricsRepeatCustomersSampleSizeMin,
+            ),
+        }),
+        cancellationTrend: zod.object({
+          value: zod.number().nullable(),
+          confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+          explanation: zod.string(),
+          definition: zod.string(),
+          sampleSize: zod
+            .number()
+            .min(
+              getOwnerStatsResponsePremiumAnalyticsTwoMetricsCancellationTrendSampleSizeMin,
+            ),
+        }),
+        revenueForecast: zod.object({
+          value: zod.number().nullable(),
+          confidence: zod.enum(["insufficient", "low", "medium", "high"]),
+          explanation: zod.string(),
+          definition: zod.string(),
+          sampleSize: zod
+            .number()
+            .min(
+              getOwnerStatsResponsePremiumAnalyticsTwoMetricsRevenueForecastSampleSizeMin,
+            ),
+        }),
+      }),
+    }),
+  ]),
 });
 
 /**
@@ -1965,7 +2331,7 @@ export const GetOwnerSubscriptionResponse = zod.object({
     overrideReason: zod.string().nullable(),
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
-    capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+    capabilities: zod.array(zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"])),
     billingConfigured: zod.boolean(),
   }),
 });
@@ -1998,7 +2364,7 @@ export const CancelOwnerSubscriptionResponse = zod.object({
     overrideReason: zod.string().nullable(),
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
-    capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+    capabilities: zod.array(zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"])),
     billingConfigured: zod.boolean(),
   }),
 });
@@ -2033,7 +2399,9 @@ export const ListOwnerSubscriptionsResponse = zod.object({
         overrideReason: zod.string().nullable(),
         overrideStartsAt: zod.coerce.date().nullable(),
         overrideEndsAt: zod.coerce.date().nullable(),
-        capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+        capabilities: zod.array(
+          zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"]),
+        ),
         billingConfigured: zod.boolean(),
       }),
     }),
@@ -2069,7 +2437,9 @@ export const GetOwnerSubscriptionAdminResponse = zod.object({
       overrideReason: zod.string().nullable(),
       overrideStartsAt: zod.coerce.date().nullable(),
       overrideEndsAt: zod.coerce.date().nullable(),
-      capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+      capabilities: zod.array(
+        zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"]),
+      ),
       billingConfigured: zod.boolean(),
     }),
   }),
@@ -2123,7 +2493,7 @@ export const SetOwnerSubscriptionOverrideResponse = zod.object({
     overrideReason: zod.string().nullable(),
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
-    capabilities: zod.array(zod.enum(["MANUAL_BOOKING"])),
+    capabilities: zod.array(zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS"])),
     billingConfigured: zod.boolean(),
   }),
 });

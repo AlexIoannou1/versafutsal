@@ -169,6 +169,13 @@
       "when": 1788258134000,
       "tag": "0024_subscription_race_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788258194000,
+      "tag": "0025_sms_reminder_jobs",
+      "breakpoints": true
     }
   ]
 }
