@@ -59,6 +59,7 @@ type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
 type VenuePlanCompatibility = {
   effectivePlan?: string | null;
   planBadgeLabel?: string | null;
+  eliteMatchmakingEnabled?: boolean;
 };
 
 const TYPE_ICONS: Record<string, FeatherName> = {
@@ -493,6 +494,49 @@ export default function PlayerVenueDetailScreen() {
       lineHeight: 20,
       marginTop: 8,
     },
+    eliteMatchmakingCard: {
+      marginTop: 20,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary + "45",
+      backgroundColor: colors.primary + "0D",
+    },
+    eliteMatchmakingHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 6,
+    },
+    eliteMatchmakingTitle: {
+      flex: 1,
+      fontSize: 16,
+      fontFamily: "PlusJakartaSans_700Bold",
+      color: colors.foreground,
+    },
+    eliteMatchmakingDescription: {
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.mutedForeground,
+      lineHeight: 20,
+      marginBottom: 14,
+    },
+    eliteMatchmakingButton: {
+      minHeight: 44,
+      borderRadius: 8,
+      backgroundColor: colors.primary,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    eliteMatchmakingButtonText: {
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.primaryForeground,
+    },
     amenitiesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     amenityChip: {
       flexDirection: "row",
@@ -626,6 +670,7 @@ export default function PlayerVenueDetailScreen() {
     effectivePlan === "PRO" || effectivePlan === "ELITE"
       ? planVenue.planBadgeLabel?.trim() || `Verified ${effectivePlan === "PRO" ? "Pro" : "Elite"}`
       : null;
+  const eliteMatchmakingEnabled = planVenue.eliteMatchmakingEnabled === true;
   const safePhotoIndex = Math.max(0, Math.min(photoIndex, photos.length - 1));
   const currentPhoto = photos[safePhotoIndex];
 
@@ -729,6 +774,39 @@ export default function PlayerVenueDetailScreen() {
           {venue.description ? (
             <Text style={s.description}>{String(venue.description)}</Text>
           ) : null}
+
+          {eliteMatchmakingEnabled && (
+            <View style={s.eliteMatchmakingCard}>
+              <View style={s.eliteMatchmakingHeader}>
+                <FeatherIcons name="users" size={20} color={colors.primary} />
+                <Text style={s.eliteMatchmakingTitle}>Elite matchmaking</Text>
+              </View>
+              <Text style={s.eliteMatchmakingDescription}>
+                Bring a five-player squad, add your availability, and we’ll find
+                a compatible opponent.
+              </Text>
+              <TouchableOpacity
+                style={s.eliteMatchmakingButton}
+                onPress={() =>
+                  router.push(
+                    `/player/elite?venueId=${encodeURIComponent(id!)}`,
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`Create a squad request for ${String(venue.name)}`}
+                accessibilityHint="Opens the Elite matchmaking form"
+              >
+                <FeatherIcons
+                  name="users"
+                  size={18}
+                  color={colors.primaryForeground}
+                />
+                <Text style={s.eliteMatchmakingButtonText}>
+                  Create squad request
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <View style={{ marginTop: 18 }}>
             <PlayerStatsCard

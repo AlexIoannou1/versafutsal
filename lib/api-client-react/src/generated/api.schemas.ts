@@ -5,6 +5,205 @@
  * Versa API specification
  * OpenAPI spec version: 0.1.0
  */
+export interface SquadMemberInput {
+  userId: string;
+}
+
+export interface Teammate {
+  id: string;
+  name: string;
+  /** Masked email suitable only to distinguish search results */
+  emailHint: string;
+}
+
+export interface TeammateSearchResult {
+  /** @maxItems 10 */
+  players: Teammate[];
+}
+
+export interface SquadAvailabilityInput {
+  /** @nullable */
+  pitchId?: string | null;
+  startAt: string;
+  endAt: string;
+  exactSlot?: boolean;
+}
+
+export interface SquadRequestInput {
+  venueId: string;
+  /**
+   * @minimum 1
+   * @maximum 10
+   */
+  skillMin: number;
+  /**
+   * @minimum 1
+   * @maximum 10
+   */
+  skillMax: number;
+  /**
+   * @minItems 5
+   * @maxItems 5
+   */
+  members: SquadMemberInput[];
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  availability: SquadAvailabilityInput[];
+  expiresAt: string;
+}
+
+export type SquadRequestStatus =
+  (typeof SquadRequestStatus)[keyof typeof SquadRequestStatus];
+
+export const SquadRequestStatus = {
+  DRAFT: "DRAFT",
+  PENDING: "PENDING",
+  MATCHED: "MATCHED",
+  BOOKED: "BOOKED",
+  CANCELLED: "CANCELLED",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export type MatchProposalStatus =
+  (typeof MatchProposalStatus)[keyof typeof MatchProposalStatus];
+
+export const MatchProposalStatus = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  BOOKED: "BOOKED",
+  DECLINED: "DECLINED",
+  CANCELLED: "CANCELLED",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export type MatchProposalSquadAResponse =
+  (typeof MatchProposalSquadAResponse)[keyof typeof MatchProposalSquadAResponse];
+
+export const MatchProposalSquadAResponse = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  DECLINED: "DECLINED",
+} as const;
+
+export type MatchProposalSquadBResponse =
+  (typeof MatchProposalSquadBResponse)[keyof typeof MatchProposalSquadBResponse];
+
+export const MatchProposalSquadBResponse = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  DECLINED: "DECLINED",
+} as const;
+
+export interface MatchProposal {
+  id: string;
+  squadAId: string;
+  squadBId: string;
+  bookingId: string;
+  status: MatchProposalStatus;
+  squadAResponse: MatchProposalSquadAResponse;
+  squadBResponse: MatchProposalSquadBResponse;
+  expiresAt: string;
+}
+
+export interface SquadRequest {
+  id: string;
+  captainId: string;
+  venueId: string;
+  skillMin: number;
+  skillMax: number;
+  status: SquadRequestStatus;
+  expiresAt: string;
+  createdAt: string;
+  members: string[];
+  availability: SquadAvailabilityInput[];
+  proposal?: MatchProposal | null;
+}
+
+export interface SquadRequestList {
+  /** @maxItems 100 */
+  requests: SquadRequest[];
+}
+
+export type MatchProposalResponseInputResponse =
+  (typeof MatchProposalResponseInputResponse)[keyof typeof MatchProposalResponseInputResponse];
+
+export const MatchProposalResponseInputResponse = {
+  ACCEPTED: "ACCEPTED",
+  DECLINED: "DECLINED",
+} as const;
+
+export interface MatchProposalResponseInput {
+  response: MatchProposalResponseInputResponse;
+}
+
+export interface WaitlistJoinInput {
+  pitchId: string;
+  startAt: string;
+}
+
+export type WaitlistEntryStatus =
+  (typeof WaitlistEntryStatus)[keyof typeof WaitlistEntryStatus];
+
+export const WaitlistEntryStatus = {
+  WAITING: "WAITING",
+  OFFERED: "OFFERED",
+  CLAIMED: "CLAIMED",
+  LEFT: "LEFT",
+  EXPIRED: "EXPIRED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export interface WaitlistEntry {
+  id: string;
+  venueId: string;
+  pitchId: string;
+  userId: string;
+  startAt: string;
+  endAt: string;
+  position: number;
+  status: WaitlistEntryStatus;
+  createdAt: string;
+  /** @nullable */
+  claimId?: string | null;
+  /** @nullable */
+  claimExpiresAt?: string | null;
+  /** @nullable */
+  queuePosition?: number | null;
+  queueLength?: number;
+}
+
+export interface WaitlistEntryList {
+  /** @maxItems 100 */
+  entries: WaitlistEntry[];
+}
+
+export interface WaitlistStatus {
+  entry: WaitlistEntry | null;
+  queueLength: number;
+}
+
+export type WaitlistClaimResultStatus =
+  (typeof WaitlistClaimResultStatus)[keyof typeof WaitlistClaimResultStatus];
+
+export const WaitlistClaimResultStatus = {
+  CLAIMED: "CLAIMED",
+} as const;
+
+export interface WaitlistClaimResult {
+  claimId: string;
+  bookingId: string;
+  status: WaitlistClaimResultStatus;
+}
+
+export interface EliteDemand {
+  /** @maxItems 100 */
+  squadRequests: SquadRequest[];
+  /** @maxItems 100 */
+  waitlistEntries: WaitlistEntry[];
+}
+
 export type MatchTeam = (typeof MatchTeam)[keyof typeof MatchTeam];
 
 export const MatchTeam = {
@@ -569,6 +768,8 @@ export interface VenueRecord {
   disabledReason?: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Whether this venue's owner currently has Elite matchmaking enabled. */
+  eliteMatchmakingEnabled: boolean;
 }
 
 export interface VenuePhoto {
@@ -1573,6 +1774,66 @@ export type GetAdminVenueLeaderboardPlayerSourcesParams = {
   /**
    * @minimum 1
    * @maximum 50
+   */
+  limit?: number;
+};
+
+export type ListSquadRequestsParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type SearchPlayerTeammatesParams = {
+  /**
+   * @minLength 3
+   * @maxLength 100
+   */
+  query: string;
+  /**
+   * @minimum 1
+   * @maximum 10
+   */
+  limit?: number;
+};
+
+export type ListSlotWaitlistParams = {
+  pitchId: string;
+  startAt: string;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type ListPlayerWaitlistEntriesParams = {
+  status?: ListPlayerWaitlistEntriesStatus;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type ListPlayerWaitlistEntriesStatus =
+  (typeof ListPlayerWaitlistEntriesStatus)[keyof typeof ListPlayerWaitlistEntriesStatus];
+
+export const ListPlayerWaitlistEntriesStatus = {
+  WAITING: "WAITING",
+  OFFERED: "OFFERED",
+  CLAIMED: "CLAIMED",
+  LEFT: "LEFT",
+  EXPIRED: "EXPIRED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type GetEliteDemandParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
    */
   limit?: number;
 };

@@ -6,6 +6,7 @@ import {
   uuid,
   boolean,
   jsonb,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { usersTable } from "./users";
@@ -20,6 +21,11 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "VENUE_DISABLED",
   "PAYMENT_FAILED",
   "MATCH_FINISHED",
+  "SQUAD_MATCHED",
+  "MATCH_EXPIRED",
+  "MATCH_CANCELLED",
+  "WAITLIST_CLAIM",
+  "WAITLIST_CLAIM_EXPIRED",
 ]);
 
 export const notificationsTable = pgTable("notifications", {
@@ -36,8 +42,11 @@ export const notificationsTable = pgTable("notifications", {
   pushSent: boolean("push_sent").notNull().default(false),
   expoTicketId: text("expo_ticket_id"), // Expo push ticket ID; used for receipt polling
   scheduledAt: timestamp("scheduled_at"), // null = immediate
+  dedupeKey: text("dedupe_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("notifications_dedupe_key_unique").on(table.dedupeKey),
+]);
 
 export const notificationsRelations = relations(notificationsTable, ({ one }) => ({
   user: one(usersTable, {

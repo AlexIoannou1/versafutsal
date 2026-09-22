@@ -14,8 +14,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
 import { MotionPressable, SkeletonBlock } from "@/components/Motion";
-import { useListOwnerBookings } from "@workspace/api-client-react";
-import type { BookingStatus } from "@workspace/api-client-react";
+import {
+  useListOwnerBookings,
+  useListOwnerVenues,
+  useGetOwnerSubscription,
+  useGetEliteDemand,
+  getGetEliteDemandQueryKey,
+  type BookingStatus
+} from "@workspace/api-client-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -204,7 +210,34 @@ export default function OwnerBookingsScreen() {
     return p;
   }, [statusFilter, fromParam, toParam]);
 
-  const { data, isLoading, refetch, isRefetching } = useListOwnerBookings(apiParams);
+  // Elite Feature state
+  const [showEliteDemand, setShowEliteDemand] = useState(false);
+
+  const { data: ownerVenuesData } = useListOwnerVenues();
+  const { data: subscriptionData } = useGetOwnerSubscription();
+
+  // Use either the explicit selected venueId or the first available owner venue for Elite checking
+  const effectiveEliteVenueId = venueId !== "ALL"
+     ? venueId
+     : (ownerVenuesData?.venues?.find(v => v.eliteMatchmakingEnabled)?.id ?? null);
+
+  const selectedOwnerVenue = ownerVenuesData?.venues?.find(v => v.id === effectiveEliteVenueId);
+
+  // Actually query Elite Demand if we have a valid venue and are on the elite plan/matchmaking enabled
+  const { data: eliteDemandData, isLoading: eliteDemandLoading, refetch: refetchEliteDemand, isRefetching: isRefetchingEliteDemand } = useGetEliteDemand(effectiveEliteVenueId!, { limit: 20 }, {
+     query: { enabled: !!effectiveEliteVenueId && selectedOwnerVenue?.eliteMatchmakingEnabled, queryKey: getGetEliteDemandQueryKey(effectiveEliteVenueId!, { limit: 20 }) }
+  });
+
+  const { data, isLoading, refetch: refetchBookings, isRefetching: isRefetchingBookings } = useListOwnerBookings(apiParams);
+
+  const handleRefetch = () => {
+    refetchBookings();
+    if (selectedOwnerVenue?.eliteMatchmakingEnabled) {
+      refetchEliteDemand();
+    }
+  };
+
+  const isRefetching = isRefetchingBookings || isRefetchingEliteDemand;
   const serverBookings = (data?.bookings ?? []) as unknown as Booking[];
 
   // Derive unique venues for client-side venue filter
@@ -376,6 +409,79 @@ export default function OwnerBookingsScreen() {
       textAlign: "center",
       paddingHorizontal: 24,
     },
+
+    // Elite
+    eliteSection: {
+      backgroundColor: colors.card,
+      marginHorizontal: 16,
+      marginTop: 10,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.info + "50",
+    },
+    eliteHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    eliteTitle: {
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_700Bold",
+      color: colors.foreground,
+    },
+    eliteBadge: {
+      backgroundColor: colors.info + "20",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    eliteBadgeText: {
+      color: colors.info,
+      fontSize: 11,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+    },
+    eliteStatRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 12,
+    },
+    eliteStatBox: {
+      flex: 1,
+      backgroundColor: colors.background,
+      padding: 10,
+      borderRadius: 8,
+      alignItems: "center",
+      marginHorizontal: 4,
+    },
+    eliteStatNum: {
+      fontSize: 18,
+      fontFamily: "PlusJakartaSans_700Bold",
+      color: colors.primary,
+    },
+    eliteStatLabel: {
+      fontSize: 11,
+      fontFamily: "PlusJakartaSans_500Medium",
+      color: colors.mutedForeground,
+      marginTop: 4,
+    },
+    eliteUpsell: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.muted,
+      marginHorizontal: 16,
+      marginTop: 10,
+      borderRadius: 12,
+      padding: 14,
+      gap: 12,
+    },
+    eliteUpsellText: {
+      flex: 1,
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.mutedForeground,
+      lineHeight: 18,
+    },
   });
 
   // ── Header (search + filters) ───────────────────────────────────────────────
@@ -402,6 +508,51 @@ export default function OwnerBookingsScreen() {
           )}
         </View>
       </View>
+
+      {/* Elite Demand Section */}
+      {selectedOwnerVenue && (
+        selectedOwnerVenue.eliteMatchmakingEnabled ? (
+          <TouchableOpacity
+            style={s.eliteSection}
+            onPress={() => setShowEliteDemand(!showEliteDemand)}
+            activeOpacity={0.7}
+          >
+            <View style={s.eliteHeaderRow}>
+              <Text style={s.eliteTitle}>Elite Demand</Text>
+              <View style={s.eliteBadge}>
+                <Text style={s.eliteBadgeText}>Active</Text>
+              </View>
+            </View>
+            {showEliteDemand && (
+              <View style={s.eliteStatRow}>
+                <View style={s.eliteStatBox}>
+                  {eliteDemandLoading ? (
+                    <SkeletonBlock style={{ width: 24, height: 24, borderRadius: 4 }} />
+                  ) : (
+                    <Text style={s.eliteStatNum}>{eliteDemandData?.squadRequests?.length ?? 0}</Text>
+                  )}
+                  <Text style={s.eliteStatLabel}>Squad Requests</Text>
+                </View>
+                <View style={s.eliteStatBox}>
+                  {eliteDemandLoading ? (
+                    <SkeletonBlock style={{ width: 24, height: 24, borderRadius: 4 }} />
+                  ) : (
+                    <Text style={s.eliteStatNum}>{eliteDemandData?.waitlistEntries?.length ?? 0}</Text>
+                  )}
+                  <Text style={s.eliteStatLabel}>Waitlist Entries</Text>
+                </View>
+              </View>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={s.eliteUpsell}>
+            <FeatherIcons name="trending-up" size={20} color={colors.mutedForeground} />
+            <Text style={s.eliteUpsellText}>
+              Elite matchmaking and automated waitlists are not enabled for {selectedOwnerVenue.name}. Contact your account administrator to enable Elite for this venue.
+            </Text>
+          </View>
+        )
+      )}
 
       {/* Period filter */}
       <View style={s.filterSection}>
@@ -529,7 +680,7 @@ export default function OwnerBookingsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={refetch}
+              onRefresh={handleRefetch}
               tintColor={colors.primary}
             />
           }
@@ -566,7 +717,7 @@ export default function OwnerBookingsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
-            onRefresh={refetch}
+            onRefresh={handleRefetch}
             tintColor={colors.primary}
           />
         }

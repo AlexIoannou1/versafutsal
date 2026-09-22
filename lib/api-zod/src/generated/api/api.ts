@@ -326,6 +326,11 @@ export const GetVenueResponse = zod.object({
       disabledReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
+      eliteMatchmakingEnabled: zod
+        .boolean()
+        .describe(
+          "Whether this venue's owner currently has Elite matchmaking enabled.",
+        ),
     })
     .and(
       zod.object({
@@ -579,6 +584,11 @@ export const GetOwnerVenueResponse = zod.object({
       disabledReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
+      eliteMatchmakingEnabled: zod
+        .boolean()
+        .describe(
+          "Whether this venue's owner currently has Elite matchmaking enabled.",
+        ),
     })
     .and(
       zod.object({
@@ -734,6 +744,11 @@ export const UpdateVenueResponse = zod.object({
     disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    eliteMatchmakingEnabled: zod
+      .boolean()
+      .describe(
+        "Whether this venue's owner currently has Elite matchmaking enabled.",
+      ),
   }),
 });
 
@@ -767,6 +782,11 @@ export const SubmitVenueForApprovalResponse = zod.object({
     disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    eliteMatchmakingEnabled: zod
+      .boolean()
+      .describe(
+        "Whether this venue's owner currently has Elite matchmaking enabled.",
+      ),
   }),
 });
 
@@ -1803,6 +1823,11 @@ export const AdminListVenuesResponse = zod.object({
         disabledReason: zod.string().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
+        eliteMatchmakingEnabled: zod
+          .boolean()
+          .describe(
+            "Whether this venue's owner currently has Elite matchmaking enabled.",
+          ),
       })
       .and(
         zod.object({
@@ -1845,6 +1870,11 @@ export const AdminGetVenueResponse = zod.object({
       disabledReason: zod.string().nullish(),
       createdAt: zod.coerce.date(),
       updatedAt: zod.coerce.date(),
+      eliteMatchmakingEnabled: zod
+        .boolean()
+        .describe(
+          "Whether this venue's owner currently has Elite matchmaking enabled.",
+        ),
     })
     .and(
       zod.object({
@@ -1942,6 +1972,11 @@ export const ApproveVenueResponse = zod.object({
     disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    eliteMatchmakingEnabled: zod
+      .boolean()
+      .describe(
+        "Whether this venue's owner currently has Elite matchmaking enabled.",
+      ),
   }),
 });
 
@@ -1974,6 +2009,11 @@ export const RejectVenueResponse = zod.object({
     disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    eliteMatchmakingEnabled: zod
+      .boolean()
+      .describe(
+        "Whether this venue's owner currently has Elite matchmaking enabled.",
+      ),
   }),
 });
 
@@ -2004,6 +2044,11 @@ export const AdminDisableVenueResponse = zod.object({
     disabledReason: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    eliteMatchmakingEnabled: zod
+      .boolean()
+      .describe(
+        "Whether this venue's owner currently has Elite matchmaking enabled.",
+      ),
   }),
 });
 
@@ -3251,4 +3296,497 @@ export const GetAdminVenueLeaderboardPlayerSourcesResponse = zod.object({
       version: zod.number().min(1),
     }),
   ),
+});
+
+export const listSquadRequestsQueryLimitDefault = 50;
+export const listSquadRequestsQueryLimitMax = 100;
+
+export const ListSquadRequestsQueryParams = zod.object({
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listSquadRequestsQueryLimitMax)
+    .default(listSquadRequestsQueryLimitDefault),
+});
+
+export const listSquadRequestsResponseRequestsItemAvailabilityItemExactSlotDefault = false;
+export const listSquadRequestsResponseRequestsMax = 100;
+
+export const ListSquadRequestsResponse = zod.object({
+  requests: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        captainId: zod.string().uuid(),
+        venueId: zod.string().uuid(),
+        skillMin: zod.number(),
+        skillMax: zod.number(),
+        status: zod.enum([
+          "DRAFT",
+          "PENDING",
+          "MATCHED",
+          "BOOKED",
+          "CANCELLED",
+          "EXPIRED",
+        ]),
+        expiresAt: zod.coerce.date(),
+        createdAt: zod.coerce.date(),
+        members: zod.array(zod.string().uuid()),
+        availability: zod.array(
+          zod.object({
+            pitchId: zod.string().uuid().nullish(),
+            startAt: zod.coerce.date(),
+            endAt: zod.coerce.date(),
+            exactSlot: zod
+              .boolean()
+              .default(
+                listSquadRequestsResponseRequestsItemAvailabilityItemExactSlotDefault,
+              ),
+          }),
+        ),
+        proposal: zod
+          .union([
+            zod.object({
+              id: zod.string().uuid(),
+              squadAId: zod.string().uuid(),
+              squadBId: zod.string().uuid(),
+              bookingId: zod.string().uuid(),
+              status: zod.enum([
+                "PENDING",
+                "ACCEPTED",
+                "BOOKED",
+                "DECLINED",
+                "CANCELLED",
+                "EXPIRED",
+              ]),
+              squadAResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+              squadBResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+              expiresAt: zod.coerce.date(),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+      }),
+    )
+    .max(listSquadRequestsResponseRequestsMax),
+});
+
+export const createSquadRequestBodySkillMinMax = 10;
+
+export const createSquadRequestBodySkillMaxMax = 10;
+
+export const createSquadRequestBodyMembersMin = 5;
+export const createSquadRequestBodyMembersMax = 5;
+
+export const createSquadRequestBodyAvailabilityItemExactSlotDefault = false;
+export const createSquadRequestBodyAvailabilityMax = 50;
+
+export const CreateSquadRequestBody = zod.object({
+  venueId: zod.string().uuid(),
+  skillMin: zod.number().min(1).max(createSquadRequestBodySkillMinMax),
+  skillMax: zod.number().min(1).max(createSquadRequestBodySkillMaxMax),
+  members: zod
+    .array(
+      zod.object({
+        userId: zod.string().uuid(),
+      }),
+    )
+    .min(createSquadRequestBodyMembersMin)
+    .max(createSquadRequestBodyMembersMax),
+  availability: zod
+    .array(
+      zod.object({
+        pitchId: zod.string().uuid().nullish(),
+        startAt: zod.coerce.date(),
+        endAt: zod.coerce.date(),
+        exactSlot: zod
+          .boolean()
+          .default(createSquadRequestBodyAvailabilityItemExactSlotDefault),
+      }),
+    )
+    .min(1)
+    .max(createSquadRequestBodyAvailabilityMax),
+  expiresAt: zod.coerce.date(),
+});
+
+export const searchPlayerTeammatesQueryQueryMin = 3;
+export const searchPlayerTeammatesQueryQueryMax = 100;
+
+export const searchPlayerTeammatesQueryLimitDefault = 10;
+export const searchPlayerTeammatesQueryLimitMax = 10;
+
+export const SearchPlayerTeammatesQueryParams = zod.object({
+  query: zod.coerce
+    .string()
+    .min(searchPlayerTeammatesQueryQueryMin)
+    .max(searchPlayerTeammatesQueryQueryMax),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(searchPlayerTeammatesQueryLimitMax)
+    .default(searchPlayerTeammatesQueryLimitDefault),
+});
+
+export const searchPlayerTeammatesResponsePlayersMax = 10;
+
+export const SearchPlayerTeammatesResponse = zod.object({
+  players: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        name: zod.string(),
+        emailHint: zod
+          .string()
+          .describe("Masked email suitable only to distinguish search results"),
+      }),
+    )
+    .max(searchPlayerTeammatesResponsePlayersMax),
+});
+
+export const GetSquadRequestParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const getSquadRequestResponseAvailabilityItemExactSlotDefault = false;
+
+export const GetSquadRequestResponse = zod.object({
+  id: zod.string().uuid(),
+  captainId: zod.string().uuid(),
+  venueId: zod.string().uuid(),
+  skillMin: zod.number(),
+  skillMax: zod.number(),
+  status: zod.enum([
+    "DRAFT",
+    "PENDING",
+    "MATCHED",
+    "BOOKED",
+    "CANCELLED",
+    "EXPIRED",
+  ]),
+  expiresAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+  members: zod.array(zod.string().uuid()),
+  availability: zod.array(
+    zod.object({
+      pitchId: zod.string().uuid().nullish(),
+      startAt: zod.coerce.date(),
+      endAt: zod.coerce.date(),
+      exactSlot: zod
+        .boolean()
+        .default(getSquadRequestResponseAvailabilityItemExactSlotDefault),
+    }),
+  ),
+  proposal: zod
+    .union([
+      zod.object({
+        id: zod.string().uuid(),
+        squadAId: zod.string().uuid(),
+        squadBId: zod.string().uuid(),
+        bookingId: zod.string().uuid(),
+        status: zod.enum([
+          "PENDING",
+          "ACCEPTED",
+          "BOOKED",
+          "DECLINED",
+          "CANCELLED",
+          "EXPIRED",
+        ]),
+        squadAResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+        squadBResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+        expiresAt: zod.coerce.date(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+
+export const CancelSquadRequestParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const cancelSquadRequestResponseAvailabilityItemExactSlotDefault = false;
+
+export const CancelSquadRequestResponse = zod.object({
+  id: zod.string().uuid(),
+  captainId: zod.string().uuid(),
+  venueId: zod.string().uuid(),
+  skillMin: zod.number(),
+  skillMax: zod.number(),
+  status: zod.enum([
+    "DRAFT",
+    "PENDING",
+    "MATCHED",
+    "BOOKED",
+    "CANCELLED",
+    "EXPIRED",
+  ]),
+  expiresAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+  members: zod.array(zod.string().uuid()),
+  availability: zod.array(
+    zod.object({
+      pitchId: zod.string().uuid().nullish(),
+      startAt: zod.coerce.date(),
+      endAt: zod.coerce.date(),
+      exactSlot: zod
+        .boolean()
+        .default(cancelSquadRequestResponseAvailabilityItemExactSlotDefault),
+    }),
+  ),
+  proposal: zod
+    .union([
+      zod.object({
+        id: zod.string().uuid(),
+        squadAId: zod.string().uuid(),
+        squadBId: zod.string().uuid(),
+        bookingId: zod.string().uuid(),
+        status: zod.enum([
+          "PENDING",
+          "ACCEPTED",
+          "BOOKED",
+          "DECLINED",
+          "CANCELLED",
+          "EXPIRED",
+        ]),
+        squadAResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+        squadBResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+        expiresAt: zod.coerce.date(),
+      }),
+      zod.null(),
+    ])
+    .optional(),
+});
+
+export const RespondMatchProposalParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const RespondMatchProposalBody = zod.object({
+  response: zod.enum(["ACCEPTED", "DECLINED"]),
+});
+
+export const RespondMatchProposalResponse = zod.object({
+  id: zod.string().uuid(),
+  squadAId: zod.string().uuid(),
+  squadBId: zod.string().uuid(),
+  bookingId: zod.string().uuid(),
+  status: zod.enum([
+    "PENDING",
+    "ACCEPTED",
+    "BOOKED",
+    "DECLINED",
+    "CANCELLED",
+    "EXPIRED",
+  ]),
+  squadAResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+  squadBResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+  expiresAt: zod.coerce.date(),
+});
+
+export const listSlotWaitlistQueryLimitDefault = 50;
+export const listSlotWaitlistQueryLimitMax = 100;
+
+export const ListSlotWaitlistQueryParams = zod.object({
+  pitchId: zod.coerce.string().uuid(),
+  startAt: zod.date(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listSlotWaitlistQueryLimitMax)
+    .default(listSlotWaitlistQueryLimitDefault),
+});
+
+export const ListSlotWaitlistResponse = zod.object({
+  entry: zod.union([
+    zod.object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      pitchId: zod.string().uuid(),
+      userId: zod.string().uuid(),
+      startAt: zod.coerce.date(),
+      endAt: zod.coerce.date(),
+      position: zod.number(),
+      status: zod.enum([
+        "WAITING",
+        "OFFERED",
+        "CLAIMED",
+        "LEFT",
+        "EXPIRED",
+        "CANCELLED",
+      ]),
+      createdAt: zod.coerce.date(),
+      claimId: zod.string().uuid().nullish(),
+      claimExpiresAt: zod.coerce.date().nullish(),
+      queuePosition: zod.number().nullish(),
+      queueLength: zod.number().optional(),
+    }),
+    zod.null(),
+  ]),
+  queueLength: zod.number(),
+});
+
+export const JoinSlotWaitlistBody = zod.object({
+  pitchId: zod.string().uuid(),
+  startAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List the authenticated player's recent waitlist entries
+ */
+export const listPlayerWaitlistEntriesQueryLimitDefault = 50;
+export const listPlayerWaitlistEntriesQueryLimitMax = 100;
+
+export const ListPlayerWaitlistEntriesQueryParams = zod.object({
+  status: zod
+    .enum(["WAITING", "OFFERED", "CLAIMED", "LEFT", "EXPIRED", "CANCELLED"])
+    .optional(),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(listPlayerWaitlistEntriesQueryLimitMax)
+    .default(listPlayerWaitlistEntriesQueryLimitDefault),
+});
+
+export const listPlayerWaitlistEntriesResponseEntriesMax = 100;
+
+export const ListPlayerWaitlistEntriesResponse = zod.object({
+  entries: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        venueId: zod.string().uuid(),
+        pitchId: zod.string().uuid(),
+        userId: zod.string().uuid(),
+        startAt: zod.coerce.date(),
+        endAt: zod.coerce.date(),
+        position: zod.number(),
+        status: zod.enum([
+          "WAITING",
+          "OFFERED",
+          "CLAIMED",
+          "LEFT",
+          "EXPIRED",
+          "CANCELLED",
+        ]),
+        createdAt: zod.coerce.date(),
+        claimId: zod.string().uuid().nullish(),
+        claimExpiresAt: zod.coerce.date().nullish(),
+        queuePosition: zod.number().nullish(),
+        queueLength: zod.number().optional(),
+      }),
+    )
+    .max(listPlayerWaitlistEntriesResponseEntriesMax),
+});
+
+export const LeaveSlotWaitlistParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ClaimWaitlistOfferParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetEliteDemandParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+});
+
+export const getEliteDemandQueryLimitDefault = 50;
+export const getEliteDemandQueryLimitMax = 100;
+
+export const GetEliteDemandQueryParams = zod.object({
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getEliteDemandQueryLimitMax)
+    .default(getEliteDemandQueryLimitDefault),
+});
+
+export const getEliteDemandResponseSquadRequestsItemAvailabilityItemExactSlotDefault = false;
+export const getEliteDemandResponseSquadRequestsMax = 100;
+
+export const getEliteDemandResponseWaitlistEntriesMax = 100;
+
+export const GetEliteDemandResponse = zod.object({
+  squadRequests: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        captainId: zod.string().uuid(),
+        venueId: zod.string().uuid(),
+        skillMin: zod.number(),
+        skillMax: zod.number(),
+        status: zod.enum([
+          "DRAFT",
+          "PENDING",
+          "MATCHED",
+          "BOOKED",
+          "CANCELLED",
+          "EXPIRED",
+        ]),
+        expiresAt: zod.coerce.date(),
+        createdAt: zod.coerce.date(),
+        members: zod.array(zod.string().uuid()),
+        availability: zod.array(
+          zod.object({
+            pitchId: zod.string().uuid().nullish(),
+            startAt: zod.coerce.date(),
+            endAt: zod.coerce.date(),
+            exactSlot: zod
+              .boolean()
+              .default(
+                getEliteDemandResponseSquadRequestsItemAvailabilityItemExactSlotDefault,
+              ),
+          }),
+        ),
+        proposal: zod
+          .union([
+            zod.object({
+              id: zod.string().uuid(),
+              squadAId: zod.string().uuid(),
+              squadBId: zod.string().uuid(),
+              bookingId: zod.string().uuid(),
+              status: zod.enum([
+                "PENDING",
+                "ACCEPTED",
+                "BOOKED",
+                "DECLINED",
+                "CANCELLED",
+                "EXPIRED",
+              ]),
+              squadAResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+              squadBResponse: zod.enum(["PENDING", "ACCEPTED", "DECLINED"]),
+              expiresAt: zod.coerce.date(),
+            }),
+            zod.null(),
+          ])
+          .optional(),
+      }),
+    )
+    .max(getEliteDemandResponseSquadRequestsMax),
+  waitlistEntries: zod
+    .array(
+      zod.object({
+        id: zod.string().uuid(),
+        venueId: zod.string().uuid(),
+        pitchId: zod.string().uuid(),
+        userId: zod.string().uuid(),
+        startAt: zod.coerce.date(),
+        endAt: zod.coerce.date(),
+        position: zod.number(),
+        status: zod.enum([
+          "WAITING",
+          "OFFERED",
+          "CLAIMED",
+          "LEFT",
+          "EXPIRED",
+          "CANCELLED",
+        ]),
+        createdAt: zod.coerce.date(),
+        claimId: zod.string().uuid().nullish(),
+        claimExpiresAt: zod.coerce.date().nullish(),
+        queuePosition: zod.number().nullish(),
+        queueLength: zod.number().optional(),
+      }),
+    )
+    .max(getEliteDemandResponseWaitlistEntriesMax),
 });

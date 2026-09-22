@@ -25,6 +25,7 @@ import { paymentProvider } from "../lib/payment-provider";
 import { logBookingAuditFireAndForget, logBookingAudit } from "../lib/audit";
 import { reconcileSmsReminder } from "../lib/sms-reminders";
 import { canConfirmOfflinePayment, canUsePaymentProvider, bookingExportCsv, recognizesBookingRevenue, bookingSnapshotRevenue } from "../lib/manual-bookings";
+import { promoteWaitlist } from "../lib/elite";
 
 const router: IRouter = Router();
 
@@ -2177,6 +2178,10 @@ router.post<{ id: string }>(
       } catch (error) {
         req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
       }
+      // A released slot is immediately offered to the next eligible waitlist member.
+      void promoteWaitlist(booking.pitchId, booking.startAt).catch((error) =>
+        req.log.error({ err: error, bookingId }, "Waitlist promotion failed"),
+      );
 
       res.json({
         booking: {

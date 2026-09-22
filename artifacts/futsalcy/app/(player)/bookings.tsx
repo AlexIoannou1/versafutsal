@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,20 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import FeatherIcons from "@/components/FeatherIcons";
 import { useColors } from "@/hooks/useColors";
-import { useListPlayerBookings } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useListPlayerBookings,
+  useListSquadRequests,
+  useListPlayerWaitlistEntries,
+  useRespondMatchProposal,
+  useClaimWaitlistOffer,
+  useLeaveSlotWaitlist,
+  useCancelSquadRequest,
+  getListSquadRequestsQueryKey,
+  getListPlayerWaitlistEntriesQueryKey,
+  getListPlayerBookingsQueryKey,
+} from "@workspace/api-client-react";
+import { Alert } from "react-native";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "#F59E0B",
@@ -31,6 +44,10 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
   NO_SHOW: "No Show",
+};
+const WAITLIST_STATUS_LABELS: Record<string, string> = {
+  WAITING: "Waiting", OFFERED: "Offered", CLAIMED: "Claimed",
+  LEFT: "Left", EXPIRED: "Expired", CANCELLED: "Cancelled",
 };
 
 function formatDateShort(iso: string) {
@@ -62,8 +79,72 @@ export default function PlayerBookingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const { data, isLoading, refetch, isRefetching } = useListPlayerBookings();
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, refetch: refetchBookings, isRefetching: isRefetchingBookings } = useListPlayerBookings();
   const bookings = (data?.bookings ?? []) as Booking[];
+
+  // Elite Activity Queries with Polling
+  const { data: squadData, refetch: refetchSquads, isRefetching: isRefetchingSquads } = useListSquadRequests({ limit: 50 }, {
+    query: { refetchInterval: 15000, queryKey: getListSquadRequestsQueryKey({ limit: 50 }) }
+  });
+  const { data: waitlistData, refetch: refetchWaitlists, isRefetching: isRefetchingWaitlists } = useListPlayerWaitlistEntries(undefined, {
+    query: { refetchInterval: 15000, queryKey: getListPlayerWaitlistEntriesQueryKey() }
+  });
+
+  const activeSquads = squadData?.requests?.filter(r => ["PENDING", "MATCHED"].includes(r.status)) ?? [];
+  const waitlists = waitlistData?.entries ?? [];
+  const activeWaitlists = waitlists.filter(w => ["WAITING", "OFFERED"].includes(w.status));
+
+  const hasEliteActivity = activeSquads.length > 0 || activeWaitlists.length > 0;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const cancelSquad = useCancelSquadRequest({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListSquadRequestsQueryKey() }),
+      onError: (err: any) => Alert.alert("Error", err.message || "Failed to cancel squad request")
+    }
+  });
+
+  const respondProposal = useRespondMatchProposal({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListSquadRequestsQueryKey() }),
+      onError: (err: any) => Alert.alert("Error", err.message || "Failed to respond to proposal")
+    }
+  });
+
+  const claimWaitlist = useClaimWaitlistOffer({
+    mutation: {
+      onSuccess: (res) => {
+        queryClient.invalidateQueries({ queryKey: getListPlayerWaitlistEntriesQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListPlayerBookingsQueryKey() });
+        router.push(`/player/booking/${res.bookingId}`);
+      },
+      onError: (err: any) => Alert.alert("Error", err.message || "Failed to claim offer")
+    }
+  });
+
+  const leaveWaitlist = useLeaveSlotWaitlist({
+    mutation: {
+       onSuccess: () => {
+         queryClient.invalidateQueries({ queryKey: getListPlayerWaitlistEntriesQueryKey() });
+         queryClient.invalidateQueries({ queryKey: getListPlayerBookingsQueryKey() });
+       },
+      onError: (err: any) => Alert.alert("Error", err.message || "Failed to leave waitlist")
+    }
+  });
+
+  const handleRefetch = () => {
+    refetchBookings();
+    refetchSquads();
+    refetchWaitlists();
+  };
+
+  const isRefetching = isRefetchingBookings || isRefetchingSquads || isRefetchingWaitlists;
 
   const areas = useMemo(() => {
     const seen = new Set<string>();
@@ -300,7 +381,7 @@ export default function PlayerBookingsScreen() {
       color: colors.mutedForeground,
     },
     sectionHeaderChevron: {
-      marginLeft: "auto" as never,
+      marginLeft: "auto",
     },
     list: { paddingBottom: insets.bottom + 100 },
     cardWrap: { paddingHorizontal: 16, paddingBottom: 10 },
@@ -343,6 +424,74 @@ export default function PlayerBookingsScreen() {
     emptySub: {
       fontSize: 14, fontFamily: "PlusJakartaSans_400Regular",
       color: colors.mutedForeground, textAlign: "center", lineHeight: 20,
+    },
+    eliteCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.info + "50",
+      marginBottom: 10,
+    },
+    eliteTitle: {
+      fontSize: 14,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+      color: colors.foreground,
+      marginBottom: 6,
+    },
+    eliteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 4,
+    },
+    eliteText: {
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_400Regular",
+      color: colors.mutedForeground,
+    },
+    eliteActions: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 10,
+    },
+    eliteBtnPrimary: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      paddingVertical: 8,
+      borderRadius: 6,
+      alignItems: 'center',
+    },
+    eliteBtnPrimaryText: {
+      color: colors.primaryForeground,
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+    },
+    eliteBtnSecondary: {
+      flex: 1,
+      backgroundColor: colors.muted,
+      paddingVertical: 8,
+      borderRadius: 6,
+      alignItems: 'center',
+    },
+    eliteBtnSecondaryText: {
+      color: colors.foreground,
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+    },
+    eliteBtnDestructive: {
+      flex: 1,
+      backgroundColor: colors.destructive + "15",
+      paddingVertical: 8,
+      borderRadius: 6,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.destructive + "30",
+    },
+    eliteBtnDestructiveText: {
+      color: colors.destructive,
+      fontSize: 13,
+      fontFamily: "PlusJakartaSans_600SemiBold",
     },
   });
 
@@ -549,11 +698,99 @@ export default function PlayerBookingsScreen() {
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
-              onRefresh={refetch}
+              onRefresh={handleRefetch}
               tintColor={colors.primary}
             />
           }
         >
+          {hasEliteActivity && (
+            <>
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionHeaderText}>Elite Matchmaking & Waitlists</Text>
+              </View>
+               {squadData?.requests?.map((req) => (
+                <View key={req.id} style={s.cardWrap}>
+                  <View style={s.eliteCard}>
+                    <Text style={s.eliteTitle}>Squad Request ({req.status})</Text>
+                     <Text style={s.eliteText}>
+                       {req.members?.length === 5
+                         ? "Complete five-player squad"
+                         : `${req.members?.length ?? 0} players selected`}
+                     </Text>
+                    <View style={s.eliteRow}>
+                      <FeatherIcons name="activity" size={14} color={colors.mutedForeground} />
+                      <Text style={s.eliteText}>Skill Range: {req.skillMin} - {req.skillMax}</Text>
+                    </View>
+                    <View style={s.eliteRow}>
+                      <FeatherIcons name="clock" size={14} color={colors.mutedForeground} />
+                      <Text style={s.eliteText}>Expires: {formatDateShort(req.expiresAt)}</Text>
+                    </View>
+
+                     {req.proposal && req.proposal.status === "PENDING" && (
+                      <View style={s.eliteActions}>
+                         <TouchableOpacity testID="squad-accept-match" style={s.eliteBtnPrimary} onPress={() => respondProposal.mutate({ id: req.proposal!.id, data: { response: "ACCEPTED" }})}>
+                          <Text style={s.eliteBtnPrimaryText}>Accept Match</Text>
+                        </TouchableOpacity>
+                         <TouchableOpacity testID="squad-decline-match" style={s.eliteBtnDestructive} onPress={() => respondProposal.mutate({ id: req.proposal!.id, data: { response: "DECLINED" }})}>
+                          <Text style={s.eliteBtnDestructiveText}>Decline</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {req.status === "PENDING" && !req.proposal && (
+                      <View style={s.eliteActions}>
+                         <TouchableOpacity testID="squad-cancel-request" style={s.eliteBtnSecondary} onPress={() => cancelSquad.mutate({ id: req.id })}>
+                          <Text style={s.eliteBtnSecondaryText}>Cancel Request</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              ))}
+
+               {waitlists.map((entry) => (
+                <View key={entry.id} style={s.cardWrap}>
+                  <View style={[s.eliteCard, { borderColor: entry.status === "OFFERED" ? colors.success + "50" : colors.warning + "50" }]}>
+                     <Text style={s.eliteTitle}>Waitlist: {formatDateShort(entry.startAt)} {formatTimeRange(entry.startAt, entry.endAt)} · {WAITLIST_STATUS_LABELS[entry.status] ?? entry.status}</Text>
+
+                    {entry.status === "OFFERED" && (
+                      <View>
+                        <View style={s.eliteRow}>
+                          <FeatherIcons name="check-circle" size={14} color={colors.success} />
+                          <Text style={[s.eliteText, { color: colors.success }]}>Slot Available! Claim now.</Text>
+                        </View>
+                          {entry.claimExpiresAt && (
+                          <View style={s.eliteRow}>
+                            <FeatherIcons name="clock" size={14} color={colors.destructive} />
+                            <Text style={[s.eliteText, { color: colors.destructive }]}>Claim window: {Math.max(0, Math.ceil((new Date(entry.claimExpiresAt).getTime() - now) / 1000))}s</Text>
+                          </View>
+                        )}
+                        <View style={s.eliteActions}>
+                           <TouchableOpacity style={[s.eliteBtnPrimary, { backgroundColor: colors.success }]} disabled={claimWaitlist.isPending || (!!entry.claimExpiresAt && new Date(entry.claimExpiresAt).getTime() <= now)} onPress={() => claimWaitlist.mutate({ id: entry.id })}>
+                            <Text style={s.eliteBtnPrimaryText}>Claim Offer</Text>
+                          </TouchableOpacity>
+                        </View>
+                       </View>
+                     )}
+                     {entry.status === "WAITING" && (
+                      <View>
+                        <View style={s.eliteRow}>
+                          <FeatherIcons name="users" size={14} color={colors.mutedForeground} />
+                          <Text style={s.eliteText}>Position in queue: {entry.queuePosition}</Text>
+                        </View>
+                         <View style={s.eliteActions}>
+                           <TouchableOpacity testID="waitlist-leave" style={s.eliteBtnSecondary} onPress={() => leaveWaitlist.mutate({ id: entry.id })}>
+                            <Text style={s.eliteBtnSecondaryText}>Leave Waitlist</Text>
+                          </TouchableOpacity>
+                       </View>
+                       </View>
+                     )}
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
           {/* Upcoming section */}
           {hasUpcoming && (
             <>

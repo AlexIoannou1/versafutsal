@@ -95,6 +95,10 @@ function RootLayoutNav() {
         options={{ headerShown: true, title: "Venue Details" }}
       />
       <Stack.Screen
+        name="player/elite"
+        options={{ headerShown: true, title: "Elite Matchmaking" }}
+      />
+      <Stack.Screen
         name="player/venue/[id]/book"
         options={{ headerShown: true }}
       />

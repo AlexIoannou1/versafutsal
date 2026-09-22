@@ -226,7 +226,14 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
 
   const signedPhotos = await signPhotoList(photos, ownerPreviewForId);
   const discovery = getVenueDiscoveryMetadata(resolveEffectivePlan(subscriptions[0]));
-  return { ...venue, ...discovery, photos: signedPhotos, pitches: pitchesWithPricing, openingHours: hours };
+  return {
+    ...venue,
+    ...discovery,
+    eliteMatchmakingEnabled: resolveEffectivePlan(subscriptions[0]) === "ELITE",
+    photos: signedPhotos,
+    pitches: pitchesWithPricing,
+    openingHours: hours,
+  };
 }
 
 function assertOwnsVenue(venueOwnerId: string, userId: string, res: Response): boolean {
@@ -338,6 +345,7 @@ router.get("/venues", async (req, res) => {
       return {
         ...v,
         ...getVenueDiscoveryMetadata(planByOwner.get(v.ownerId) ?? "FREE"),
+        eliteMatchmakingEnabled: planByOwner.get(v.ownerId) === "ELITE",
         coverPhoto: photoMap.get(v.id) ?? null,
         photos: photosGroupMap.get(v.id) ?? [],
         minPrice: priceRange?.minPrice ? parseFloat(priceRange.minPrice) : null,
@@ -480,6 +488,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
         return {
           ...v,
           ...discovery,
+          eliteMatchmakingEnabled: resolveEffectivePlan(subscription[0]) === "ELITE",
           coverPhoto: rawCover
             ? await signPhotoUrl(
                 photos.find((photo) => photo.venueId === v.id && photo.url === rawCover)!,

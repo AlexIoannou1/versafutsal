@@ -2407,6 +2407,130 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ApiError" }
 
+  /player/squad-requests:
+    get:
+      operationId: listSquadRequests
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: Own squad requests, content: { application/json: { schema: { $ref: "#/components/schemas/SquadRequestList" } } } }
+    post:
+      operationId: createSquadRequest
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SquadRequestInput" } } }
+      responses:
+        "201": { description: Submitted, content: { application/json: { schema: { $ref: "#/components/schemas/SquadRequest" } } } }
+        "403": { description: Elite required, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+        "409": { description: Duplicate, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /player/teammates:
+    get:
+      operationId: searchPlayerTeammates
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: query, in: query, required: true, schema: { type: string, minLength: 3, maxLength: 100 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 10, default: 10 } }
+      responses:
+        "200": { description: Matching active players, content: { application/json: { schema: { $ref: "#/components/schemas/TeammateSearchResult" } } } }
+        "400": { description: Invalid query, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /player/squad-requests/{id}:
+    get:
+      operationId: getSquadRequest
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Own request, content: { application/json: { schema: { $ref: "#/components/schemas/SquadRequest" } } } }
+        "404": { description: Not found, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /player/squad-requests/{id}/cancel:
+    post:
+      operationId: cancelSquadRequest
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Cancelled, content: { application/json: { schema: { $ref: "#/components/schemas/SquadRequest" } } } }
+  /player/match-proposals/{id}/response:
+    post:
+      operationId: respondMatchProposal
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/MatchProposalResponseInput" } } }
+      responses:
+        "200": { description: Response recorded, content: { application/json: { schema: { $ref: "#/components/schemas/MatchProposal" } } } }
+  /player/waitlist:
+    get:
+      operationId: listSlotWaitlist
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: pitchId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: startAt, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: Caller waitlist status for the slot, content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistStatus" } } } }
+    post:
+      operationId: joinSlotWaitlist
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistJoinInput" } } }
+      responses:
+        "201": { description: Joined, content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "409": { description: Slot is not full or duplicate, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /player/waitlist-entries:
+    get:
+      operationId: listPlayerWaitlistEntries
+      tags: [bookings]
+      summary: List the authenticated player's recent waitlist entries
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [WAITING, OFFERED, CLAIMED, LEFT, EXPIRED, CANCELLED] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: The player's waitlist entries only, content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntryList" } } } }
+  /player/waitlist/{id}:
+    delete:
+      operationId: leaveSlotWaitlist
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Left }
+  /player/waitlist-claims/{id}/claim:
+    post:
+      operationId: claimWaitlistOffer
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "201": { description: Slot booked, content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistClaimResult" } } } }
+  /owner/venues/{venueId}/elite-demand:
+    get:
+      operationId: getEliteDemand
+      tags: [bookings]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: venueId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: Elite demand, content: { application/json: { schema: { $ref: "#/components/schemas/EliteDemand" } } } }
+        "403": { description: Ownership or Elite required, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2415,6 +2539,130 @@ components:
       bearerFormat: JWT
 
   schemas:
+    SquadMemberInput:
+      type: object
+      additionalProperties: false
+      required: [userId]
+      properties:
+        userId: { type: string, format: uuid }
+    Teammate:
+      type: object
+      required: [id, name, emailHint]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        emailHint: { type: string, description: Masked email suitable only to distinguish search results }
+    TeammateSearchResult:
+      type: object
+      required: [players]
+      properties:
+        players: { type: array, maxItems: 10, items: { $ref: "#/components/schemas/Teammate" } }
+    SquadAvailabilityInput:
+      type: object
+      additionalProperties: false
+      required: [startAt, endAt]
+      properties:
+        pitchId: { type: ["string", "null"], format: uuid }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        exactSlot: { type: boolean, default: false }
+    SquadRequestInput:
+      type: object
+      additionalProperties: false
+      required: [venueId, skillMin, skillMax, members, availability, expiresAt]
+      properties:
+        venueId: { type: string, format: uuid }
+        skillMin: { type: integer, minimum: 1, maximum: 10 }
+        skillMax: { type: integer, minimum: 1, maximum: 10 }
+        members: { type: array, minItems: 5, maxItems: 5, items: { $ref: "#/components/schemas/SquadMemberInput" } }
+        availability: { type: array, minItems: 1, maxItems: 50, items: { $ref: "#/components/schemas/SquadAvailabilityInput" } }
+        expiresAt: { type: string, format: date-time }
+    SquadRequest:
+      type: object
+      required: [id, captainId, venueId, skillMin, skillMax, status, expiresAt, createdAt, members, availability]
+      properties:
+        id: { type: string, format: uuid }
+        captainId: { type: string, format: uuid }
+        venueId: { type: string, format: uuid }
+        skillMin: { type: integer }
+        skillMax: { type: integer }
+        status: { type: string, enum: [DRAFT, PENDING, MATCHED, BOOKED, CANCELLED, EXPIRED] }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        members: { type: array, items: { type: string, format: uuid } }
+        availability: { type: array, items: { $ref: "#/components/schemas/SquadAvailabilityInput" } }
+        proposal: { anyOf: [{ $ref: "#/components/schemas/MatchProposal" }, { type: "null" }] }
+    SquadRequestList:
+      type: object
+      required: [requests]
+      properties:
+        requests: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/SquadRequest" } }
+    MatchProposal:
+      type: object
+      required: [id, squadAId, squadBId, bookingId, status, squadAResponse, squadBResponse, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        squadAId: { type: string, format: uuid }
+        squadBId: { type: string, format: uuid }
+        bookingId: { type: string, format: uuid }
+        status: { type: string, enum: [PENDING, ACCEPTED, BOOKED, DECLINED, CANCELLED, EXPIRED] }
+        squadAResponse: { type: string, enum: [PENDING, ACCEPTED, DECLINED] }
+        squadBResponse: { type: string, enum: [PENDING, ACCEPTED, DECLINED] }
+        expiresAt: { type: string, format: date-time }
+    MatchProposalResponseInput:
+      type: object
+      additionalProperties: false
+      required: [response]
+      properties:
+        response: { type: string, enum: [ACCEPTED, DECLINED] }
+    WaitlistJoinInput:
+      type: object
+      additionalProperties: false
+      required: [pitchId, startAt]
+      properties:
+        pitchId: { type: string, format: uuid }
+        startAt: { type: string, format: date-time }
+    WaitlistEntry:
+      type: object
+      required: [id, venueId, pitchId, userId, startAt, endAt, position, status, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        venueId: { type: string, format: uuid }
+        pitchId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+        position: { type: integer }
+        status: { type: string, enum: [WAITING, OFFERED, CLAIMED, LEFT, EXPIRED, CANCELLED] }
+        createdAt: { type: string, format: date-time }
+        claimId: { type: ["string", "null"], format: uuid }
+        claimExpiresAt: { type: ["string", "null"], format: date-time }
+        queuePosition: { type: ["integer", "null"] }
+        queueLength: { type: integer }
+    WaitlistEntryList:
+      type: object
+      required: [entries]
+      properties:
+        entries: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/WaitlistEntry" } }
+    WaitlistStatus:
+      type: object
+      required: [entry, queueLength]
+      properties:
+        entry: { anyOf: [{ $ref: "#/components/schemas/WaitlistEntry" }, { type: "null" }] }
+        queueLength: { type: integer }
+    WaitlistClaimResult:
+      type: object
+      required: [claimId, bookingId, status]
+      properties:
+        claimId: { type: string, format: uuid }
+        bookingId: { type: string, format: uuid }
+        status: { type: string, enum: [CLAIMED] }
+    EliteDemand:
+      type: object
+      required: [squadRequests, waitlistEntries]
+      properties:
+        squadRequests: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/SquadRequest" } }
+        waitlistEntries: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/WaitlistEntry" } }
     MatchTeam:
       type: string
       enum: [HOME, AWAY]
@@ -3065,7 +3313,10 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, ownerId, status, name, district, address, amenities, cancellationWindowHours, createdAt, updatedAt]
+        eliteMatchmakingEnabled:
+          type: boolean
+          description: Whether this venue's owner currently has Elite matchmaking enabled.
+      required: [id, ownerId, status, name, district, address, amenities, cancellationWindowHours, createdAt, updatedAt, eliteMatchmakingEnabled]
 
     VenuePhoto:
       type: object

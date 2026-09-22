@@ -57,11 +57,7 @@ function NotificationBell() {
 
 function NativeTabLayout() {
   return (
-    <NativeTabs
-      screenOptions={{
-        headerRight: () => <NotificationBell />,
-      }}
-    >
+    <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "magnifyingglass", selected: "magnifyingglass" }} />
         <Label>Venues</Label>

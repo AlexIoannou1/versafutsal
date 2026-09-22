@@ -8,6 +8,7 @@ import {
   type Notification,
 } from "@workspace/db/schema";
 import { and, eq, isNotNull, lt, lte, notExists } from "drizzle-orm";
+import { logger } from "./logger";
 
 type NotifType =
   | "BOOKING_CONFIRMED"
@@ -18,7 +19,12 @@ type NotifType =
   | "VENUE_REJECTED"
   | "VENUE_DISABLED"
   | "PAYMENT_FAILED"
-  | "MATCH_FINISHED";
+  | "MATCH_FINISHED"
+  | "SQUAD_MATCHED"
+  | "MATCH_EXPIRED"
+  | "MATCH_CANCELLED"
+  | "WAITLIST_CLAIM"
+  | "WAITLIST_CLAIM_EXPIRED";
 
 interface SendNotifOpts {
   userId: string;
@@ -28,6 +34,7 @@ interface SendNotifOpts {
   entityType?: string;
   entityId?: string;
   scheduledAt?: Date;
+  dedupeKey?: string;
 }
 
 // ─── Expo Push API ─────────────────────────────────────────────────────────────
@@ -200,7 +207,7 @@ async function checkPushReceipts(): Promise<void> {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function sendNotification(opts: SendNotifOpts): Promise<void> {
-  const { userId, type, title, body, entityType, entityId, scheduledAt } = opts;
+  const { userId, type, title, body, entityType, entityId, scheduledAt, dedupeKey } = opts;
 
   // Store in-app notification and get its ID.
   const [inserted] = await db
@@ -213,7 +220,9 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
       entityType: entityType ?? null,
       entityId: entityId ?? null,
       scheduledAt: scheduledAt ?? null,
+      dedupeKey: dedupeKey ?? null,
     })
+    .onConflictDoNothing({ target: notificationsTable.dedupeKey })
     .returning({ id: notificationsTable.id });
 
   // Send push notification if immediate (no scheduledAt).

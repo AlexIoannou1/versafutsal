@@ -204,6 +204,13 @@
       "when": 1789723570561,
       "tag": "0028_reconcile_schema_drift",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788258194000,
+      "tag": "0025_elite_matchmaking_waitlists",
+      "breakpoints": true
     }
   ]
 }
