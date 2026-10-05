@@ -66,7 +66,7 @@ const PLANS: Array<{
       { label: "Includes everything in Free", availability: "included" },
       { label: "Create manual and phone bookings", availability: "included" },
       { label: "Advanced match statistics", availability: "included" },
-      { label: "Growth tools and promotions", availability: "comingSoon" },
+      { label: "Discount codes and weekly streak rewards", availability: "included" },
       { label: "Insights and automated reminders", availability: "comingSoon" },
     ],
   },

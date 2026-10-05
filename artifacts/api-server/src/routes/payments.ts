@@ -9,18 +9,53 @@ import {
   pricingRulesTable,
   adminSettingsTable,
   auditLogTable,
+  promotionRedemptionsTable,
+  venueStreakRewardsTable,
 } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { paymentProvider } from "../lib/payment-provider";
+import { closeUnpaidCheckout } from "../lib/growth-checkout-cleanup";
+import { repairIncompleteBookingPricing } from "../lib/growth-pricing-recovery";
+import { reconcileSmsReminder } from "../lib/sms-reminders";
+import { canUsePaymentProvider } from "../lib/manual-bookings";
+import { logger } from "../lib/logger";
 import { sendBookingConfirmedNotifications } from "../lib/notifications";
 import { logBookingAudit, logBookingAuditFireAndForget } from "../lib/audit";
 import { randomUUID } from "crypto";
-import type { Logger } from "pino";
-import { reconcileSmsReminder } from "../lib/sms-reminders";
-import { canUsePaymentProvider } from "../lib/manual-bookings";
+import {
+  finalizeGrowthIncentive,
+  quoteFromDiscount,
+  reservePromotion,
+  reserveStreakReward,
+  releaseGrowthReservation,
+} from "../lib/growth-tools";
 
 const router: IRouter = Router();
+router.use("/bookings/:bookingId", requireAuth, async (req, res, next) => {
+  const [booking] = await db.select().from(bookingsTable).where(and(
+    eq(bookingsTable.id, req.params.bookingId as string),
+    eq(bookingsTable.playerId, req.user!.userId),
+  )).limit(1);
+  if (!booking) { res.status(404).json({ error: "Booking not found" }); return; }
+  if (!canUsePaymentProvider(booking.source)) {
+    res.status(400).json({ error: "Manual bookings must be paid offline", code: "MANUAL_BOOKING_OFFLINE_ONLY" });
+    return;
+  }
+  if (booking.status === "PENDING" && !booking.pricingSnapshot) {
+    try { await repairIncompleteBookingPricing(booking.id); }
+    catch (error) {
+      req.log.error({ err: error, bookingId: booking.id }, "Unable to reconcile interrupted checkout pricing");
+      res.status(409).json({ error: "Payment pricing could not be safely recovered. Retry later or contact support.", code: "PRICING_RECOVERY_REQUIRED" });
+      return;
+    }
+  }
+  if (booking.status === "CONFIRMED") {
+    try { await reconcileSmsReminder(booking.id); }
+    catch (error) { req.log.error({ err: error }, "Unable to reconcile booking SMS reminder"); }
+  }
+  next();
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -58,45 +93,50 @@ router.post<{ bookingId: string }>(
   requireAuth,
   requireRole("PLAYER"),
   async (req, res) => {
+    let releaseUnpricedCheckout: (() => Promise<void>) | null = null;
     try {
       const { bookingId } = req.params;
-      const { paymentType = "FULL", idempotencyKey } = req.body as {
+      const { paymentType = "FULL", idempotencyKey, promoCode, useStreakReward = true } = req.body as {
         paymentType?: "FULL" | "DEPOSIT";
         idempotencyKey?: string;
+        promoCode?: string;
+        useStreakReward?: boolean;
       };
 
       if (paymentType !== "FULL" && paymentType !== "DEPOSIT") {
         res.status(400).json({ error: "paymentType must be FULL or DEPOSIT" });
         return;
       }
+      if ((promoCode != null && (typeof promoCode !== "string" || promoCode.length > 32)) ||
+          (idempotencyKey != null && (typeof idempotencyKey !== "string" || !/^[A-Za-z0-9:_.-]{1,200}$/.test(idempotencyKey))) ||
+          typeof useStreakReward !== "boolean") {
+        res.status(400).json({ error: "Invalid checkout incentive or idempotency key" });
+        return;
+      }
 
       // Idempotency: if a payment already exists with this key and is SUCCEEDED, return 200
       const effectiveKey = idempotencyKey ?? `${bookingId}:${paymentType}:${req.user!.userId}`;
 
-      const [sourceCheck] = await db
-        .select({
-          id: bookingsTable.id,
-          playerId: bookingsTable.playerId,
-          source: bookingsTable.source,
-          status: bookingsTable.status,
-          pitchId: bookingsTable.pitchId,
-          startAt: bookingsTable.startAt,
-          endAt: bookingsTable.endAt,
-        })
+      // Ownership must be established before any idempotency response. A guessed
+      // booking ID/key must never disclose another player's payment or secret.
+      const [booking] = await db
+        .select()
         .from(bookingsTable)
-        .where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)))
+        .where(and(
+          eq(bookingsTable.id, bookingId),
+          eq(bookingsTable.playerId, req.user!.userId),
+        ))
         .limit(1);
-      if (!sourceCheck) {
+      if (!booking) {
         res.status(404).json({ error: "Booking not found" });
         return;
       }
-      if (!canUsePaymentProvider(sourceCheck.source)) {
-        res.status(400).json({
-          error: "Manual bookings must be paid offline",
-          code: "MANUAL_BOOKING_OFFLINE_ONLY",
-        });
+      if (booking.status === "CANCELLED" || booking.status === "REFUNDED") {
+        res.status(409).json({ error: "This booking is closed. Please reserve again.", code: "CHECKOUT_EXPIRED" });
         return;
       }
+
+      // Idempotency: scope the lookup to THIS booking + key to prevent cross-booking leakage
       const [existingPayment] = await db
         .select()
         .from(paymentsTable)
@@ -121,14 +161,6 @@ router.post<{ bookingId: string }>(
             )
             .limit(1);
 
-          if (alreadyBooking?.status === "CONFIRMED") {
-            try {
-              await reconcileSmsReminder(bookingId);
-            } catch (error) {
-              req.log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
-            }
-          }
-
           res.json({
             alreadyProcessed: true,
             booking: alreadyBooking
@@ -144,34 +176,99 @@ router.post<{ bookingId: string }>(
         } else if (existingPayment.status === "PENDING" && existingPayment.provider === "STRIPE") {
           // Stripe payment is PENDING — client may need to re-present the payment sheet.
           // Return the existing providerPaymentId so client can retrieve the client_secret if needed.
-        const publishableKey = process.env.STRIPE_TEST_PK ?? null;
+          const publishableKey = process.env.STRIPE_TEST_PK ?? null;
+          let clientSecret: string | undefined;
+          try {
+            clientSecret = existingPayment.providerPaymentId
+              ? await paymentProvider.getClientSecret(existingPayment.providerPaymentId)
+              : undefined;
+          } catch (error) {
+            // A network error does not prove that an intent cannot charge.
+            const state = existingPayment.providerPaymentId
+              ? await paymentProvider.confirmPayment(existingPayment.providerPaymentId) : null;
+            if (state?.terminal) {
+              await closeUnpaidCheckout(bookingId, existingPayment.id);
+              res.status(409).json({ error: "This payment was canceled. Please create a new booking.", code: "CHECKOUT_EXPIRED" });
+              return;
+            }
+            res.status(503).json({ error: "Payment status is temporarily unavailable. Retry this checkout.", code: "PAYMENT_STATUS_UNAVAILABLE" });
+            return;
+          }
+          if (!clientSecret) {
+            res.status(503).json({ error: "Payment cannot currently be resumed. Retry this checkout.", code: "PAYMENT_STATUS_UNAVAILABLE" });
+            return;
+          }
           res.status(202).json({
             requiresClientAction: true,
             providerPaymentId: existingPayment.providerPaymentId,
+            clientSecret,
             publishableKey,
             booking: { id: bookingId, status: "PENDING" },
             payment: formatPayment(existingPayment),
           });
+        } else if (existingPayment.status === "PENDING" && existingPayment.provider === "INTERNAL") {
+          const [freePitch] = await db.select({
+            id: pitchesTable.id, name: pitchesTable.name,
+            slotDurationMinutes: pitchesTable.slotDurationMinutes,
+            venueId: venuesTable.id, venueName: venuesTable.name, venueOwnerId: venuesTable.ownerId,
+          }).from(pitchesTable).innerJoin(venuesTable, eq(venuesTable.id, pitchesTable.venueId))
+            .where(eq(pitchesTable.id, booking.pitchId)).limit(1);
+          try {
+            await confirmBookingAfterPayment({
+              bookingId, actorUserId: req.user!.userId, providerPaymentId: existingPayment.providerPaymentId!,
+              intent: { ...existingPayment, providerPaymentId: existingPayment.providerPaymentId! },
+              pitchRow: freePitch ?? null, booking,
+            });
+          } catch (error) {
+            if ((error as Error).message === "STREAK_REWARD_UNAVAILABLE") {
+              await closeUnpaidCheckout(bookingId, existingPayment.id);
+              res.status(409).json({ error: "This reward is no longer available. Please reserve again.", code: "CHECKOUT_EXPIRED" });
+              return;
+            }
+            throw error;
+          }
+          res.json({ booking: { id: bookingId, status: "CONFIRMED" }, payment: formatPayment(existingPayment) });
         } else {
           // FAILED or other PENDING state — client must supply a fresh idempotency key to retry.
           res.status(409).json({
             error: `A payment with this idempotency key already exists with status: ${existingPayment.status}. Use a new idempotency key to retry.`,
+            code: "PAYMENT_RETRY_KEY_REQUIRED",
           });
         }
         return;
       }
 
-      // Fetch booking + pitch + venue
-      const booking = sourceCheck;
       if (booking.status === "CONFIRMED") {
         res.status(409).json({ error: "Booking is already confirmed" });
         return;
       }
 
       if (booking.status !== "PENDING") {
-        res.status(400).json({ error: `Booking cannot be checked out in status: ${booking.status}` });
+        res.status(400).json({ error: `Booking cannot be checked out in status: ${booking.status}`, code: "CHECKOUT_EXPIRED" });
         return;
       }
+      // Claim before any incentive reservation. This prevents a losing concurrent
+      // request from reserving a promotion/reward for the same booking.
+      const [checkoutClaim] = await db.update(bookingsTable).set({ checkoutKey: effectiveKey, updatedAt: new Date() })
+        .where(and(
+          eq(bookingsTable.id, bookingId),
+          eq(bookingsTable.status, "PENDING"),
+          isNull(bookingsTable.checkoutKey),
+        )).returning({ id: bookingsTable.id });
+      if (!checkoutClaim) {
+        res.status(409).json({ error: "Checkout is already in progress for this booking.", code: "CHECKOUT_IN_PROGRESS" });
+        return;
+      }
+      releaseUnpricedCheckout = async () => {
+        await db.transaction(async (tx) => {
+          const [released] = await tx.update(bookingsTable).set({ checkoutKey: null }).where(and(
+            eq(bookingsTable.id, bookingId),
+            eq(bookingsTable.checkoutKey, effectiveKey),
+            isNull(bookingsTable.pricingSnapshot),
+          )).returning({ id: bookingsTable.id });
+          if (released) await releaseGrowthReservation(tx, bookingId);
+        });
+      };
 
       const [pitchRow] = await db
         .select({
@@ -188,6 +285,7 @@ router.post<{ bookingId: string }>(
         .limit(1);
 
       if (!pitchRow) {
+        await releaseUnpricedCheckout();
         res.status(404).json({ error: "Pitch not found" });
         return;
       }
@@ -199,30 +297,126 @@ router.post<{ bookingId: string }>(
         .where(eq(pricingRulesTable.pitchId, booking.pitchId));
 
       const rule = pricingRules[0];
-      const pricePerHour = rule?.pricePerHour ?? null;
+      const policyPricing = booking.policySnapshot as {
+        pricePerHour?: string | number | null;
+        slotDurationMinutes?: number;
+      };
+      const pricePerHour = policyPricing.pricePerHour ?? null;
       const subtotalNum =
         pricePerHour != null
-          ? (parseFloat(pricePerHour) * pitchRow.slotDurationMinutes) / 60
+          ? (parseFloat(String(pricePerHour)) * (policyPricing.slotDurationMinutes ?? pitchRow.slotDurationMinutes)) / 60
           : 0;
       const subtotal = subtotalNum.toFixed(2);
+
+      // Reserve exactly one incentive while holding the booking row lock. The
+      // unique booking redemption/reward constraints make concurrent checkout safe.
+      let quote = booking.pricingSnapshot
+        ? {
+            currency: "EUR" as const,
+            subtotal: booking.pricingSnapshot.subtotal,
+            discountAmount: booking.pricingSnapshot.discountAmount,
+            payableAmount: booking.pricingSnapshot.payableAmount,
+            incentiveType: booking.pricingSnapshot.incentiveType,
+            incentiveId: booking.pricingSnapshot.incentiveId,
+          }
+        : null;
+      if (!quote) {
+        try {
+          quote = await db.transaction(async (tx) => {
+            if (promoCode?.trim()) {
+              return reservePromotion(tx, {
+                bookingId, playerId: booking.playerId, venueId: booking.venueId,
+                code: promoCode, subtotal,
+              });
+            }
+            if (useStreakReward) {
+              const reward = await reserveStreakReward(tx, {
+                bookingId, playerId: booking.playerId, venueId: booking.venueId, subtotal,
+              });
+              if (reward) return reward;
+            }
+            return quoteFromDiscount(subtotal);
+          }, { isolationLevel: "serializable" });
+        } catch (incentiveError: any) {
+          if (incentiveError?.code?.startsWith("PROMO_") || incentiveError?.code === "GROWTH_DISABLED" || incentiveError?.code === "REWARD_CONFLICT" ||
+              incentiveError?.code === "23505" || incentiveError?.cause?.code === "23505") {
+            await releaseUnpricedCheckout();
+            res.status(409).json({ error: incentiveError.message, code: incentiveError.code ?? "INCENTIVE_CONFLICT" });
+            return;
+          }
+          await releaseUnpricedCheckout();
+          throw incentiveError;
+        }
+      }
 
       // Compute deposit amount from venue pricing rule config
       let depositAmountOverride: string | undefined;
       if (paymentType === "DEPOSIT") {
         if (!rule || rule.depositType === "NONE") {
+          await releaseUnpricedCheckout();
           res.status(400).json({ error: "Deposit payments are not configured for this venue" });
           return;
         }
         if (rule.depositType === "FIXED" && rule.depositAmount) {
-          depositAmountOverride = parseFloat(rule.depositAmount).toFixed(2);
+          depositAmountOverride = Math.min(
+            parseFloat(rule.depositAmount),
+            Number(quote.payableAmount),
+          ).toFixed(2);
         } else if (rule.depositType === "PERCENT" && rule.depositAmount) {
           const pct = parseFloat(rule.depositAmount) / 100;
-          depositAmountOverride = (subtotalNum * pct).toFixed(2);
+          depositAmountOverride = (Number(quote.payableAmount) * pct).toFixed(2);
         }
         if (!depositAmountOverride) {
+          await releaseUnpricedCheckout();
           res.status(400).json({ error: "Invalid deposit configuration for this pitch" });
           return;
         }
+      }
+
+      // A fifth-free reward is always a full zero-cost booking; deposits are
+      // meaningless and could otherwise accidentally create a positive charge.
+      if (quote.payableAmount === "0.00" && paymentType === "DEPOSIT") {
+        await releaseUnpricedCheckout();
+        res.status(400).json({ error: "A free reward must be checked out as FULL" });
+        return;
+      }
+
+      if (quote.payableAmount === "0.00") {
+        const providerPaymentId = `free_${randomUUID()}`;
+        try {
+          await db.transaction(async (tx) => {
+            await tx.insert(paymentsTable).values({
+            bookingId, provider: "INTERNAL", providerPaymentId, amount: "0.00",
+            feeAmount: "0.00", feePercent: "0.00", feeWaived: true,
+            status: "PENDING", paymentType: "FULL", idempotencyKey: effectiveKey,
+            metadata: { zeroCostReward: true },
+          });
+            const [snapshotted] = await tx.update(bookingsTable).set({
+            pricingSnapshot: {
+              ...quote!, feeAmount: "0.00", feePercent: "0.00", feeWaived: true,
+              capturedAt: new Date().toISOString(),
+            },
+            }).where(and(eq(bookingsTable.id, bookingId), eq(bookingsTable.status, "PENDING"))).returning({
+              id: bookingsTable.id,
+            });
+            if (!snapshotted) throw new Error("FREE_PAYMENT_SNAPSHOT_FAILED");
+          });
+        } catch (error) {
+          await releaseUnpricedCheckout();
+          throw error;
+        }
+        await confirmBookingAfterPayment({
+          bookingId, actorUserId: req.user!.userId, providerPaymentId,
+          intent: { providerPaymentId, amount: "0.00", feeAmount: "0.00", feePercent: "0.00", feeWaived: true, currency: "EUR" },
+          pitchRow, booking: {
+            ...booking,
+            pricingSnapshot: { ...quote, feeAmount: "0.00", feePercent: "0.00", feeWaived: true },
+          },
+        });
+        const [freePayment] = await db.select().from(paymentsTable)
+          .where(eq(paymentsTable.providerPaymentId, providerPaymentId)).limit(1);
+        res.json({ booking: { id: bookingId, status: "CONFIRMED" }, payment: freePayment ? formatPayment(freePayment) : null });
+        return;
       }
 
       // Create payment intent (race-safe)
@@ -231,10 +425,13 @@ router.post<{ bookingId: string }>(
         intent = await paymentProvider.createPaymentIntent({
           bookingId,
           venueId: pitchRow.venueId,
-          subtotalAmount: subtotal,
+          subtotalAmount: quote.payableAmount,
           paymentType,
           idempotencyKey: effectiveKey,
           depositAmountOverride,
+          feePercentOverride: booking.pricingSnapshot?.feePercent,
+          feeWaivedOverride: booking.pricingSnapshot?.feeWaived,
+          bookingQuote: quote,
         });
       } catch (insertErr: unknown) {
         const pgCode =
@@ -283,8 +480,11 @@ router.post<{ bookingId: string }>(
           }
           return;
         }
+        await releaseUnpricedCheckout();
         throw insertErr;
       }
+
+      // The provider committed the payment and snapshot in one transaction.
 
       // ── Stripe mode: return clientSecret for client-side payment sheet ──
       if (intent.clientSecret) {
@@ -313,6 +513,13 @@ router.post<{ bookingId: string }>(
       const confirmation = await paymentProvider.confirmPayment(intent.providerPaymentId);
 
       if (!confirmation.success) {
+        if (!confirmation.terminal) {
+          res.status(409).json({ error: confirmation.errorMessage ?? "Payment is still pending.", code: "PAYMENT_PENDING" });
+          return;
+        }
+        const [failedPayment] = await db.select().from(paymentsTable)
+          .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId)).limit(1);
+        if (failedPayment) await closeUnpaidCheckout(bookingId, failedPayment.id);
         await db.transaction(async (tx) => {
           await tx
             .update(paymentsTable)
@@ -341,9 +548,10 @@ router.post<{ bookingId: string }>(
             notes: confirmation.errorMessage ?? "Payment failed",
             metadata: { via: "checkout" },
           });
+          await tx.update(bookingsTable).set({ checkoutKey: null }).where(eq(bookingsTable.id, bookingId));
         });
 
-        res.status(402).json({ error: confirmation.errorMessage ?? "Payment failed" });
+        res.status(402).json({ error: confirmation.errorMessage ?? "Payment failed", code: "CHECKOUT_EXPIRED" });
         return;
       }
 
@@ -353,14 +561,20 @@ router.post<{ bookingId: string }>(
         providerPaymentId: intent.providerPaymentId,
         intent,
         pitchRow,
-        booking,
-        log: req.log,
+        booking: {
+          ...booking,
+          pricingSnapshot: {
+            ...quote,
+            feeAmount: intent.feeAmount,
+            feePercent: intent.feePercent,
+          },
+        },
       });
 
       const [payment] = await db
         .select()
         .from(paymentsTable)
-        .where(eq(paymentsTable.bookingId, bookingId))
+        .where(eq(paymentsTable.providerPaymentId, intent.providerPaymentId))
         .limit(1);
 
       res.json({
@@ -368,6 +582,15 @@ router.post<{ bookingId: string }>(
         payment: payment ? formatPayment(payment) : null,
       });
     } catch (err) {
+      // Covers unexpected validation/query errors after the claim but before a
+      // snapshot exists. The helper is a no-op once pricing is immutable.
+      if (releaseUnpricedCheckout) {
+        try {
+          await releaseUnpricedCheckout();
+        } catch (cleanupError) {
+          req.log.error({ err: cleanupError }, "Unable to release unpriced checkout claim");
+        }
+      }
       console.error("POST /bookings/:bookingId/checkout error:", err);
       res.status(500).json({ error: "Internal server error" });
     }
@@ -386,18 +609,15 @@ router.post<{ bookingId: string }>(
     try {
       const { bookingId } = req.params;
 
+      // Verify booking belongs to this player
       const [booking] = await db
-        .select({
-          id: bookingsTable.id,
-          pitchId: bookingsTable.pitchId,
-          startAt: bookingsTable.startAt,
-          endAt: bookingsTable.endAt,
-          playerId: bookingsTable.playerId,
-          source: bookingsTable.source,
-        })
+        .select()
         .from(bookingsTable)
         .where(
-          and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)),
+          and(
+            eq(bookingsTable.id, bookingId),
+            eq(bookingsTable.playerId, req.user!.userId),
+          ),
         )
         .limit(1);
 
@@ -405,15 +625,28 @@ router.post<{ bookingId: string }>(
         res.status(404).json({ error: "Booking not found" });
         return;
       }
-      if (!canUsePaymentProvider(booking.source)) {
-        res.status(400).json({ error: "Manual bookings must be paid offline", code: "MANUAL_BOOKING_OFFLINE_ONLY" });
+
+      if (booking.status === "CONFIRMED") {
+        // Already confirmed (idempotent)
+        res.json({ booking: { id: bookingId, status: "CONFIRMED" } });
         return;
       }
 
+      if (booking.status !== "PENDING") {
+        res.status(400).json({ error: `Booking cannot be captured in status: ${booking.status}` });
+        return;
+      }
+
+      // Find the PENDING payment record for this booking
       const [payment] = await db
         .select()
         .from(paymentsTable)
-        .where(eq(paymentsTable.bookingId, bookingId))
+        .where(
+          and(
+            eq(paymentsTable.bookingId, bookingId),
+            eq(paymentsTable.status, "PENDING"),
+          ),
+        )
         .limit(1);
 
       if (!payment) {
@@ -422,9 +655,16 @@ router.post<{ bookingId: string }>(
       }
 
       // Verify the payment with the provider
-      const confirmation = await paymentProvider.confirmPayment(payment.providerPaymentId!);
+      const confirmation = payment.provider === "INTERNAL"
+        ? { success: true }
+        : await paymentProvider.confirmPayment(payment.providerPaymentId!);
 
       if (!confirmation.success) {
+        if (!confirmation.terminal) {
+          res.status(409).json({ error: confirmation.errorMessage ?? "Payment is still pending.", code: "PAYMENT_PENDING" });
+          return;
+        }
+        await closeUnpaidCheckout(bookingId, payment.id);
         // Mark payment failed
         await db.transaction(async (tx) => {
           await tx
@@ -442,9 +682,10 @@ router.post<{ bookingId: string }>(
             notes: confirmation.errorMessage ?? "Payment verification failed",
             metadata: { via: "capture" },
           });
+          await tx.update(bookingsTable).set({ checkoutKey: null }).where(eq(bookingsTable.id, bookingId));
         });
 
-        res.status(402).json({ error: confirmation.errorMessage ?? "Payment verification failed" });
+        res.status(402).json({ error: confirmation.errorMessage ?? "Payment verification failed", code: "CHECKOUT_EXPIRED" });
         return;
       }
 
@@ -479,7 +720,6 @@ router.post<{ bookingId: string }>(
         intent: intentForCapture,
         pitchRow: pitchRow ?? null,
         booking,
-        log: req.log,
       });
 
       const [updatedPayment] = await db
@@ -527,10 +767,11 @@ async function confirmBookingAfterPayment(opts: {
     startAt: Date;
     endAt: Date;
     playerId: string;
+    venueId: string;
+    pricingSnapshot?: any;
   };
-  log: Logger;
 }) {
-  const { bookingId, actorUserId, providerPaymentId, intent, pitchRow, booking, log } = opts;
+  const { bookingId, actorUserId, providerPaymentId, intent, pitchRow, booking } = opts;
 
   let alreadyConfirmedConcurrently = false;
 
@@ -542,12 +783,22 @@ async function confirmBookingAfterPayment(opts: {
         and(
           eq(bookingsTable.id, bookingId),
           eq(bookingsTable.status, "PENDING"),
-          eq(bookingsTable.source, "ONLINE"),
         ),
       )
-      .returning({ id: bookingsTable.id });
+      .returning();
 
     if (updatedBookings.length === 0) {
+      const [currentBooking] = await tx
+        .select({ status: bookingsTable.status })
+        .from(bookingsTable)
+        .where(eq(bookingsTable.id, bookingId))
+        .limit(1);
+      if (currentBooking?.status !== "CONFIRMED") {
+        throw Object.assign(
+          new Error(`Booking cannot be confirmed from ${currentBooking?.status ?? "missing"}`),
+          { code: "BOOKING_NOT_CONFIRMABLE" },
+        );
+      }
       alreadyConfirmedConcurrently = true;
     }
 
@@ -586,6 +837,7 @@ async function confirmBookingAfterPayment(opts: {
     });
 
     if (!alreadyConfirmedConcurrently) {
+      await finalizeGrowthIncentive(tx, updatedBookings[0]!);
       await logBookingAudit(tx, {
         bookingId,
         actorUserId,
@@ -610,15 +862,9 @@ async function confirmBookingAfterPayment(opts: {
     });
   });
 
-  if (!alreadyConfirmedConcurrently) {
-    try {
-      await reconcileSmsReminder(bookingId);
-    } catch (error) {
-      log.error({ err: error, event: "sms.reminder.reconcile_failed", bookingId }, "SMS reminder reconciliation failed");
-    }
-  }
-
   if (!alreadyConfirmedConcurrently && pitchRow) {
+    try { await reconcileSmsReminder(bookingId); }
+    catch (error) { logger.error({ err: error, bookingId }, "Unable to reconcile confirmed booking SMS reminder"); }
     try {
       const [player] = await db
         .select({ id: usersTable.id, name: usersTable.name })
@@ -661,7 +907,7 @@ router.get<{ bookingId: string }>(
       const { bookingId } = req.params;
 
       const [booking] = await db
-        .select({ id: bookingsTable.id, playerId: bookingsTable.playerId, source: bookingsTable.source })
+        .select({ id: bookingsTable.id, playerId: bookingsTable.playerId })
         .from(bookingsTable)
         .where(
           and(eq(bookingsTable.id, bookingId), eq(bookingsTable.playerId, req.user!.userId)),
@@ -670,10 +916,6 @@ router.get<{ bookingId: string }>(
 
       if (!booking) {
         res.status(404).json({ error: "Booking not found" });
-        return;
-      }
-      if (!canUsePaymentProvider(booking.source)) {
-        res.status(400).json({ error: "Manual bookings must be paid offline", code: "MANUAL_BOOKING_OFFLINE_ONLY" });
         return;
       }
 
@@ -733,14 +975,28 @@ router.get("/admin/settings", requireAuth, requireRole("ADMIN"), async (_req, re
 });
 
 // ─── PATCH /admin/settings ───────────────────────────────────────────────────
+
 router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
-    const { feeEnabled, feePercent } = req.body as { feeEnabled?: boolean; feePercent?: string };
+    const { feeEnabled, feePercent } = req.body as {
+      feeEnabled?: boolean;
+      feePercent?: string;
+    };
+
     const settings = await getOrSeedAdminSettings();
-    const updates: Partial<typeof adminSettingsTable.$inferSelect> = { updatedAt: new Date() };
+
+    const updates: Partial<typeof adminSettingsTable.$inferSelect> = {
+      updatedAt: new Date(),
+    };
     if (typeof feeEnabled === "boolean") updates.feeEnabled = feeEnabled;
     if (feePercent !== undefined) updates.feePercent = feePercent;
-    const [updated] = await db.update(adminSettingsTable).set(updates).where(eq(adminSettingsTable.id, settings.id)).returning();
+
+    const [updated] = await db
+      .update(adminSettingsTable)
+      .set(updates)
+      .where(eq(adminSettingsTable.id, settings.id))
+      .returning();
+
     res.json({ settings: updated });
   } catch (err) {
     console.error("PATCH /admin/settings error:", err);
@@ -749,32 +1005,61 @@ router.patch("/admin/settings", requireAuth, requireRole("ADMIN"), async (req, r
 });
 
 // ─── PATCH /admin/settings/venues/:venueId ───────────────────────────────────
-router.patch<{ venueId: string }>("/admin/settings/venues/:venueId", requireAuth, requireRole("ADMIN"), async (req, res) => {
-  try {
-    const venueId = req.params.venueId as string;
-    const { feeEnabled } = req.body as { feeEnabled?: boolean | null };
-    const settings = await getOrSeedAdminSettings();
-    const overrides = { ...(settings.perVenueOverrides ?? {}) } as Record<string, boolean>;
-    if (feeEnabled === null || feeEnabled === undefined) delete overrides[venueId]; else overrides[venueId] = feeEnabled;
-    const [updated] = await db.update(adminSettingsTable).set({ perVenueOverrides: overrides, updatedAt: new Date() }).where(eq(adminSettingsTable.id, settings.id)).returning();
-    res.json({ settings: updated });
-  } catch (err) {
-    console.error("PATCH /admin/settings/venues/:venueId error:", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
+// Set or clear per-venue fee override
+
+router.patch<{ venueId: string }>(
+  "/admin/settings/venues/:venueId",
+  requireAuth,
+  requireRole("ADMIN"),
+  async (req, res) => {
+    try {
+      const { venueId } = req.params;
+      const { feeEnabled } = req.body as { feeEnabled?: boolean | null };
+
+      const settings = await getOrSeedAdminSettings();
+      const overrides = { ...(settings.perVenueOverrides ?? {}) };
+
+      if (feeEnabled === null || feeEnabled === undefined) {
+        delete overrides[venueId];
+      } else {
+        overrides[venueId] = feeEnabled;
+      }
+
+      const [updated] = await db
+        .update(adminSettingsTable)
+        .set({ perVenueOverrides: overrides, updatedAt: new Date() })
+        .where(eq(adminSettingsTable.id, settings.id))
+        .returning();
+
+      res.json({ settings: updated });
+    } catch (err) {
+      console.error("PATCH /admin/settings/venues/:venueId error:", err);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // ─── GET /checkout/fee ────────────────────────────────────────────────────────
+// Preview: get current fee to display on checkout
+
 router.get("/checkout/fee", requireAuth, async (req, res) => {
   try {
     const { venueId } = req.query as { venueId?: string };
+
     const settings = await getOrSeedAdminSettings();
+
     let feeEnabled = settings.feeEnabled;
     if (venueId) {
       const overrides = (settings.perVenueOverrides ?? {}) as Record<string, boolean>;
-      if (Object.prototype.hasOwnProperty.call(overrides, venueId)) feeEnabled = overrides[venueId];
+      if (Object.prototype.hasOwnProperty.call(overrides, venueId)) {
+        feeEnabled = overrides[venueId];
+      }
     }
-    res.json({ feeEnabled, feePercent: feeEnabled ? settings.feePercent : "0.00" });
+
+    res.json({
+      feeEnabled,
+      feePercent: feeEnabled ? settings.feePercent : "0.00",
+    });
   } catch (err) {
     console.error("GET /checkout/fee error:", err);
     res.status(500).json({ error: "Internal server error" });

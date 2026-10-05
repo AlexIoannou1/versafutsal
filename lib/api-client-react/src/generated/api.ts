@@ -48,6 +48,7 @@ import type {
   CreateManualBooking201,
   CreatePitch201,
   CreatePitchRequest,
+  CreatePromotionRequest,
   CreateVenue201,
   CreateVenueRequest,
   EliteDemand,
@@ -69,9 +70,12 @@ import type {
   GetVenue200,
   GetVenueLeaderboardParams,
   GetVenuePhotoFileParams,
+  GrowthAnalytics,
+  GrowthPromotionResponse,
   HealthStatus,
   ListOwnerBookings200,
   ListOwnerBookingsParams,
+  ListOwnerPromotions200,
   ListOwnerSubscriptions200,
   ListOwnerSubscriptionsParams,
   ListOwnerVenues200,
@@ -100,6 +104,11 @@ import type {
   PasswordResetRequestResponse,
   PlayerMatchStatisticsSummary,
   PlayerVenueMatchStatisticsSummary,
+  PlayerVenueStreak,
+  PreviewBookingGrowthIncentive200,
+  PreviewBookingGrowthIncentiveBody,
+  QuoteBookingGrowthIncentive200,
+  QuoteBookingGrowthIncentiveBody,
   ReceiveStripeSubscriptionWebhook200,
   ReceiveStripeSubscriptionWebhookBody,
   RegisterPushToken200,
@@ -114,6 +123,8 @@ import type {
   SetPricingRules200,
   SetPricingRulesRequest,
   SetVenueFeeOverride200,
+  SetVenueStreak200,
+  SetVenueStreakBody,
   SquadRequest,
   SquadRequestInput,
   SquadRequestList,
@@ -137,6 +148,7 @@ import type {
   TournamentUpdate,
   UpdateAdminSettings200,
   UpdateAdminSettingsRequest,
+  UpdateOwnerPromotionBody,
   UpdatePitch200,
   UpdatePitchRequest,
   UpdateProfileRequest,
@@ -9513,3 +9525,718 @@ export const useReconcileTournamentStripeWebhook = <
     getReconcileTournamentStripeWebhookMutationOptions(options),
   );
 };
+
+/**
+ * @summary Preview pricing without reserving a booking or incentive
+ */
+export const getPreviewBookingGrowthIncentiveUrl = () => {
+  return `/api/growth/quote`;
+};
+
+export const previewBookingGrowthIncentive = async (
+  previewBookingGrowthIncentiveBody: PreviewBookingGrowthIncentiveBody,
+  options?: RequestInit,
+): Promise<PreviewBookingGrowthIncentive200> => {
+  return customFetch<PreviewBookingGrowthIncentive200>(
+    getPreviewBookingGrowthIncentiveUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(previewBookingGrowthIncentiveBody),
+    },
+  );
+};
+
+export const getPreviewBookingGrowthIncentiveMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewBookingGrowthIncentive>>,
+    TError,
+    { data: BodyType<PreviewBookingGrowthIncentiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewBookingGrowthIncentive>>,
+  TError,
+  { data: BodyType<PreviewBookingGrowthIncentiveBody> },
+  TContext
+> => {
+  const mutationKey = ["previewBookingGrowthIncentive"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewBookingGrowthIncentive>>,
+    { data: BodyType<PreviewBookingGrowthIncentiveBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return previewBookingGrowthIncentive(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewBookingGrowthIncentiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewBookingGrowthIncentive>>
+>;
+export type PreviewBookingGrowthIncentiveMutationBody =
+  BodyType<PreviewBookingGrowthIncentiveBody>;
+export type PreviewBookingGrowthIncentiveMutationError = ErrorType<void>;
+
+/**
+ * @summary Preview pricing without reserving a booking or incentive
+ */
+export const usePreviewBookingGrowthIncentive = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewBookingGrowthIncentive>>,
+    TError,
+    { data: BodyType<PreviewBookingGrowthIncentiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewBookingGrowthIncentive>>,
+  TError,
+  { data: BodyType<PreviewBookingGrowthIncentiveBody> },
+  TContext
+> => {
+  return useMutation(getPreviewBookingGrowthIncentiveMutationOptions(options));
+};
+
+export const getQuoteBookingGrowthIncentiveUrl = (bookingId: string) => {
+  return `/api/bookings/${bookingId}/quote`;
+};
+
+export const quoteBookingGrowthIncentive = async (
+  bookingId: string,
+  quoteBookingGrowthIncentiveBody: QuoteBookingGrowthIncentiveBody,
+  options?: RequestInit,
+): Promise<QuoteBookingGrowthIncentive200> => {
+  return customFetch<QuoteBookingGrowthIncentive200>(
+    getQuoteBookingGrowthIncentiveUrl(bookingId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(quoteBookingGrowthIncentiveBody),
+    },
+  );
+};
+
+export const getQuoteBookingGrowthIncentiveMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof quoteBookingGrowthIncentive>>,
+    TError,
+    { bookingId: string; data: BodyType<QuoteBookingGrowthIncentiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof quoteBookingGrowthIncentive>>,
+  TError,
+  { bookingId: string; data: BodyType<QuoteBookingGrowthIncentiveBody> },
+  TContext
+> => {
+  const mutationKey = ["quoteBookingGrowthIncentive"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof quoteBookingGrowthIncentive>>,
+    { bookingId: string; data: BodyType<QuoteBookingGrowthIncentiveBody> }
+  > = (props) => {
+    const { bookingId, data } = props ?? {};
+
+    return quoteBookingGrowthIncentive(bookingId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type QuoteBookingGrowthIncentiveMutationResult = NonNullable<
+  Awaited<ReturnType<typeof quoteBookingGrowthIncentive>>
+>;
+export type QuoteBookingGrowthIncentiveMutationBody =
+  BodyType<QuoteBookingGrowthIncentiveBody>;
+export type QuoteBookingGrowthIncentiveMutationError = ErrorType<void>;
+
+export const useQuoteBookingGrowthIncentive = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof quoteBookingGrowthIncentive>>,
+    TError,
+    { bookingId: string; data: BodyType<QuoteBookingGrowthIncentiveBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof quoteBookingGrowthIncentive>>,
+  TError,
+  { bookingId: string; data: BodyType<QuoteBookingGrowthIncentiveBody> },
+  TContext
+> => {
+  return useMutation(getQuoteBookingGrowthIncentiveMutationOptions(options));
+};
+
+export const getListOwnerPromotionsUrl = () => {
+  return `/api/owner/promotions`;
+};
+
+export const listOwnerPromotions = async (
+  options?: RequestInit,
+): Promise<ListOwnerPromotions200> => {
+  return customFetch<ListOwnerPromotions200>(getListOwnerPromotionsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListOwnerPromotionsQueryKey = () => {
+  return [`/api/owner/promotions`] as const;
+};
+
+export const getListOwnerPromotionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listOwnerPromotions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOwnerPromotions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListOwnerPromotionsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listOwnerPromotions>>
+  > = ({ signal }) => listOwnerPromotions({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listOwnerPromotions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListOwnerPromotionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listOwnerPromotions>>
+>;
+export type ListOwnerPromotionsQueryError = ErrorType<void>;
+
+export function useListOwnerPromotions<
+  TData = Awaited<ReturnType<typeof listOwnerPromotions>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listOwnerPromotions>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListOwnerPromotionsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getCreateOwnerPromotionUrl = () => {
+  return `/api/owner/promotions`;
+};
+
+export const createOwnerPromotion = async (
+  createPromotionRequest: CreatePromotionRequest,
+  options?: RequestInit,
+): Promise<GrowthPromotionResponse> => {
+  return customFetch<GrowthPromotionResponse>(getCreateOwnerPromotionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createPromotionRequest),
+  });
+};
+
+export const getCreateOwnerPromotionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOwnerPromotion>>,
+    TError,
+    { data: BodyType<CreatePromotionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createOwnerPromotion>>,
+  TError,
+  { data: BodyType<CreatePromotionRequest> },
+  TContext
+> => {
+  const mutationKey = ["createOwnerPromotion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createOwnerPromotion>>,
+    { data: BodyType<CreatePromotionRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createOwnerPromotion(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateOwnerPromotionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createOwnerPromotion>>
+>;
+export type CreateOwnerPromotionMutationBody = BodyType<CreatePromotionRequest>;
+export type CreateOwnerPromotionMutationError = ErrorType<void>;
+
+export const useCreateOwnerPromotion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createOwnerPromotion>>,
+    TError,
+    { data: BodyType<CreatePromotionRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createOwnerPromotion>>,
+  TError,
+  { data: BodyType<CreatePromotionRequest> },
+  TContext
+> => {
+  return useMutation(getCreateOwnerPromotionMutationOptions(options));
+};
+
+export const getUpdateOwnerPromotionUrl = (id: string) => {
+  return `/api/owner/promotions/${id}`;
+};
+
+export const updateOwnerPromotion = async (
+  id: string,
+  updateOwnerPromotionBody: UpdateOwnerPromotionBody,
+  options?: RequestInit,
+): Promise<GrowthPromotionResponse> => {
+  return customFetch<GrowthPromotionResponse>(getUpdateOwnerPromotionUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateOwnerPromotionBody),
+  });
+};
+
+export const getUpdateOwnerPromotionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOwnerPromotion>>,
+    TError,
+    { id: string; data: BodyType<UpdateOwnerPromotionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateOwnerPromotion>>,
+  TError,
+  { id: string; data: BodyType<UpdateOwnerPromotionBody> },
+  TContext
+> => {
+  const mutationKey = ["updateOwnerPromotion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateOwnerPromotion>>,
+    { id: string; data: BodyType<UpdateOwnerPromotionBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateOwnerPromotion(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateOwnerPromotionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateOwnerPromotion>>
+>;
+export type UpdateOwnerPromotionMutationBody =
+  BodyType<UpdateOwnerPromotionBody>;
+export type UpdateOwnerPromotionMutationError = ErrorType<unknown>;
+
+export const useUpdateOwnerPromotion = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateOwnerPromotion>>,
+    TError,
+    { id: string; data: BodyType<UpdateOwnerPromotionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateOwnerPromotion>>,
+  TError,
+  { id: string; data: BodyType<UpdateOwnerPromotionBody> },
+  TContext
+> => {
+  return useMutation(getUpdateOwnerPromotionMutationOptions(options));
+};
+
+export const getDeleteOwnerPromotionUrl = (id: string) => {
+  return `/api/owner/promotions/${id}`;
+};
+
+export const deleteOwnerPromotion = async (
+  id: string,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteOwnerPromotionUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteOwnerPromotionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOwnerPromotion>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteOwnerPromotion>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  const mutationKey = ["deleteOwnerPromotion"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteOwnerPromotion>>,
+    { id: string }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteOwnerPromotion(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteOwnerPromotionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteOwnerPromotion>>
+>;
+
+export type DeleteOwnerPromotionMutationError = ErrorType<void>;
+
+export const useDeleteOwnerPromotion = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteOwnerPromotion>>,
+    TError,
+    { id: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteOwnerPromotion>>,
+  TError,
+  { id: string },
+  TContext
+> => {
+  return useMutation(getDeleteOwnerPromotionMutationOptions(options));
+};
+
+export const getGetOwnerGrowthAnalyticsUrl = () => {
+  return `/api/owner/growth/analytics`;
+};
+
+export const getOwnerGrowthAnalytics = async (
+  options?: RequestInit,
+): Promise<GrowthAnalytics> => {
+  return customFetch<GrowthAnalytics>(getGetOwnerGrowthAnalyticsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOwnerGrowthAnalyticsQueryKey = () => {
+  return [`/api/owner/growth/analytics`] as const;
+};
+
+export const getGetOwnerGrowthAnalyticsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetOwnerGrowthAnalyticsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>
+  > = ({ signal }) => getOwnerGrowthAnalytics({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOwnerGrowthAnalyticsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>
+>;
+export type GetOwnerGrowthAnalyticsQueryError = ErrorType<unknown>;
+
+export function useGetOwnerGrowthAnalytics<
+  TData = Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOwnerGrowthAnalytics>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOwnerGrowthAnalyticsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+export const getSetVenueStreakUrl = (id: string) => {
+  return `/api/owner/venues/${id}/streak`;
+};
+
+export const setVenueStreak = async (
+  id: string,
+  setVenueStreakBody: SetVenueStreakBody,
+  options?: RequestInit,
+): Promise<SetVenueStreak200> => {
+  return customFetch<SetVenueStreak200>(getSetVenueStreakUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(setVenueStreakBody),
+  });
+};
+
+export const getSetVenueStreakMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setVenueStreak>>,
+    TError,
+    { id: string; data: BodyType<SetVenueStreakBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setVenueStreak>>,
+  TError,
+  { id: string; data: BodyType<SetVenueStreakBody> },
+  TContext
+> => {
+  const mutationKey = ["setVenueStreak"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setVenueStreak>>,
+    { id: string; data: BodyType<SetVenueStreakBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return setVenueStreak(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetVenueStreakMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setVenueStreak>>
+>;
+export type SetVenueStreakMutationBody = BodyType<SetVenueStreakBody>;
+export type SetVenueStreakMutationError = ErrorType<void>;
+
+export const useSetVenueStreak = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setVenueStreak>>,
+    TError,
+    { id: string; data: BodyType<SetVenueStreakBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setVenueStreak>>,
+  TError,
+  { id: string; data: BodyType<SetVenueStreakBody> },
+  TContext
+> => {
+  return useMutation(getSetVenueStreakMutationOptions(options));
+};
+
+export const getGetPlayerVenueStreakUrl = (venueId: string) => {
+  return `/api/player/venues/${venueId}/streak`;
+};
+
+export const getPlayerVenueStreak = async (
+  venueId: string,
+  options?: RequestInit,
+): Promise<PlayerVenueStreak> => {
+  return customFetch<PlayerVenueStreak>(getGetPlayerVenueStreakUrl(venueId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPlayerVenueStreakQueryKey = (venueId: string) => {
+  return [`/api/player/venues/${venueId}/streak`] as const;
+};
+
+export const getGetPlayerVenueStreakQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPlayerVenueStreak>>,
+  TError = ErrorType<unknown>,
+>(
+  venueId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerVenueStreak>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPlayerVenueStreakQueryKey(venueId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPlayerVenueStreak>>
+  > = ({ signal }) =>
+    getPlayerVenueStreak(venueId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!venueId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPlayerVenueStreak>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPlayerVenueStreakQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPlayerVenueStreak>>
+>;
+export type GetPlayerVenueStreakQueryError = ErrorType<unknown>;
+
+export function useGetPlayerVenueStreak<
+  TData = Awaited<ReturnType<typeof getPlayerVenueStreak>>,
+  TError = ErrorType<unknown>,
+>(
+  venueId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlayerVenueStreak>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPlayerVenueStreakQueryOptions(venueId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

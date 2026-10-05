@@ -347,6 +347,10 @@ export default function PlayerBookingDetailScreen() {
   const snapshot = (booking.policySnapshot ?? {}) as {
     pricePerHour?: string | null;
     cancellationWindowHours?: number;
+    subtotal?: string;
+    discountAmount?: string;
+    payableAmount?: string;
+    incentiveType?: "PROMOTION" | "STREAK_REWARD" | null;
   };
 
   async function handleConfirmCancel() {
@@ -463,6 +467,30 @@ export default function PlayerBookingDetailScreen() {
             </View>
           )}
         </View>
+
+        {snapshot.payableAmount != null && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Payment Summary</Text>
+            <View style={[s.row, s.rowFirst]}>
+              <Text style={s.rowLabel}>Subtotal</Text>
+              <Text style={s.rowValue}>€{Number(snapshot.subtotal ?? snapshot.payableAmount).toFixed(2)}</Text>
+            </View>
+            {Number(snapshot.discountAmount ?? 0) > 0 && (
+              <View style={s.row}>
+                <Text style={s.rowLabel}>
+                  {snapshot.incentiveType === "STREAK_REWARD" ? "Reward" : "Discount"}
+                </Text>
+                <Text style={[s.rowValue, { color: colors.success }]}>
+                  −€{Number(snapshot.discountAmount).toFixed(2)}
+                </Text>
+              </View>
+            )}
+            <View style={s.row}>
+              <Text style={s.rowLabel}>Final price</Text>
+              <Text style={s.rowValue}>€{Number(snapshot.payableAmount).toFixed(2)}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={{
           marginHorizontal: 16,

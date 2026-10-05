@@ -7,6 +7,7 @@ export * from "./notifications";
 export * from "./login-rate-limit";
 export * from "./password-reset-tokens";
 export * from "./subscriptions";
+export * from "./growth";
 export * from "./sms-reminders";
 export * from "./match-statistics";
 export * from "./elite-matchmaking";

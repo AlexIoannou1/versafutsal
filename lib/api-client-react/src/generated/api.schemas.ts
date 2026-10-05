@@ -5,6 +5,120 @@
  * Versa API specification
  * OpenAPI spec version: 0.1.0
  */
+export type GrowthPromotionKind =
+  (typeof GrowthPromotionKind)[keyof typeof GrowthPromotionKind];
+
+export const GrowthPromotionKind = {
+  PERCENTAGE: "PERCENTAGE",
+  FIXED: "FIXED",
+} as const;
+
+export interface GrowthPromotion {
+  id: string;
+  venueId: string;
+  code: string;
+  kind: GrowthPromotionKind;
+  value: string;
+  enabled: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  redemptionLimit?: number | null;
+  perPlayerLimit: number;
+  reservedCount?: number;
+  redeemedCount?: number;
+  redeemedDiscountTotal?: string;
+  createdAt: string;
+}
+
+export interface GrowthPromotionResponse {
+  promotion: GrowthPromotion;
+}
+
+export interface GrowthAnalytics {
+  promotionCount: number;
+  redeemedCount: number;
+  discountTotal: string;
+  activeStreakPlayers: number;
+  nearRewardPlayers: number;
+}
+
+export type PlayerVenueStreakProgress = {
+  paidWeeks: number;
+  expiresAt?: string | null;
+} | null;
+
+export type PlayerVenueStreakRewardStatus =
+  (typeof PlayerVenueStreakRewardStatus)[keyof typeof PlayerVenueStreakRewardStatus];
+
+export const PlayerVenueStreakRewardStatus = {
+  AVAILABLE: "AVAILABLE",
+} as const;
+
+export type PlayerVenueStreakReward = {
+  id?: string;
+  status?: PlayerVenueStreakRewardStatus;
+  expiresAt?: string | null;
+} | null;
+
+export interface PlayerVenueStreak {
+  enabled: boolean;
+  rewardAvailable: boolean;
+  progress: PlayerVenueStreakProgress;
+  reward: PlayerVenueStreakReward;
+}
+
+export type PricingQuoteCurrency =
+  (typeof PricingQuoteCurrency)[keyof typeof PricingQuoteCurrency];
+
+export const PricingQuoteCurrency = {
+  EUR: "EUR",
+} as const;
+
+export type PricingQuoteIncentiveType =
+  | (typeof PricingQuoteIncentiveType)[keyof typeof PricingQuoteIncentiveType]
+  | null;
+
+export const PricingQuoteIncentiveType = {
+  PROMOTION: "PROMOTION",
+  STREAK_REWARD: "STREAK_REWARD",
+} as const;
+
+export interface PricingQuote {
+  currency: PricingQuoteCurrency;
+  subtotal: string;
+  discountAmount: string;
+  payableAmount: string;
+  incentiveType?: PricingQuoteIncentiveType;
+  incentiveId?: string | null;
+}
+
+export type CreatePromotionRequestKind =
+  (typeof CreatePromotionRequestKind)[keyof typeof CreatePromotionRequestKind];
+
+export const CreatePromotionRequestKind = {
+  PERCENTAGE: "PERCENTAGE",
+  FIXED: "FIXED",
+} as const;
+
+export interface CreatePromotionRequest {
+  venueId: string;
+  /**
+   * @minLength 3
+   * @maxLength 32
+   * @pattern ^[A-Z0-9][A-Z0-9_-]{2,31}$
+   */
+  code: string;
+  kind: CreatePromotionRequestKind;
+  /** @exclusiveMinimum 0 */
+  value: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  /** @minimum 1 */
+  redemptionLimit?: number | null;
+  /** @minimum 1 */
+  perPlayerLimit?: number;
+}
+
 export interface SquadMemberInput {
   userId: string;
 }
@@ -476,6 +590,9 @@ export const OwnerSubscriptionCapabilitiesItem = {
   MANUAL_BOOKING: "MANUAL_BOOKING",
   ADVANCED_ANALYTICS: "ADVANCED_ANALYTICS",
   MATCH_STATISTICS: "MATCH_STATISTICS",
+  ELITE_MATCHMAKING: "ELITE_MATCHMAKING",
+  TOURNAMENT_CREATOR: "TOURNAMENT_CREATOR",
+  GROWTH_TOOLS: "GROWTH_TOOLS",
 } as const;
 
 export interface OwnerSubscription {
@@ -878,6 +995,8 @@ export interface VenueSummary {
   minPrice?: number | null;
   maxPrice?: number | null;
   pitchTypes: PitchType[];
+  /** Four qualifying paid weeks unlock a fifth booking free. */
+  streakEnabled?: boolean;
   status: VenueStatus;
   createdAt: string;
   effectivePlan: SubscriptionPlan;
@@ -900,6 +1019,7 @@ export type OwnerVenueSummary = VenueSummary & {
 };
 
 export type VenueDetail = VenueRecord & {
+  streakEnabled?: boolean;
   effectivePlan: SubscriptionPlan;
   planBadgeLabel: string | null;
   /** Compatibility field indicating whether the venue has a verified paid-plan badge. */
@@ -1086,6 +1206,8 @@ export type AdminVenueDetail = VenueRecord & {
 };
 
 export interface CreateVenueRequest {
+  /** Enable the weekly streak program during venue setup (Pro or Elite only). */
+  streakEnabled?: boolean;
   /**
    * @minLength 1
    * @maxLength 160
@@ -1356,6 +1478,12 @@ export const CheckoutRequestPaymentType = {
 } as const;
 
 export interface CheckoutRequest {
+  /**
+   * @maxLength 32
+   * @pattern ^[A-Z0-9][A-Z0-9_-]{2,31}$
+   */
+  promoCode?: string;
+  useStreakReward?: boolean;
   paymentType: CheckoutRequestPaymentType;
   idempotencyKey?: string | null;
 }
@@ -2073,4 +2201,62 @@ export type GetEliteDemandParams = {
    * @maximum 100
    */
   limit?: number;
+};
+
+export type PreviewBookingGrowthIncentiveBody = {
+  pitchId: string;
+  startAt: string;
+  /** @maxLength 32 */
+  promoCode?: string;
+};
+
+export type PreviewBookingGrowthIncentive200 = {
+  quote: PricingQuote;
+};
+
+export type QuoteBookingGrowthIncentiveBody = {
+  /** @maxLength 32 */
+  promoCode?: string;
+};
+
+export type QuoteBookingGrowthIncentive200 = {
+  quote: PricingQuote;
+};
+
+export type ListOwnerPromotions200 = {
+  promotions: GrowthPromotion[];
+};
+
+export type UpdateOwnerPromotionBodyKind =
+  (typeof UpdateOwnerPromotionBodyKind)[keyof typeof UpdateOwnerPromotionBodyKind];
+
+export const UpdateOwnerPromotionBodyKind = {
+  PERCENTAGE: "PERCENTAGE",
+  FIXED: "FIXED",
+} as const;
+
+export type UpdateOwnerPromotionBody = {
+  enabled?: boolean;
+  code?: string;
+  kind?: UpdateOwnerPromotionBodyKind;
+  /** @exclusiveMinimum 0 */
+  value?: number;
+  endsAt?: string | null;
+  /** @minimum 1 */
+  redemptionLimit?: number | null;
+  /** @minimum 1 */
+  perPlayerLimit?: number;
+};
+
+export type SetVenueStreakBody = {
+  enabled: boolean;
+};
+
+export type SetVenueStreak200Streak = {
+  enabled: boolean;
+  venueId: string;
+};
+
+export type SetVenueStreak200 = {
+  streak: SetVenueStreak200Streak;
 };

@@ -6,6 +6,7 @@ import {
   uuid,
   jsonb,
   uniqueIndex,
+  index,
   unique,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -45,6 +46,13 @@ export const bookingsTable = pgTable(
     source: bookingSourceEnum("source").notNull().default("ONLINE"),
     offlinePaymentReceivedAt: timestamp("offline_payment_received_at", { withTimezone: true }),
     policySnapshot: jsonb("policy_snapshot").notNull().default({}),
+    pricingSnapshot: jsonb("pricing_snapshot").$type<{
+      currency: "EUR"; subtotal: string; discountAmount: string; payableAmount: string;
+      feeAmount: string; feePercent: string; feeWaived: boolean;
+      incentiveType: "PROMOTION" | "STREAK_REWARD" | null;
+      incentiveId: string | null; capturedAt: string;
+    }>(),
+    checkoutKey: text("checkout_key"),
     cancellationReason: text("cancellation_reason"),
     guestName: text("guest_name"),
     guestPhone: text("guest_phone"),
@@ -57,6 +65,10 @@ export const bookingsTable = pgTable(
     uniquePitchSlotActive: uniqueIndex("unique_pitch_slot_active")
       .on(table.pitchId, table.startAt)
       .where(sql`(status = 'PENDING' OR status = 'CONFIRMED')`),
+    checkoutKeyUnique: uniqueIndex("bookings_checkout_key_unique")
+      .on(table.checkoutKey).where(sql`${table.checkoutKey} IS NOT NULL`),
+    checkoutPending: index("bookings_checkout_pending_idx")
+      .on(table.id, table.checkoutKey).where(sql`${table.status} = 'PENDING'`),
     bookingVenueUnique: unique("bookings_id_venue_unique").on(table.id, table.venueId),
   }),
 );

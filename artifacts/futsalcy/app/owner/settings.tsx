@@ -353,6 +353,19 @@ export default function OwnerSettingsScreen() {
           </View>
         </View>
 
+        <View style={s.section}>
+          <Text style={s.sectionLabel}>Venue Growth</Text>
+          <View style={s.card}>
+            <TouchableOpacity style={s.row} onPress={() => router.push("/owner/growth-tools" as never)}>
+              <View style={s.rowIcon}>
+                <FeatherIcons name="trending-up" size={18} color={colors.primary} />
+              </View>
+              <Text style={s.rowLabel}>Discounts &amp; Weekly Streaks</Text>
+              <FeatherIcons name="chevron-right" size={18} color={colors.mutedForeground} style={s.rowChevron} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Delete Account */}
         <View style={s.section}>
           <Text style={s.sectionLabel}>Account</Text>

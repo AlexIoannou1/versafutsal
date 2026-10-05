@@ -6,9 +6,12 @@ import {
   pitchesTable,
   venuesTable,
   type Notification,
+  venueStreakProgressTable,
+  venueStreakSettingsTable,
 } from "@workspace/db/schema";
 import { and, eq, isNotNull, lt, lte, notExists } from "drizzle-orm";
 import { logger } from "./logger";
+import { venueGrowthToolsEnabled } from "./growth-tools";
 
 type NotifType =
   | "BOOKING_CONFIRMED"
@@ -24,7 +27,9 @@ type NotifType =
   | "MATCH_EXPIRED"
   | "MATCH_CANCELLED"
   | "WAITLIST_CLAIM"
-  | "WAITLIST_CLAIM_EXPIRED";
+  | "WAITLIST_CLAIM_EXPIRED"
+  | "STREAK_NEAR_COMPLETION"
+  | "STREAK_EXPIRING";
 
 interface SendNotifOpts {
   userId: string;
@@ -222,7 +227,9 @@ export async function sendNotification(opts: SendNotifOpts): Promise<void> {
       scheduledAt: scheduledAt ?? null,
       dedupeKey: dedupeKey ?? null,
     })
-    .onConflictDoNothing({ target: notificationsTable.dedupeKey })
+    // Both global feature keys and venue-streak composite keys use partial
+    // indexes; PostgreSQL cannot infer either from a bare dedupe_key target.
+    .onConflictDoNothing()
     .returning({ id: notificationsTable.id });
 
   // Send push notification if immediate (no scheduledAt).
@@ -283,6 +290,23 @@ export function startReminderDispatcher(intervalMs = 60_000): NodeJS.Timeout {
         .limit(50);
 
       for (const row of dueRows) {
+        if (row.notif.entityType === "STREAK_PROGRESS" && row.notif.entityId) {
+          const [progress] = await db.select().from(venueStreakProgressTable)
+            .where(eq(venueStreakProgressTable.id, row.notif.entityId)).limit(1);
+          const [setting] = progress ? await db.select().from(venueStreakSettingsTable)
+            .where(eq(venueStreakSettingsTable.venueId, progress.venueId)).limit(1) : [];
+          if (!progress || !setting?.enabled || !progress.expiresAt || progress.expiresAt <= now ||
+              (row.notif.type === "STREAK_NEAR_COMPLETION" && progress.paidWeeks !== 3) ||
+              !await venueGrowthToolsEnabled(progress.venueId)) {
+            await db.delete(notificationsTable).where(and(
+              eq(notificationsTable.id, row.notif.id), eq(notificationsTable.pushSent, false),
+            ));
+            continue;
+          }
+          const claimed = await db.update(notificationsTable).set({ pushSent: true })
+            .where(and(eq(notificationsTable.id, row.notif.id), eq(notificationsTable.pushSent, false))).returning();
+          if (!claimed.length) continue;
+        }
         if (!row.pushToken) {
           console.info(
             `[push] skipped (no token) — user ${row.userId} has no push token (reminder notif ${row.notif.id})`,

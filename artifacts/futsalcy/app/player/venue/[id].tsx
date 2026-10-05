@@ -23,10 +23,13 @@ import {
   useFavouriteIds,
   useToggleFavourite,
   useGetPitchAvailability,
+  getGetPitchAvailabilityQueryKey,
 } from "@workspace/api-client-react";
 import PlayerStatsCard from "@/components/PlayerStatsCard";
 import VenueLeaderboard from "@/components/VenueLeaderboard";
 import { usePlayerVenueMatchStats } from "@/lib/match-stats-api";
+import { useQuery } from "@tanstack/react-query";
+import { getPlayerVenueStreak } from "@/lib/growth-api";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SHORT_DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -194,7 +197,7 @@ function PitchCard({ venueId, pitch, selectedDateStr, onBook }: PitchCardProps) 
     venueId,
     pitch.id,
     { date: selectedDateStr },
-    { query: { enabled: !!selectedDateStr && !!venueId && !!pitch.id } },
+    { query: { queryKey: getGetPitchAvailabilityQueryKey(venueId, pitch.id, { date: selectedDateStr }), enabled: !!selectedDateStr && !!venueId && !!pitch.id } },
   );
 
   const availableSlots = useMemo(
@@ -404,6 +407,11 @@ export default function PlayerVenueDetailScreen() {
 
   const { data, isLoading, error } = useGetVenue(id!);
   const venue: VenueDetail | undefined = data?.venue;
+  const streakQuery = useQuery({
+    queryKey: ["playerVenueStreak", id, user?.id],
+    queryFn: () => getPlayerVenueStreak(id!),
+    enabled: !!id && !!user?.id,
+  });
   const photoCount = Array.isArray(venue?.photos) ? venue.photos.length : 0;
 
   const { data: favouriteIdsData } = useFavouriteIds();
@@ -774,6 +782,28 @@ export default function PlayerVenueDetailScreen() {
           {venue.description ? (
             <Text style={s.description}>{String(venue.description)}</Text>
           ) : null}
+          {(streakQuery.data?.enabled ?? venue.streakEnabled) && (
+            <View style={{ backgroundColor: colors.success + "12", borderColor: colors.success + "35", borderWidth: 1, borderRadius: 12, padding: 14, marginVertical: 14 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <FeatherIcons name="award" size={20} color={colors.success} />
+                <Text style={{ color: colors.foreground, fontFamily: "PlusJakartaSans_700Bold", fontSize: 14 }}>
+                  {streakQuery.data?.rewardAvailable ? "Your free booking is ready" : "Weekly streak rewards"}
+                </Text>
+              </View>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, lineHeight: 18, marginTop: 8 }}>
+                {streakQuery.data?.rewardAvailable
+                  ? "Your next qualifying booking at this venue can be free."
+                  : streakQuery.data?.progress
+                    ? `${Math.max(0, 4 - streakQuery.data.progress.paidWeeks)} more qualifying weekly bookings until your free reward.`
+                    : "Book once each week. After four qualifying paid bookings, your fifth is free."}
+              </Text>
+              <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
+                {[0, 1, 2, 3, 4].map((step) => <View key={step} style={{ flex: 1, height: 5, borderRadius: 3,
+                  backgroundColor: streakQuery.data?.rewardAvailable || step < (streakQuery.data?.progress?.paidWeeks ?? 0) ? colors.success : colors.border,
+                }} />)}
+              </View>
+            </View>
+          )}
 
           {eliteMatchmakingEnabled && (
             <View style={s.eliteMatchmakingCard}>

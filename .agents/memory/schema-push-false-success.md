@@ -8,8 +8,8 @@ Treat Drizzle schema-push output containing database errors as a failed setup, e
 
 **How to apply:** Check both exit status and error output when verifying schema reconciliation. Preserve existing data; establish missing composite-key prerequisites on existing tables before retrying. Do not assume the managed success flag proves schema changes applied.
 
-For composite foreign-key targets, prefer explicit unique constraints over standalone unique indexes. Reuse existing indexes with `UNIQUE USING INDEX` rather than dropping them or dependent foreign keys.
+For composite foreign-key targets, prefer explicit unique constraints over standalone unique indexes. Preserve and reuse existing backing indexes rather than dropping them or dependent foreign keys.
 
-**Why:** Drizzle Kit 0.31.9 excludes indexes referenced by foreign keys from its index inventory, misclassifying them as constraint-generated. A subsequent push then tries to recreate the same index. Its unique-constraint introspection also returns columns in table-column order, not necessarily index order, which can cause unnecessary constraint replacement.
+**Why:** Schema tools can classify foreign-key-backed indexes differently from independent indexes, causing repeated object recreation after apparently successful reconciliation.
 
-**How to apply:** Match the unique-constraint declaration to introspected table-column order (uniqueness is unchanged by column order). Verify a second reconciliation run, not just the first successful run, to catch this recurrence.
+**How to apply:** Keep parent uniqueness explicit and verify reconciliation is repeatable, not just successful once. Investigate introspection differences before replacing constraints or removing dependent relationships.

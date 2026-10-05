@@ -16,6 +16,7 @@ import matchStatisticsRouter from "./match-statistics";
 import leaderboardRouter from "./leaderboard";
 import eliteRouter from "./elite";
 import tournamentsRouter from "./tournaments";
+import growthToolsRouter from "./growth-tools";
 
 const router: IRouter = Router();
 router.use(healthRouter);
@@ -36,4 +37,5 @@ router.use(leaderboardRouter);
 router.use(eliteRouter);
 
 router.use(tournamentsRouter);
+router.use(growthToolsRouter);
 export default router;

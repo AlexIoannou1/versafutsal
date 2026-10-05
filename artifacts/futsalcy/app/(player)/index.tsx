@@ -24,8 +24,21 @@ import {
   useFavouriteIds,
   useToggleFavourite,
 } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { getPlayerVenueStreak } from "@/lib/growth-api";
 
 type FeatherName = ComponentProps<typeof FeatherIcons>["name"];
+
+type GrowthVenueSummary = VenueSummary & {
+  streakEnabled?: boolean;
+  weeklyStreakEnabled?: boolean;
+  streak?: {
+    enabled?: boolean;
+    completedBookings?: number;
+    bookingsUntilReward?: number;
+    rewardAvailable?: boolean;
+  } | null;
+};
 type VenuePlanCompatibility = {
   effectivePlan?: string | null;
   planBadgeLabel?: string | null;
@@ -682,6 +695,7 @@ export default function PlayerVenuesScreen() {
             />
           }
           renderItem={({ item }) => {
+            const growthVenue = item as GrowthVenueSummary;
             const navigateToVenue = () => router.push(`/player/venue/${item.id}`);
             const planVenue = item as VenueSummary & VenuePlanCompatibility;
             const plan = planVenue.effectivePlan?.toUpperCase();
@@ -767,6 +781,8 @@ export default function PlayerVenuesScreen() {
                       </View>
                     )}
 
+                    <VenueStreakCue venue={growthVenue} />
+
                     <View style={s.cardBottom}>
                       <Text style={s.priceText}>
                         {item.minPrice != null
@@ -786,6 +802,39 @@ export default function PlayerVenuesScreen() {
           }}
         />
       )}
+    </View>
+  );
+}
+
+function VenueStreakCue({ venue }: { venue: GrowthVenueSummary }) {
+  const colors = useColors();
+  const { data } = useQuery({
+    queryKey: ["playerVenueStreak", venue.id],
+    queryFn: () => getPlayerVenueStreak(venue.id),
+  });
+  const enabled =
+    data?.enabled ??
+    venue.streakEnabled ??
+    venue.weeklyStreakEnabled ??
+    venue.streak?.enabled ??
+    false;
+  if (!enabled) return null;
+  const paidWeeks = data?.progress?.paidWeeks ?? venue.streak?.completedBookings ?? 0;
+  const rewardReady =
+    data?.rewardAvailable ||
+    data?.reward?.status === "AVAILABLE" ||
+    venue.streak?.rewardAvailable;
+  const remaining = Math.max(0, 4 - paidWeeks);
+  return (
+    <View style={{
+      flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6,
+      backgroundColor: colors.success + "14", borderRadius: 8, borderWidth: 1,
+      borderColor: colors.success + "35", paddingHorizontal: 9, paddingVertical: 5, marginBottom: 7,
+    }}>
+      <FeatherIcons name="award" size={13} color={colors.success} />
+      <Text style={{ fontSize: 11, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.success }}>
+        {rewardReady ? "Free booking reward ready" : remaining > 0 ? `${remaining} booking${remaining === 1 ? "" : "s"} to a free one` : "Book weekly · 5th booking free"}
+      </Text>
     </View>
   );
 }

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,11 +20,14 @@ import {
   useCreateBooking,
   useCheckoutBooking,
   useGetCheckoutFee,
+  getGetCheckoutFeeQueryKey,
   getGetPitchAvailabilityQueryKey,
   captureBookingPayment,
   getStripeConfig,
 } from "@workspace/api-client-react";
 import { StripeProvider, useStripe } from "@/lib/stripe-native";
+import { getBookingQuote, previewBookingQuote, getPlayerVenueStreak, type BookingQuote } from "@/lib/growth-api";
+import { useQuery } from "@tanstack/react-query";
 
 const MONTHS_FULL = [
   "January","February","March","April","May","June",
@@ -49,7 +53,16 @@ function makeIdempotencyKey() {
   return `checkout_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function errorMessageForPromo(error: unknown): string {
+  return error instanceof Error ? error.message : "This code could not be applied.";
+}
+
 type PaymentType = "FULL" | "DEPOSIT";
+type StripeAttempt = {
+  bookingId: string;
+  clientSecret: string;
+  paymentSheetCompleted?: boolean;
+};
 
 function BookSummaryInner() {
   const colors = useColors();
@@ -71,12 +84,20 @@ function BookSummaryInner() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isSlotConflict, setIsSlotConflict] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoFeedback, setPromoFeedback] = useState<string | null>(null);
+  const [quote, setQuote] = useState<BookingQuote | null>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(true);
+  const [stripeAttempt, setStripeAttempt] = useState<StripeAttempt | null>(null);
 
   // Persisted booking ID — set on first successful createBooking, reused on checkout retry
   const [pendingBookingId, setPendingBookingId] = useState<string | null>(null);
 
   // New idempotency key per attempt; regenerated after each failure to avoid conflicts
   const idempotencyKeyRef = useRef<string>(makeIdempotencyKey());
+  const initialQuoteStartedRef = useRef(false);
 
   const decodedStartAt = startAt ? decodeURIComponent(String(startAt)) : "";
   const decodedEndAt = endAt ? decodeURIComponent(String(endAt)) : "";
@@ -84,10 +105,15 @@ function BookSummaryInner() {
 
   const { data: venueData, isLoading: venueLoading } = useGetVenue(venueId!);
   const venue = venueData?.venue;
+  const streakQuery = useQuery({
+    queryKey: ["playerVenueStreak", venueId],
+    queryFn: () => getPlayerVenueStreak(venueId!),
+    enabled: !!venueId,
+  });
 
   const { data: feeData } = useGetCheckoutFee(
     { venueId: venueId! },
-    { query: { enabled: !!venueId } },
+    { query: { queryKey: getGetCheckoutFeeQueryKey({ venueId: venueId! }), enabled: !!venueId } },
   );
 
   const pitch = venue?.pitches?.find((p) => p.id === pitchId);
@@ -113,7 +139,15 @@ function BookSummaryInner() {
   const feeEnabled = feeData?.feeEnabled ?? true;
   const feePercent = feeEnabled ? parseFloat(feeData?.feePercent ?? "6.00") : 0;
 
-  const baseAmount = paymentType === "DEPOSIT" && depositAmount != null ? depositAmount : subtotal;
+  const discountedSubtotal = quote ? Number(quote.payableAmount) : subtotal;
+  const discountedDeposit = discountedSubtotal != null && depositAmount != null
+    ? depositType === "FIXED"
+      ? Math.min(depositAmount, discountedSubtotal)
+      : Math.round(discountedSubtotal * Number(pricingRule?.depositAmount ?? 0)) / 100
+    : depositAmount;
+  const baseAmount = paymentType === "DEPOSIT" && discountedDeposit != null
+    ? discountedDeposit
+    : discountedSubtotal;
   const feeAmount = feeEnabled && baseAmount != null ? baseAmount * (feePercent / 100) : 0;
   const feeLabel = feeEnabled
     ? `€${feeAmount.toFixed(2)} (${feePercent}%)`
@@ -124,6 +158,15 @@ function BookSummaryInner() {
   const { mutate: createBooking } = useCreateBooking();
   const { mutate: checkoutBooking } = useCheckoutBooking();
 
+  useEffect(() => {
+    if (!pitchId || !decodedStartAt || initialQuoteStartedRef.current) return;
+    initialQuoteStartedRef.current = true;
+    void previewBookingQuote(pitchId, decodedStartAt)
+      .then(({ quote: initialQuote }) => setQuote(initialQuote))
+      .catch(() => setCheckoutError("Could not load a price preview. Retry before paying."))
+      .finally(() => setIsLoadingQuote(false));
+  }, [decodedStartAt, pitchId]);
+
   // ── Stripe payment sheet flow ───────────────────────────────────────────────
 
   /**
@@ -133,7 +176,6 @@ function BookSummaryInner() {
   async function handleStripePayment(
     bookingId: string,
     clientSecret: string,
-    publishableKey: string,
   ) {
     // initPaymentSheet with the server-provided client secret
     const initResult = await initPaymentSheet({
@@ -144,8 +186,10 @@ function BookSummaryInner() {
 
     if (initResult.error) {
       setIsProcessing(false);
-      idempotencyKeyRef.current = makeIdempotencyKey();
-      setCheckoutError(initResult.error.message ?? "Could not initialise payment sheet.");
+      // The checkout claim remains valid. Keep this server-issued secret so a
+      // retry can initialize the same PaymentIntent instead of stranding it.
+      setStripeAttempt({ bookingId, clientSecret });
+      setCheckoutError(initResult.error.message ?? "Could not initialise payment sheet. Tap Retry Payment to try again.");
       return;
     }
 
@@ -153,8 +197,9 @@ function BookSummaryInner() {
 
     if (presentResult.error) {
       setIsProcessing(false);
-      // Regenerate key so next retry creates a fresh PaymentIntent
-      idempotencyKeyRef.current = makeIdempotencyKey();
+      // A cancelled/failed sheet has not necessarily failed the intent. Reuse
+      // its client secret on retry rather than requesting a locked checkout.
+      setStripeAttempt({ bookingId, clientSecret });
       if ((presentResult.error.code as string) === "Canceled") {
         setCheckoutError("Payment cancelled. Tap Pay Now to try again.");
       } else {
@@ -163,19 +208,32 @@ function BookSummaryInner() {
       return;
     }
 
-    // Payment sheet succeeded — confirm on the server
+    // Payment sheet succeeded — confirm on the server. If the network call
+    // fails, a retry captures this same intent rather than presenting it again.
+    setStripeAttempt({ bookingId, clientSecret, paymentSheetCompleted: true });
+    await captureStripePayment(bookingId);
+  }
+
+  async function captureStripePayment(bookingId: string) {
     try {
       await captureBookingPayment(bookingId);
       setIsProcessing(false);
+      setStripeAttempt(null);
       router.replace(`/player/booking/${bookingId}`);
     } catch (captureErr: unknown) {
       setIsProcessing(false);
-      idempotencyKeyRef.current = makeIdempotencyKey();
+      if ((captureErr as { data?: { code?: string } })?.data?.code === "CHECKOUT_EXPIRED") {
+        setPendingBookingId(null);
+        setStripeAttempt(null);
+        idempotencyKeyRef.current = makeIdempotencyKey();
+        setCheckoutError("This checkout expired. Tap Pay Now to reserve this slot again.");
+        return;
+      }
       const msg =
         (captureErr as { data?: { error?: string } })?.data?.error ??
         (captureErr as { message?: string })?.message ??
         "Payment succeeded but booking confirmation failed. Please contact support.";
-      setCheckoutError(msg);
+      setCheckoutError(`${msg} Tap Retry Payment to confirm your booking.`);
     }
   }
 
@@ -187,15 +245,16 @@ function BookSummaryInner() {
         data: {
           paymentType,
           idempotencyKey: idempotencyKeyRef.current,
-        },
+          promoCode: appliedPromoCode ?? undefined,
+        } as Parameters<typeof checkoutBooking>[0]["data"],
       },
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onSuccess: (res: any) => {
           // Stripe mode: server returned clientSecret for payment sheet
-          if (res?.requiresClientAction && res?.clientSecret) {
-            const pk: string = res.publishableKey ?? "";
-            void handleStripePayment(bookingId, res.clientSecret as string, pk);
+          if (res?.clientSecret) {
+            setStripeAttempt({ bookingId, clientSecret: res.clientSecret as string });
+            void handleStripePayment(bookingId, res.clientSecret as string);
             return;
           }
 
@@ -205,10 +264,38 @@ function BookSummaryInner() {
         },
         onError: (err: unknown) => {
           setIsProcessing(false);
-          // Regenerate key so the next retry doesn't collide with the failed attempt's record
-          idempotencyKeyRef.current = makeIdempotencyKey();
+          const response = (err as { data?: { clientSecret?: string; code?: string; error?: string } })?.data ?? (err as {
+            response?: {
+              data?: {
+                clientSecret?: string;
+                requiresClientAction?: boolean;
+                code?: string;
+                error?: string;
+              };
+            };
+          })?.response?.data;
+          // An integration may return a recoverable secret with an existing
+          // PENDING checkout. Present it directly instead of abandoning its lock.
+          if (response?.clientSecret) {
+            setStripeAttempt({ bookingId, clientSecret: response.clientSecret });
+            void handleStripePayment(bookingId, response.clientSecret);
+            return;
+          }
+          // A timeout or CHECKOUT_IN_PROGRESS can still be tied to a live
+          // Stripe intent. Keep its idempotency key so the next checkout can
+          // recover that intent/client secret. Only backend-stable codes say a
+          // new key is required.
+          if (
+            response?.code === "PAYMENT_RETRY_KEY_REQUIRED" ||
+            response?.code === "PAYMENT_INTENT_UNAVAILABLE" ||
+            response?.code === "CHECKOUT_EXPIRED"
+          ) {
+            idempotencyKeyRef.current = makeIdempotencyKey();
+            setStripeAttempt(null);
+          }
+          if (response?.code === "CHECKOUT_EXPIRED") setPendingBookingId(null);
           const msg =
-            (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+            response?.error ??
             "Payment failed. Tap Pay Now to try again.";
           setCheckoutError(msg);
         },
@@ -218,9 +305,29 @@ function BookSummaryInner() {
 
   function handlePayNow() {
     if (isProcessing) return;
+    if (!quote && !stripeAttempt) {
+      setIsLoadingQuote(true);
+      setCheckoutError(null);
+      const preview = pendingBookingId
+        ? getBookingQuote(pendingBookingId, appliedPromoCode ?? undefined)
+        : previewBookingQuote(pitchId!, decodedStartAt, appliedPromoCode ?? undefined);
+      void preview.then(({ quote: nextQuote }) => setQuote(nextQuote))
+        .catch(() => setCheckoutError("Could not load a price preview. Retry before paying."))
+        .finally(() => setIsLoadingQuote(false));
+      return;
+    }
     setCheckoutError(null);
     setIsSlotConflict(false);
     setIsProcessing(true);
+
+    if (stripeAttempt) {
+      if (stripeAttempt.paymentSheetCompleted) {
+        void captureStripePayment(stripeAttempt.bookingId);
+      } else {
+        void handleStripePayment(stripeAttempt.bookingId, stripeAttempt.clientSecret);
+      }
+      return;
+    }
 
     if (pendingBookingId) {
       // Booking already created — retry checkout against same booking, new idempotency key
@@ -256,6 +363,31 @@ function BookSummaryInner() {
         },
       },
     );
+  }
+
+  function handleApplyPromo() {
+    const normalized = promoCode.trim().toUpperCase();
+    if (!normalized) {
+      setPromoFeedback("Enter a discount code.");
+      return;
+    }
+    setIsApplyingPromo(true);
+    setPromoFeedback(null);
+    const preview = pendingBookingId
+      ? getBookingQuote(pendingBookingId, normalized)
+      : previewBookingQuote(pitchId!, decodedStartAt, normalized);
+    void preview
+        .then(({ quote: nextQuote }) => {
+          setQuote(nextQuote);
+          setAppliedPromoCode(normalized);
+          setPromoFeedback(`Code applied — you save €${Number(nextQuote.discountAmount).toFixed(2)}.`);
+        })
+        .catch((error: unknown) => {
+          setQuote(null);
+          setAppliedPromoCode(null);
+          setPromoFeedback(errorMessageForPromo(error));
+        })
+        .finally(() => setIsApplyingPromo(false));
   }
 
   const s = StyleSheet.create({
@@ -365,6 +497,51 @@ function BookSummaryInner() {
       fontFamily: "PlusJakartaSans_500Medium",
       color: colors.primary,
     },
+    promoCard: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 14,
+    },
+    promoTitle: { fontSize: 14, fontFamily: "PlusJakartaSans_700Bold", color: colors.foreground },
+    promoRow: { flexDirection: "row", gap: 8, marginTop: 10 },
+    promoInput: {
+      flex: 1,
+      height: 44,
+      borderWidth: 1,
+      borderColor: appliedPromoCode ? colors.success : colors.border,
+      borderRadius: 9,
+      paddingHorizontal: 12,
+      color: colors.foreground,
+      backgroundColor: colors.background,
+      fontFamily: "PlusJakartaSans_600SemiBold",
+    },
+    promoButton: {
+      minWidth: 76,
+      height: 44,
+      borderRadius: 9,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+    },
+    promoFeedback: { fontSize: 12, lineHeight: 17, marginTop: 8, fontFamily: "PlusJakartaSans_500Medium" },
+    rewardBanner: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      flexDirection: "row",
+      gap: 10,
+      padding: 13,
+      borderRadius: 11,
+      backgroundColor: colors.success + "14",
+      borderWidth: 1,
+      borderColor: colors.success + "35",
+    },
+    rewardText: { flex: 1, color: colors.foreground, fontSize: 12, lineHeight: 18, fontFamily: "PlusJakartaSans_500Medium" },
+    savingsValue: { color: colors.success, textDecorationLine: "line-through" },
     totalRow: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -507,6 +684,49 @@ function BookSummaryInner() {
           <Text style={s.heroSub}>Review and pay to confirm your slot.</Text>
         </View>
 
+        {streakQuery.data?.enabled && (
+          <View style={s.rewardBanner}>
+            <FeatherIcons name="award" size={18} color={colors.success} />
+            <Text style={s.rewardText}>
+              {streakQuery.data.rewardAvailable || quote?.incentiveType === "STREAK_REWARD"
+                ? "Free booking reward ready. It will be applied automatically unless you use a discount code."
+                : `${streakQuery.data.progress?.paidWeeks ?? 0} of 4 paid weeks complete. This qualifying booking can advance your streak.`}
+            </Text>
+          </View>
+        )}
+
+        <View style={s.promoCard}>
+          <Text style={s.promoTitle}>Have a discount code?</Text>
+          <View style={s.promoRow}>
+            <TextInput
+              style={s.promoInput}
+              value={promoCode}
+              onChangeText={(text) => {
+                setPromoCode(text.toUpperCase().replace(/[^A-Z0-9_-]/g, ""));
+                if (appliedPromoCode && text.toUpperCase() !== appliedPromoCode) {
+                  setAppliedPromoCode(null);
+                  setQuote(null);
+                }
+                setPromoFeedback(null);
+              }}
+              placeholder="ENTER CODE"
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!isProcessing && !isApplyingPromo && !stripeAttempt}
+              maxLength={32}
+            />
+            <TouchableOpacity style={s.promoButton} onPress={handleApplyPromo} disabled={isApplyingPromo || isProcessing || !!stripeAttempt}>
+              {isApplyingPromo ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : <Text style={s.primaryBtnText}>Apply</Text>}
+            </TouchableOpacity>
+          </View>
+          {!!promoFeedback && (
+            <Text style={[s.promoFeedback, { color: appliedPromoCode ? colors.success : colors.destructive }]}>
+              {promoFeedback}
+            </Text>
+          )}
+        </View>
+
         {/* Venue Card */}
         <View style={s.card}>
           <Text style={s.cardTitle}>Venue</Text>
@@ -565,24 +785,24 @@ function BookSummaryInner() {
                 style={[s.selectorBtn, paymentType === "FULL" && s.selectorBtnActive]}
                 onPress={() => setPaymentType("FULL")}
                 activeOpacity={0.8}
-                disabled={isProcessing}
+                disabled={isProcessing || !!stripeAttempt}
               >
                 <Text style={[s.selectorBtnTitle, paymentType === "FULL" && s.selectorBtnTitleActive]}>
                   Pay in Full
                 </Text>
-                <Text style={s.selectorBtnSub}>€{subtotal.toFixed(2)}</Text>
+                 <Text style={s.selectorBtnSub}>€{(discountedSubtotal ?? subtotal).toFixed(2)}</Text>
               </MotionPressable>
               <MotionPressable
                 style={[s.selectorBtn, paymentType === "DEPOSIT" && s.selectorBtnActive]}
                 onPress={() => setPaymentType("DEPOSIT")}
                 activeOpacity={0.8}
-                disabled={isProcessing}
+                disabled={isProcessing || !!stripeAttempt}
               >
                 <Text style={[s.selectorBtnTitle, paymentType === "DEPOSIT" && s.selectorBtnTitleActive]}>
                   Pay Deposit
                 </Text>
                 <Text style={s.selectorBtnSub}>
-                  €{depositAmount.toFixed(2)}
+                   €{(discountedDeposit ?? depositAmount).toFixed(2)}
                   {depositType === "PERCENT" && pricingRule?.depositAmount
                     ? ` (${pricingRule.depositAmount}%)`
                     : ""}
@@ -597,12 +817,28 @@ function BookSummaryInner() {
           <Text style={s.cardTitle}>Price Breakdown</Text>
           <View style={[s.breakdownRow, s.breakdownRowFirst]}>
             <Text style={s.breakdownLabel}>
-              {paymentType === "DEPOSIT" ? "Deposit" : "Pitch subtotal"}
+              Pitch subtotal
             </Text>
             <Text style={s.breakdownValue}>
-              {baseAmount != null ? `€${baseAmount.toFixed(2)}` : "—"}
+              {subtotal != null ? `€${subtotal.toFixed(2)}` : "—"}
             </Text>
           </View>
+          {quote && Number(quote.discountAmount) > 0 && (
+            <View style={s.breakdownRow}>
+              <Text style={s.breakdownLabel}>
+                {quote.incentiveType === "STREAK_REWARD" ? "Weekly streak reward" : `Discount (${appliedPromoCode})`}
+              </Text>
+              <Text style={[s.breakdownValue, { color: colors.success }]}>
+                −€{Number(quote.discountAmount).toFixed(2)}
+              </Text>
+            </View>
+          )}
+          {paymentType === "DEPOSIT" && (
+            <View style={s.breakdownRow}>
+              <Text style={s.breakdownLabel}>Remaining at venue</Text>
+              <Text style={s.breakdownValue}>−€{Math.max(0, (discountedSubtotal ?? 0) - (baseAmount ?? 0)).toFixed(2)}</Text>
+            </View>
+          )}
           <View style={s.breakdownRow}>
             <Text style={s.breakdownLabel}>Platform fee</Text>
             {feeEnabled ? (
@@ -644,18 +880,18 @@ function BookSummaryInner() {
         ) : (
           <>
             <MotionPressable
-              style={[s.primaryBtn, isProcessing && s.primaryBtnDisabled]}
+              style={[s.primaryBtn, (isProcessing || isLoadingQuote) && s.primaryBtnDisabled]}
               onPress={handlePayNow}
-              disabled={isProcessing}
+              disabled={isProcessing || isLoadingQuote}
               activeOpacity={0.85}
             >
-              {isProcessing ? (
+              {isProcessing || isLoadingQuote ? (
                 <ActivityIndicator color={colors.primaryForeground} />
               ) : (
                 <>
                   <FeatherIcons name="lock" size={18} color={colors.primaryForeground} />
                   <Text style={s.primaryBtnText}>
-                    {checkoutError ? "Retry Payment" : "Pay Now"}
+                    {!quote && !stripeAttempt ? "Retry Price Preview" : quote?.payableAmount === "0.00" ? "Confirm Free Booking" : checkoutError ? "Retry Payment" : "Pay Now"}
                     {totalDue != null ? ` · €${totalDue.toFixed(2)}` : ""}
                   </Text>
                 </>

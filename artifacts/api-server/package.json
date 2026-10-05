@@ -27,7 +27,9 @@
   "test:manual-bookings:integration": "if [ -z \"$TEST_DATABASE_URL\" ]; then echo \"TEST_DATABASE_URL is required for the disposable integration database\" >&2; exit 1; fi; DATABASE_URL=\"$TEST_DATABASE_URL\" pnpm --filter @workspace/db run migrate && DATABASE_URL=\"$TEST_DATABASE_URL\" TEST_DATABASE_URL=\"$TEST_DATABASE_URL\" tsx src/manual-bookings.integration.test.ts",
     "test:elite-validation": "tsx src/elite-validation.test.ts",
     "test:tournaments": "tsx src/tournament-domain.test.ts",
-    "test:tournament-secure": "tsx src/tournament-secure.test.ts"
+    "test:tournament-secure": "tsx src/tournament-secure.test.ts",
+    "test:growth-tools": "DATABASE_URL=${DATABASE_URL:-postgresql://localhost/unused} tsx src/growth-tools.test.ts && DATABASE_URL=${DATABASE_URL:-postgresql://localhost/unused} tsx src/growth-payment-state.test.ts",
+    "test:growth-tools:db": "if [ -z \"$TEST_DATABASE_URL\" ]; then echo \"TEST_DATABASE_URL is required for the disposable integration database\" >&2; exit 1; fi; DATABASE_URL=\"$TEST_DATABASE_URL\" pnpm --filter @workspace/db run migrate && DATABASE_URL=\"$TEST_DATABASE_URL\" TEST_DATABASE_URL=\"$TEST_DATABASE_URL\" tsx src/growth-tools.integration.test.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",

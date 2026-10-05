@@ -4,6 +4,7 @@ import { startReminderDispatcher } from "./lib/notifications";
 import { startSmsReminderDispatcher } from "./lib/sms-reminders";
 import { smsProvider } from "./lib/sms-provider";
 import { startEliteRecovery } from "./lib/elite";
+import { startGrowthCheckoutCleanup } from "./lib/growth-checkout-cleanup";
 
 const rawPort = process.env["PORT"];
 
@@ -30,6 +31,7 @@ app.listen(port, (err) => {
   // Start in-process poller that delivers scheduled reminder push notifications
   startReminderDispatcher();
   startEliteRecovery();
+  startGrowthCheckoutCleanup();
   logger.info("Reminder dispatcher started (60s interval)");
   startSmsReminderDispatcher(logger);
   logger.info({ enabled: smsProvider.enabled, provider: smsProvider.name }, "SMS reminder dispatcher started");

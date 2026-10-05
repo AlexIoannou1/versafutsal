@@ -8,7 +8,7 @@ import {
   jsonb,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { usersTable } from "./users";
 
 export const notificationTypeEnum = pgEnum("notification_type", [
@@ -26,6 +26,8 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "MATCH_CANCELLED",
   "WAITLIST_CLAIM",
   "WAITLIST_CLAIM_EXPIRED",
+  "STREAK_NEAR_COMPLETION",
+  "STREAK_EXPIRING",
 ]);
 
 export const notificationsTable = pgTable("notifications", {
@@ -45,7 +47,11 @@ export const notificationsTable = pgTable("notifications", {
   dedupeKey: text("dedupe_key"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("notifications_dedupe_key_unique").on(table.dedupeKey),
+  uniqueIndex("notifications_dedupe_key_unique").on(table.dedupeKey)
+    .where(sql`${table.entityType} IS DISTINCT FROM 'STREAK_PROGRESS'`),
+  uniqueIndex("notifications_growth_unique")
+    .on(table.userId, table.type, table.entityType, table.entityId, table.dedupeKey)
+    .where(sql`${table.entityType} = 'STREAK_PROGRESS'`),
 ]);
 
 export const notificationsRelations = relations(notificationsTable, ({ one }) => ({

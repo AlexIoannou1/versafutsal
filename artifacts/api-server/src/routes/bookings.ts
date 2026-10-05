@@ -26,6 +26,7 @@ import { logBookingAuditFireAndForget, logBookingAudit } from "../lib/audit";
 import { reconcileSmsReminder } from "../lib/sms-reminders";
 import { canConfirmOfflinePayment, canUsePaymentProvider, bookingExportCsv, recognizesBookingRevenue, bookingSnapshotRevenue } from "../lib/manual-bookings";
 import { promoteWaitlist } from "../lib/elite";
+import { reverseGrowthIncentive } from "../lib/growth-tools";
 
 const router: IRouter = Router();
 
@@ -2007,6 +2008,10 @@ router.post<{ id: string }>(
         });
         return;
       }
+      if (booking.status === "PENDING" && booking.checkoutKey) {
+        res.status(409).json({ error: "Finish or retry this booking's checkout before cancelling.", code: "CHECKOUT_IN_PROGRESS" });
+        return;
+      }
 
       // ── Policy check: enforce cancellation window for both players and owners ─
       // Manual bookings (walk-in / phone) have no payment, so owners can cancel
@@ -2048,17 +2053,19 @@ router.post<{ id: string }>(
             )
             .limit(1);
 
+      const refundablePayment = payment && Number(payment.amount) > 0 ? payment : null;
       // ── Call payment provider first (outside tx) ──────────────────────────
       // The mock provider always succeeds and does not write to DB, so calling
       // it before the transaction is safe for development. For a real provider,
       // use an idempotency key + outbox/compensation pattern to guard against
       // external-refund-success + DB-transaction-failure divergence.
       let refundId: string | null = null;
-      if (payment && refundEligible) {
+      if (refundablePayment && refundEligible) {
         const refundResult = await paymentProvider.refundPayment({
-          providerPaymentId: payment.providerPaymentId!,
-          amount: payment.amount,
+          providerPaymentId: refundablePayment.providerPaymentId!,
+          amount: refundablePayment.amount,
           reason: reason,
+          idempotencyKey: `booking-refund:${refundablePayment.id}`,
         });
         if (!refundResult.success) {
           res.status(502).json({ error: "Refund processing failed. Please try again." });
@@ -2070,25 +2077,30 @@ router.post<{ id: string }>(
       // ── Atomic transaction: cancel booking + refund record + audit ─────────
       // Booking status: REFUNDED if a refund was issued, otherwise CANCELLED
       const finalStatus: "CANCELLED" | "REFUNDED" =
-        payment && refundEligible ? "REFUNDED" : "CANCELLED";
+        refundablePayment && refundEligible ? "REFUNDED" : "CANCELLED";
 
       await db.transaction(async (tx) => {
-        await tx
+        const [cancelledBooking] = await tx
           .update(bookingsTable)
           .set({
             status: finalStatus,
             cancellationReason: reason ?? null,
             updatedAt: new Date(),
           })
-          .where(eq(bookingsTable.id, bookingId));
+          .where(and(
+            eq(bookingsTable.id, bookingId),
+            eq(bookingsTable.status, booking.status),
+            ...(booking.status === "PENDING" ? [isNull(bookingsTable.checkoutKey)] : []),
+          )).returning({ id: bookingsTable.id });
+        if (!cancelledBooking) throw Object.assign(new Error("BOOKING_STATUS_CHANGED"), { code: "BOOKING_STATUS_CHANGED" });
 
-        if (payment && refundEligible) {
+        if (refundablePayment && refundEligible) {
           // Idempotency guard: update payment only if it is still SUCCEEDED.
           // Prevents double-refund under concurrent cancel requests.
           const [guardedPayment] = await tx
             .update(paymentsTable)
             .set({ status: "REFUNDED", updatedAt: new Date() })
-            .where(and(eq(paymentsTable.id, payment.id), eq(paymentsTable.status, "SUCCEEDED")))
+            .where(and(eq(paymentsTable.id, refundablePayment.id), eq(paymentsTable.status, "SUCCEEDED")))
             .returning();
           if (!guardedPayment) {
             throw Object.assign(new Error("ALREADY_REFUNDED"), { code: "ALREADY_REFUNDED" });
@@ -2096,8 +2108,8 @@ router.post<{ id: string }>(
 
           // Insert refund record
           await tx.insert(refundsTable).values({
-            paymentId: payment.id,
-            amount: payment.amount,
+            paymentId: refundablePayment.id,
+            amount: refundablePayment.amount,
             status: "SUCCEEDED",
             reason: reason ?? null,
             processedAt: new Date(),
@@ -2140,11 +2152,13 @@ router.post<{ id: string }>(
             actorRole,
             action: "REFUND_ISSUED",
             previousValue: { paymentStatus: "SUCCEEDED" },
-            newValue: { paymentStatus: "REFUNDED", refundId, amount: payment.amount },
+            newValue: { paymentStatus: "REFUNDED", refundId, amount: refundablePayment.amount },
             notes: reason ?? null,
-            metadata: { providerPaymentId: payment.providerPaymentId },
+            metadata: { providerPaymentId: refundablePayment.providerPaymentId },
           });
+          await reverseGrowthIncentive(tx, bookingId);
         } else {
+          await reverseGrowthIncentive(tx, bookingId);
           // Cancelled without refund (either no payment, or outside window)
           await logBookingAudit(tx, {
             bookingId,
@@ -2190,10 +2204,10 @@ router.post<{ id: string }>(
           cancellationReason: reason ?? null,
         },
         refund:
-          payment && refundEligible
+          refundablePayment && refundEligible
             ? {
                 refundId,
-                amount: payment.amount,
+              amount: refundablePayment.amount,
                 currency: payment.currency,
                 status: "SUCCEEDED",
               }
@@ -2208,6 +2222,10 @@ router.post<{ id: string }>(
         return;
       }
       console.error("POST /bookings/:id/cancel error:", err);
+      if ((err as { code?: string }).code === "BOOKING_STATUS_CHANGED") {
+        res.status(409).json({ error: "This booking changed while it was being cancelled. Refresh and try again." });
+        return;
+      }
       res.status(500).json({ error: "Internal server error" });
     }
   },

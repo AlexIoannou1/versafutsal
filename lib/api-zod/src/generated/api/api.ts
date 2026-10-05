@@ -256,6 +256,10 @@ export const ListVenuesResponse = zod.object({
       minPrice: zod.number().nullish(),
       maxPrice: zod.number().nullish(),
       pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
+      streakEnabled: zod
+        .boolean()
+        .optional()
+        .describe("Four qualifying paid weeks unlock a fifth booking free."),
       status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
       createdAt: zod.coerce.date(),
       effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
@@ -334,6 +338,7 @@ export const GetVenueResponse = zod.object({
     })
     .and(
       zod.object({
+        streakEnabled: zod.boolean().optional(),
         effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
         planBadgeLabel: zod.string().nullable(),
         verified: zod
@@ -458,6 +463,10 @@ export const ListOwnerVenuesResponse = zod.object({
         minPrice: zod.number().nullish(),
         maxPrice: zod.number().nullish(),
         pitchTypes: zod.array(zod.enum(["INDOOR", "OUTDOOR", "HYBRID"])),
+        streakEnabled: zod
+          .boolean()
+          .optional()
+          .describe("Four qualifying paid weeks unlock a fifth booking free."),
         status: zod.enum(["PENDING", "APPROVED", "REJECTED", "DISABLED"]),
         createdAt: zod.coerce.date(),
         effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
@@ -530,6 +539,12 @@ export const createVenueBodyContactPhoneMin = 5;
 export const createVenueBodyContactPhoneMax = 32;
 
 export const CreateVenueBody = zod.object({
+  streakEnabled: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Enable the weekly streak program during venue setup (Pro or Elite only).",
+    ),
   name: zod.string().min(1).max(createVenueBodyNameMax),
   district: zod.string().min(1).max(createVenueBodyDistrictMax),
   address: zod.string().min(1).max(createVenueBodyAddressMax),
@@ -593,6 +608,7 @@ export const GetOwnerVenueResponse = zod.object({
     })
     .and(
       zod.object({
+        streakEnabled: zod.boolean().optional(),
         effectivePlan: zod.enum(["FREE", "PRO", "ELITE"]),
         planBadgeLabel: zod.string().nullable(),
         verified: zod
@@ -2350,9 +2366,23 @@ export const CheckoutBookingParams = zod.object({
   bookingId: zod.coerce.string().uuid(),
 });
 
+export const checkoutBookingBodyPromoCodeMax = 32;
+
+export const checkoutBookingBodyPromoCodeRegExp = new RegExp(
+  "^[A-Z0-9][A-Z0-9_-]{2,31}$",
+);
+export const checkoutBookingBodyUseStreakRewardDefault = true;
 export const checkoutBookingBodyPaymentTypeDefault = `FULL`;
 
 export const CheckoutBookingBody = zod.object({
+  promoCode: zod
+    .string()
+    .max(checkoutBookingBodyPromoCodeMax)
+    .regex(checkoutBookingBodyPromoCodeRegExp)
+    .optional(),
+  useStreakReward: zod
+    .boolean()
+    .default(checkoutBookingBodyUseStreakRewardDefault),
   paymentType: zod
     .enum(["FULL", "DEPOSIT"])
     .default(checkoutBookingBodyPaymentTypeDefault),
@@ -2544,7 +2574,14 @@ export const GetOwnerSubscriptionResponse = zod.object({
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
     capabilities: zod.array(
-      zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+      zod.enum([
+        "MANUAL_BOOKING",
+        "ADVANCED_ANALYTICS",
+        "MATCH_STATISTICS",
+        "ELITE_MATCHMAKING",
+        "TOURNAMENT_CREATOR",
+        "GROWTH_TOOLS",
+      ]),
     ),
     billingConfigured: zod.boolean(),
   }),
@@ -2579,7 +2616,14 @@ export const CancelOwnerSubscriptionResponse = zod.object({
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
     capabilities: zod.array(
-      zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+      zod.enum([
+        "MANUAL_BOOKING",
+        "ADVANCED_ANALYTICS",
+        "MATCH_STATISTICS",
+        "ELITE_MATCHMAKING",
+        "TOURNAMENT_CREATOR",
+        "GROWTH_TOOLS",
+      ]),
     ),
     billingConfigured: zod.boolean(),
   }),
@@ -2620,6 +2664,9 @@ export const ListOwnerSubscriptionsResponse = zod.object({
             "MANUAL_BOOKING",
             "ADVANCED_ANALYTICS",
             "MATCH_STATISTICS",
+            "ELITE_MATCHMAKING",
+            "TOURNAMENT_CREATOR",
+            "GROWTH_TOOLS",
           ]),
         ),
         billingConfigured: zod.boolean(),
@@ -2658,7 +2705,14 @@ export const GetOwnerSubscriptionAdminResponse = zod.object({
       overrideStartsAt: zod.coerce.date().nullable(),
       overrideEndsAt: zod.coerce.date().nullable(),
       capabilities: zod.array(
-        zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+        zod.enum([
+          "MANUAL_BOOKING",
+          "ADVANCED_ANALYTICS",
+          "MATCH_STATISTICS",
+          "ELITE_MATCHMAKING",
+          "TOURNAMENT_CREATOR",
+          "GROWTH_TOOLS",
+        ]),
       ),
       billingConfigured: zod.boolean(),
     }),
@@ -2714,7 +2768,14 @@ export const SetOwnerSubscriptionOverrideResponse = zod.object({
     overrideStartsAt: zod.coerce.date().nullable(),
     overrideEndsAt: zod.coerce.date().nullable(),
     capabilities: zod.array(
-      zod.enum(["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"]),
+      zod.enum([
+        "MANUAL_BOOKING",
+        "ADVANCED_ANALYTICS",
+        "MATCH_STATISTICS",
+        "ELITE_MATCHMAKING",
+        "TOURNAMENT_CREATOR",
+        "GROWTH_TOOLS",
+      ]),
     ),
     billingConfigured: zod.boolean(),
   }),
@@ -4646,4 +4707,186 @@ export const CaptureTournamentRegistrationResponse = zod.object({
     participantName: zod.string().nullish(),
     createdAt: zod.coerce.date(),
   }),
+});
+
+/**
+ * @summary Preview pricing without reserving a booking or incentive
+ */
+export const previewBookingGrowthIncentiveBodyPromoCodeMax = 32;
+
+export const PreviewBookingGrowthIncentiveBody = zod.object({
+  pitchId: zod.string().uuid(),
+  startAt: zod.coerce.date(),
+  promoCode: zod
+    .string()
+    .max(previewBookingGrowthIncentiveBodyPromoCodeMax)
+    .optional(),
+});
+
+export const PreviewBookingGrowthIncentiveResponse = zod.object({
+  quote: zod.object({
+    currency: zod.enum(["EUR"]),
+    subtotal: zod.string(),
+    discountAmount: zod.string(),
+    payableAmount: zod.string(),
+    incentiveType: zod.enum(["PROMOTION", "STREAK_REWARD"]).nullish(),
+    incentiveId: zod.string().uuid().nullish(),
+  }),
+});
+
+export const QuoteBookingGrowthIncentiveParams = zod.object({
+  bookingId: zod.coerce.string().uuid(),
+});
+
+export const quoteBookingGrowthIncentiveBodyPromoCodeMax = 32;
+
+export const QuoteBookingGrowthIncentiveBody = zod.object({
+  promoCode: zod
+    .string()
+    .max(quoteBookingGrowthIncentiveBodyPromoCodeMax)
+    .optional(),
+});
+
+export const QuoteBookingGrowthIncentiveResponse = zod.object({
+  quote: zod.object({
+    currency: zod.enum(["EUR"]),
+    subtotal: zod.string(),
+    discountAmount: zod.string(),
+    payableAmount: zod.string(),
+    incentiveType: zod.enum(["PROMOTION", "STREAK_REWARD"]).nullish(),
+    incentiveId: zod.string().uuid().nullish(),
+  }),
+});
+
+export const ListOwnerPromotionsResponse = zod.object({
+  promotions: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      code: zod.string(),
+      kind: zod.enum(["PERCENTAGE", "FIXED"]),
+      value: zod.string(),
+      enabled: zod.boolean(),
+      startsAt: zod.string().nullish(),
+      endsAt: zod.string().nullish(),
+      redemptionLimit: zod.number().nullish(),
+      perPlayerLimit: zod.number(),
+      reservedCount: zod.number().optional(),
+      redeemedCount: zod.number().optional(),
+      redeemedDiscountTotal: zod.string().optional(),
+      createdAt: zod.string(),
+    }),
+  ),
+});
+
+export const createOwnerPromotionBodyCodeMin = 3;
+export const createOwnerPromotionBodyCodeMax = 32;
+
+export const createOwnerPromotionBodyCodeRegExp = new RegExp(
+  "^[A-Z0-9][A-Z0-9_-]{2,31}$",
+);
+export const createOwnerPromotionBodyValueExclusiveMin = 0;
+
+export const createOwnerPromotionBodyPerPlayerLimitDefault = 1;
+
+export const CreateOwnerPromotionBody = zod.object({
+  venueId: zod.string().uuid(),
+  code: zod
+    .string()
+    .min(createOwnerPromotionBodyCodeMin)
+    .max(createOwnerPromotionBodyCodeMax)
+    .regex(createOwnerPromotionBodyCodeRegExp),
+  kind: zod.enum(["PERCENTAGE", "FIXED"]),
+  value: zod.number().gt(createOwnerPromotionBodyValueExclusiveMin),
+  startsAt: zod.coerce.date().nullish(),
+  endsAt: zod.coerce.date().nullish(),
+  redemptionLimit: zod.number().min(1).nullish(),
+  perPlayerLimit: zod
+    .number()
+    .min(1)
+    .default(createOwnerPromotionBodyPerPlayerLimitDefault),
+});
+
+export const UpdateOwnerPromotionParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const updateOwnerPromotionBodyValueExclusiveMin = 0;
+
+export const UpdateOwnerPromotionBody = zod.object({
+  enabled: zod.boolean().optional(),
+  code: zod.string().optional(),
+  kind: zod.enum(["PERCENTAGE", "FIXED"]).optional(),
+  value: zod.number().gt(updateOwnerPromotionBodyValueExclusiveMin).optional(),
+  endsAt: zod.coerce.date().nullish(),
+  redemptionLimit: zod.number().min(1).nullish(),
+  perPlayerLimit: zod.number().min(1).optional(),
+});
+
+export const UpdateOwnerPromotionResponse = zod.object({
+  promotion: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    code: zod.string(),
+    kind: zod.enum(["PERCENTAGE", "FIXED"]),
+    value: zod.string(),
+    enabled: zod.boolean(),
+    startsAt: zod.string().nullish(),
+    endsAt: zod.string().nullish(),
+    redemptionLimit: zod.number().nullish(),
+    perPlayerLimit: zod.number(),
+    reservedCount: zod.number().optional(),
+    redeemedCount: zod.number().optional(),
+    redeemedDiscountTotal: zod.string().optional(),
+    createdAt: zod.string(),
+  }),
+});
+
+export const DeleteOwnerPromotionParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetOwnerGrowthAnalyticsResponse = zod.object({
+  promotionCount: zod.number(),
+  redeemedCount: zod.number(),
+  discountTotal: zod.string(),
+  activeStreakPlayers: zod.number(),
+  nearRewardPlayers: zod.number(),
+});
+
+export const SetVenueStreakParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const SetVenueStreakBody = zod.object({
+  enabled: zod.boolean(),
+});
+
+export const SetVenueStreakResponse = zod.object({
+  streak: zod.object({
+    enabled: zod.boolean(),
+    venueId: zod.string().uuid(),
+  }),
+});
+
+export const GetPlayerVenueStreakParams = zod.object({
+  venueId: zod.coerce.string().uuid(),
+});
+
+export const GetPlayerVenueStreakResponse = zod.object({
+  enabled: zod.boolean(),
+  rewardAvailable: zod.boolean(),
+  progress: zod
+    .object({
+      paidWeeks: zod.number(),
+      expiresAt: zod.string().nullish(),
+    })
+    .nullable(),
+  reward: zod
+    .object({
+      id: zod.string().uuid().optional(),
+      status: zod.enum(["AVAILABLE"]).optional(),
+      expiresAt: zod.string().nullish(),
+    })
+    .nullable(),
 });

@@ -14,6 +14,7 @@ import {
   availabilityBlocksTable,
   bookingsTable,
   ownerSubscriptionsTable,
+  venueStreakSettingsTable,
 } from "@workspace/db/schema";
 import { eq, and, gte, lte, inArray, sql, gt, or, isNull, asc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -29,7 +30,7 @@ import {
   removeVenuePhoto,
   saveVenuePhoto,
 } from "../lib/venue-photo-storage";
-import { resolveEffectivePlan } from "../lib/entitlements";
+import { resolveEffectivePlan, getOwnerEntitlements, planHasCapability } from "../lib/entitlements";
 import {
   getVenueDiscoveryMetadata,
   rankVenuesWithBoundedPlanBoost,
@@ -189,7 +190,7 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
 
   if (!venue) return null;
 
-  const [photos, pitches, hours, subscriptions] = await Promise.all([
+  const [photos, pitches, hours, subscriptions, streakSetting] = await Promise.all([
     db
       .select()
       .from(venuePhotosTable)
@@ -198,6 +199,7 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
     db.select().from(pitchesTable).where(eq(pitchesTable.venueId, venueId)),
     db.select().from(openingHoursTable).where(eq(openingHoursTable.venueId, venueId)),
     db.select().from(ownerSubscriptionsTable).where(eq(ownerSubscriptionsTable.ownerId, venue.ownerId)).limit(1),
+    db.select().from(venueStreakSettingsTable).where(eq(venueStreakSettingsTable.venueId, venueId)).limit(1),
   ]);
 
   const pitchIds = pitches.map((p) => p.id);
@@ -230,6 +232,8 @@ async function getVenueWithDetails(venueId: string, ownerPreviewForId?: string) 
     ...venue,
     ...discovery,
     eliteMatchmakingEnabled: resolveEffectivePlan(subscriptions[0]) === "ELITE",
+    streakEnabled: (streakSetting[0]?.enabled ?? false) &&
+      planHasCapability(resolveEffectivePlan(subscriptions[0]), "GROWTH_TOOLS"),
     photos: signedPhotos,
     pitches: pitchesWithPricing,
     openingHours: hours,
@@ -296,6 +300,9 @@ router.get("/venues", async (req, res) => {
         resolveEffectivePlan(subscription),
       ]),
     );
+    const streakSettings = await db.select().from(venueStreakSettingsTable)
+      .where(inArray(venueStreakSettingsTable.venueId, venueIds));
+    const streakMap = new Map(streakSettings.map((setting) => [setting.venueId, setting.enabled]));
 
     // Get photos (first photo per venue)
     const photos = await db
@@ -340,6 +347,12 @@ router.get("/venues", async (req, res) => {
     }
 
     // Apply price filters
+    const ownerGrowthEnabled = new Map(await Promise.all(
+      [...new Set(filteredVenues.map((venue) => venue.ownerId))].map(async (ownerId) => {
+        const entitlement = await getOwnerEntitlements(ownerId);
+        return [ownerId, planHasCapability(entitlement.effectivePlan, "GROWTH_TOOLS")] as const;
+      }),
+    ));
     let venues = filteredVenues.map((v) => {
       const priceRange = priceRangeMap.get(v.id);
       return {
@@ -351,6 +364,7 @@ router.get("/venues", async (req, res) => {
         minPrice: priceRange?.minPrice ? parseFloat(priceRange.minPrice) : null,
         maxPrice: priceRange?.maxPrice ? parseFloat(priceRange.maxPrice) : null,
         pitchTypes: pitchTypesMap.get(v.id) ?? [],
+        streakEnabled: (streakMap.get(v.id) ?? false) && (ownerGrowthEnabled.get(v.ownerId) ?? false),
       };
     });
 
@@ -462,7 +476,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
       return;
     }
 
-    const [photos, pitches, subscription] = await Promise.all([
+    const [photos, pitches, subscription, streakSettings] = await Promise.all([
       db.select().from(venuePhotosTable).where(inArray(venuePhotosTable.venueId, venueIds)),
       db.select().from(pitchesTable).where(inArray(pitchesTable.venueId, venueIds)),
       db
@@ -470,6 +484,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
         .from(ownerSubscriptionsTable)
         .where(eq(ownerSubscriptionsTable.ownerId, req.user!.userId))
         .limit(1),
+      db.select().from(venueStreakSettingsTable).where(inArray(venueStreakSettingsTable.venueId, venueIds)),
     ]);
     const discovery = getVenueDiscoveryMetadata(resolveEffectivePlan(subscription[0]));
 
@@ -478,6 +493,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
       if (!photoMap.has(p.venueId)) photoMap.set(p.venueId, p.url);
     }
     const pitchCountMap = new Map<string, number>();
+    const streakMap = new Map(streakSettings.map((setting) => [setting.venueId, setting.enabled]));
     for (const p of pitches) {
       pitchCountMap.set(p.venueId, (pitchCountMap.get(p.venueId) ?? 0) + 1);
     }
@@ -496,6 +512,7 @@ router.get("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req,
               )
             : null,
           pitchCount: pitchCountMap.get(v.id) ?? 0,
+          streakEnabled: streakMap.get(v.id) ?? false,
         };
       }),
     );
@@ -525,7 +542,7 @@ router.get<{ id: string }>("/owner/venues/:id", requireAuth, requireRole("VENUE_
 // POST /owner/venues — create venue
 router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req, res) => {
   try {
-    const { name, district, address, description, amenities, cancellationWindowHours, contactPhone } =
+    const { name, district, address, description, amenities, cancellationWindowHours, contactPhone, streakEnabled } =
       req.body as {
         name: string;
         district: string;
@@ -534,6 +551,7 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
         amenities?: string[];
         cancellationWindowHours?: number;
         contactPhone: string;
+        streakEnabled?: boolean;
       };
 
     if (!name || !district || !address) {
@@ -544,6 +562,17 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
     if (!contactPhone?.trim()) {
       res.status(400).json({ error: "contactPhone is required" });
       return;
+    }
+    if (streakEnabled) {
+      const entitlement = await getOwnerEntitlements(req.user!.userId);
+      if (!planHasCapability(entitlement.effectivePlan, "GROWTH_TOOLS")) {
+        res.status(403).json({
+          error: "Weekly streaks require a Pro or Elite owner plan.",
+          code: "ENTITLEMENT_REQUIRED",
+          capability: "GROWTH_TOOLS",
+        });
+        return;
+      }
     }
 
     if (cancellationWindowHours !== undefined) {
@@ -559,9 +588,8 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
       }
     }
 
-    const [venue] = await db
-      .insert(venuesTable)
-      .values({
+    const venue = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(venuesTable).values({
         ownerId: req.user!.userId,
         name,
         district,
@@ -571,8 +599,12 @@ router.post("/owner/venues", requireAuth, requireRole("VENUE_OWNER"), async (req
         cancellationWindowHours: cancellationWindowHours ?? 24,
         contactPhone: contactPhone.trim(),
         status: "PENDING",
-      })
-      .returning();
+      }).returning();
+      if (streakEnabled && created) {
+        await tx.insert(venueStreakSettingsTable).values({ venueId: created.id, enabled: true });
+      }
+      return created!;
+    });
 
     res.status(201).json({ venue });
   } catch (err) {

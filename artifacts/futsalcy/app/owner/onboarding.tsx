@@ -22,12 +22,14 @@ import {
   setOpeningHours,
   submitVenueForApproval,
   getListOwnerVenuesQueryKey,
+  useGetOwnerSubscription,
   validateRequestBody,
   type PitchType,
   type OpeningHoursInput,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { setVenueStreak } from "@/lib/growth-api";
 
 const DRAFT_KEY = "@futsalcy/onboarding_draft";
 export const ONBOARDING_STATUS_KEY = "@futsalcy/onboarding_status";
@@ -99,6 +101,7 @@ type DraftState = {
   pitchSlotDuration: string;
   pitchSaved: boolean;
   schedule: DaySchedule[];
+  weeklyStreakEnabled: boolean;
 };
 
 const DEFAULT_DRAFT: DraftState = {
@@ -118,6 +121,7 @@ const DEFAULT_DRAFT: DraftState = {
   pitchSlotDuration: "60",
   pitchSaved: false,
   schedule: DEFAULT_HOURS.map((d) => ({ ...d })),
+  weeklyStreakEnabled: false,
 };
 
 const STEP_LABELS = ["Details", "Pitches", "Hours", "Review"];
@@ -132,6 +136,10 @@ export default function OwnerOnboardingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { data: subscriptionData } = useGetOwnerSubscription();
+  const canUseGrowthTools =
+    subscriptionData?.subscription?.effectivePlan === "PRO" ||
+    subscriptionData?.subscription?.effectivePlan === "ELITE";
 
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [stepLoading, setStepLoading] = useState(false);
@@ -157,6 +165,7 @@ export default function OwnerOnboardingScreen() {
   const [schedule, setSchedule] = useState<DaySchedule[]>(
     DEFAULT_HOURS.map((d) => ({ ...d })),
   );
+  const [weeklyStreakEnabled, setWeeklyStreakEnabled] = useState(false);
 
   const [nameError, setNameError] = useState("");
   const [districtError, setDistrictError] = useState("");
@@ -192,6 +201,7 @@ export default function OwnerOnboardingScreen() {
           setPitchSlotDuration(draft.pitchSlotDuration ?? "60");
           setPitchSaved(draft.pitchSaved ?? false);
           if (draft.schedule?.length === 7) setSchedule(draft.schedule);
+          setWeeklyStreakEnabled(draft.weeklyStreakEnabled ?? false);
         }
       } catch {
         // ignore
@@ -207,7 +217,7 @@ export default function OwnerOnboardingScreen() {
       step, venueId, name, district, address, description,
       contactPhone, cancellationWindowHours, selectedAmenities,
       pitchName, pitchType, pitchSize, pitchPrice, pitchSlotDuration,
-      pitchSaved, schedule,
+      pitchSaved, schedule, weeklyStreakEnabled,
     };
     AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft)).catch(() => {});
   };
@@ -225,7 +235,7 @@ export default function OwnerOnboardingScreen() {
     draftLoaded, step, venueId, name, district, address, description,
     contactPhone, cancellationWindowHours, selectedAmenities,
     pitchName, pitchType, pitchSize, pitchPrice, pitchSlotDuration,
-    pitchSaved, schedule,
+    pitchSaved, schedule, weeklyStreakEnabled,
   ]);
 
   const toggleAmenity = (a: string) =>
@@ -394,6 +404,9 @@ export default function OwnerOnboardingScreen() {
       setSubmitError("");
       setStepLoading(true);
       try {
+        if (canUseGrowthTools) {
+          await setVenueStreak(venueId, weeklyStreakEnabled);
+        }
         await submitVenueForApproval(venueId);
         await queryClient.invalidateQueries({ queryKey: getListOwnerVenuesQueryKey() });
         await AsyncStorage.removeItem(DRAFT_KEY);
@@ -568,6 +581,19 @@ export default function OwnerOnboardingScreen() {
       gap: 10,
     },
     noteText: { flex: 1, fontSize: 13, fontFamily: "PlusJakartaSans_400Regular", color: colors.primary, lineHeight: 18 },
+    growthCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 16,
+    },
+    growthHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
+    growthTitle: { flex: 1, fontSize: 14, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.foreground },
+    growthCopy: { fontSize: 12, lineHeight: 18, fontFamily: "PlusJakartaSans_400Regular", color: colors.mutedForeground, marginTop: 8 },
+    upgradeBtn: { alignSelf: "flex-start", marginTop: 10, paddingVertical: 5 },
+    upgradeText: { fontSize: 13, fontFamily: "PlusJakartaSans_600SemiBold", color: colors.primary },
     hintText: { fontSize: 11, color: colors.mutedForeground, marginTop: 4, fontFamily: "PlusJakartaSans_400Regular" },
     footer: {
       flexDirection: "row",
@@ -906,6 +932,29 @@ export default function OwnerOnboardingScreen() {
         {/* ── Step 3: Review & Submit ────────────────────────────────── */}
         {step === 3 && (
           <>
+            <View style={s.growthCard}>
+              <View style={s.growthHeader}>
+                <FeatherIcons name="award" size={18} color={canUseGrowthTools ? colors.success : colors.mutedForeground} />
+                <Text style={s.growthTitle}>Weekly streak rewards</Text>
+                <Switch
+                  value={canUseGrowthTools && weeklyStreakEnabled}
+                  onValueChange={setWeeklyStreakEnabled}
+                  disabled={!canUseGrowthTools}
+                  trackColor={{ false: colors.muted, true: colors.success }}
+                  thumbColor={colors.primaryForeground}
+                />
+              </View>
+              <Text style={s.growthCopy}>
+                {canUseGrowthTools
+                  ? "Encourage weekly play: after four qualifying paid bookings, the player's fifth booking is free. You can change this later in Growth Tools."
+                  : "Weekly streaks and discount codes are included with Pro and Elite."}
+              </Text>
+              {!canUseGrowthTools && (
+                <TouchableOpacity style={s.upgradeBtn} onPress={() => router.push("/(owner)/plans")}>
+                  <Text style={s.upgradeText}>View Pro plans →</Text>
+                </TouchableOpacity>
+              )}
+            </View>
             <View style={s.note}>
               <FeatherIcons name="check-circle" size={16} color={colors.primary} />
               <Text style={s.noteText}>

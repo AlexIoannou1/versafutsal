@@ -16,3 +16,4 @@
 - [React Native range-slider drag stability](react-native-range-slider-drag-stability.md) — use stable per-thumb responders and gesture deltas; nested touch coordinates can jump between targets.
 - [Orval object-size validation](orval-object-size-validation.md) — generated Zod request schemas do not enforce OpenAPI minProperties/maxProperties; enforce object shape server-side.
 - [Schema push false success](schema-push-false-success.md) — Drizzle may exit zero after a PostgreSQL error; validate output as well as process status.
+- [Growth checkout reservations](growth-checkout-reservations.md) — released incentives must not remain reusable through immutable retry quotes; notification deduplication needs cycle identity.

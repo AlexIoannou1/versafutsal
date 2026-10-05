@@ -20,6 +20,7 @@ import { sendNotification } from "../lib/notifications";
 import { logBookingAudit } from "../lib/audit";
 import { reconcileSmsReminder } from "../lib/sms-reminders";
 import { bookingExportCsv, canUsePaymentProvider } from "../lib/manual-bookings";
+import { reverseGrowthIncentive } from "../lib/growth-tools";
 
 const router: IRouter = Router();
 
@@ -518,11 +519,12 @@ router.post<{ id: string }>(
       // an idempotency key + outbox/compensation pattern.
       let refundId: string | null = null;
       // payment is guaranteed non-null at this point (we return early above if null)
-      const result = await paymentProvider.refundPayment({
+      const result = Number(payment.amount) > 0 ? await paymentProvider.refundPayment({
         providerPaymentId: payment.providerPaymentId!,
         amount: payment.amount,
         reason: reason ?? "Admin force-refund",
-      });
+        idempotencyKey: `admin-refund:${payment.id}`,
+      }) : { success: true, refundId: null };
       if (!result.success) {
         res.status(502).json({ error: "Refund processing failed" });
         return;
@@ -559,6 +561,7 @@ router.post<{ id: string }>(
           reason: reason ?? "Admin force-refund",
           processedAt: new Date(),
         });
+        await reverseGrowthIncentive(tx, bookingId);
 
         await logBookingAudit(tx, {
           bookingId,
