@@ -17,7 +17,7 @@
 
 ## Snapshot and executive summary
 
-**Source baseline:** `7406c228a2c418b231d99da879a838765c29d9fb`.
+**Source baseline:** `5bf1828cdf6d36742cba1d0d34c6f7cb11a2036f`.
 **Inspection date:** 2026-10-05 UTC. Task statuses were refreshed during preparation; see the appendix for the final board refresh. This document describes the checked-out source, not unmerged branches. Refresh it after merges; task statuses and provider configuration can change independently of this revision.
 
 Versa is a Cyprus futsal marketplace with three roles: PLAYER, VENUE_OWNER and ADMIN. An Expo/React Native client talks to an Express API backed by PostgreSQL/Drizzle. The source includes venue discovery, booking, payment/cancellation, owner management, admin oversight, subscriptions, Pro statistics/analytics/manual bookings/reminders, and Elite matchmaking/waitlists/leaderboards/tournaments. It is **not established as launch-ready**.
@@ -37,12 +37,12 @@ No builds, package installation, application tests, schema changes, shared-datab
 
 ### Immediate risks and contradictions
 
-- #102 (Build Elite tournament creator) is Merged and its source is present. #100 (Add Pro growth tools) remains separate work; do not attribute its planned discount/streak behavior to this checkout.
+- #102 (Build Elite tournament creator) and #100 (Add Pro growth tools) are Merged and their source is present. Growth incentives now affect booking pricing, payment recovery and refunds; inspect the lifecycle below before changing checkout.
 - #13 (Route booking payments to the owner's Stripe account at checkout) and #96 (Restore form behavior after motion) are Ready. The current payment provider already uses Connect destinations if an account ID exists, but does not check charge/payout readiness at charge creation. Inspect the pending change when merged rather than treating routing as wholly absent or fully resolved.
 - #11 and #74 record historic build/typecheck issues. No current failure count was reproduced here.
 - #110 records clean-database failure. The journal visibly omits the guest-column migration and contains non-monotonic timestamps; new bootstrap remains a release gate, not a guaranteed command.
 - #106 and #113 are configuration/verification gaps, not evidence that delivered reminders or concurrent tournaments work.
-- The [plans screen](artifacts/futsalcy/app/%28owner%29/plans.tsx) still calls insights/reminders, tournaments, matchmaking/waitlists and leaderboards “coming soon” despite source being present. Growth tools are also “coming soon”, consistent with unmerged work.
+- The [plans screen](artifacts/futsalcy/app/%28owner%29/plans.tsx) still calls insights/reminders, tournaments, matchmaking/waitlists and leaderboards “coming soon” despite source being present. Growth tools are now advertised without that qualifier.
 - [replit.md](replit.md) describes an obsolete €1 fee and unconditional mock success. Current default is a configurable **6% added to the paid booking base**, with Stripe selected when its server key is present and a deliberate mock-decline switch. README onboarding is abbreviated and not a clean-bootstrap guarantee.
 
 Specific Draft/source mismatches worth resolving before assigning new work:
@@ -57,7 +57,7 @@ Specific Draft/source mismatches worth resolving before assigning new work:
 | #47 audit title | Full plan asks for filtering/search/date narrowing in existing Activity history | Do not assume the title means no inline history exists |
 | #55 match finished | Dispatcher already sends MATCH_FINISHED for elapsed confirmed bookings; there is no COMPLETED booking enum | Player-driven completion/recap is a separate product decision, not proof that all notifications lack triggers |
 | #94 Connect verification | Plan describes charges-enabled routing from pending #13 work; baseline only sees stored account ID | Keep pending-branch reported behavior separate from inspected code |
-| #115/#116 growth follow-ups | Plans refer to aggregate summaries and isolated/provider-stub checks from growth work not in this checkout | Treat those as branch-reported evidence, not inspected source or Stripe rehearsal |
+| #115/#116 growth follow-ups | Growth models, routes, aggregate analytics and tests are now in this checkout | Per-code attribution and Stripe test-payment recovery remain separate verification/enhancement work; source presence is not provider rehearsal |
 
 ## Start here: safe onboarding
 
@@ -86,8 +86,11 @@ pnpm --filter @workspace/db run migrate
 
 - `0006_guest_booking_columns.sql` exists but has no journal entry. Later migrations use `guest_name`/`guest_phone`; applying SQL files alphabetically is not equivalent to journal execution.
 - Journal `idx`, timestamps and numeric filename prefixes do not provide one consistent chronology. Some later entries have earlier timestamps; several independent migrations share prefixes/timestamps. Inspect actual Drizzle application history and ordering, not just filenames.
-- Match-statistics composite foreign keys depend on parent unique indexes. The [prerequisite helper](scripts/prepare-schema-push.cjs) creates two indexes when parent tables exist; it is **DDL**, not a read-only check.
+- Match-statistics composite foreign keys depend on explicit parent unique constraints. The [prerequisite helper](scripts/prepare-schema-push.cjs) creates missing backing indexes on existing parent tables and attaches them with `UNIQUE USING INDEX`; it is **DDL**, not a read-only check. Existing rows and foreign keys are preserved.
 - [Post-merge setup](scripts/post-merge.sh) installs dependencies, runs that helper and pushes schema. It also scans output because Drizzle can report PostgreSQL errors while exiting zero. Do not execute it on a shared or production database just to “check setup”.
+- The configured setup timeout is now **180 seconds**, rather than 20. A prior repair passed both managed setup/workflow reconciliation and a second schema reconciliation. This verifies that existing development state at that time, not clean bootstrap or the latest growth migration on a new database.
+- Drizzle Kit 0.31.9 excludes indexes referenced by foreign keys from its index inventory and can try to recreate them. Keep these targets represented as explicit unique constraints; match declarations to introspected table-column order to avoid unnecessary replacement of a referenced constraint.
+- Growth adds [the forward migration](lib/db/migrations/0029_pro_growth_tools.sql), including incentive tables, notification cycles and an immutable booking-pricing trigger. Review the journal before applying it; the earlier growth SQL files are not a substitute for journal execution. Schema push does not replace migration-defined triggers/functions.
 - [Database scripts](lib/db/package.json) also expose `push`, `push-force` and `generate`. `push` is development schema reconciliation, not reviewed production migration history; `push-force` must not be a default bootstrap fix. Generation can prompt about renames/retypes; hand-authored migrations need reviewed journal entries.
 - A pushed development schema can mask missing migrations. Do not mark #110 complete merely because a pre-provisioned database runs features.
 
@@ -155,10 +158,10 @@ Express middleware → domain routes → domain helpers → Drizzle / pg → Pos
 | Client navigation, providers, fonts, motion | [client app](artifacts/futsalcy/app/), [root layout](artifacts/futsalcy/app/_layout.tsx), [components](artifacts/futsalcy/components/), [contexts](artifacts/futsalcy/context/) | Expo Router role groups are UI navigation, not authorization; server guards are authoritative. Feather font workaround uses a unique font name for Android Expo Go. |
 | Auth/session persistence | [AuthContext](artifacts/futsalcy/context/AuthContext.tsx), [auth middleware](artifacts/api-server/src/middlewares/auth.ts), [auth routes](artifacts/api-server/src/routes/auth.ts) | Native SecureStore with legacy AsyncStorage migration/fallback; cached user/mode remain AsyncStorage. API verifies session version/deletion on every authenticated request. |
 | API boot and transport | [index](artifacts/api-server/src/index.ts), [app](artifacts/api-server/src/app.ts), [route registry](artifacts/api-server/src/routes/index.ts), [validation middleware](artifacts/api-server/src/middlewares/request-validation.ts) | API binds `PORT`, mounts `/api`, saves raw JSON bytes for webhook signatures. General CORS is currently permissive. |
-| Domain API | [routes directory](artifacts/api-server/src/routes/) | Groups: auth; public/owner venues/pitches/pricing/hours/photos/blocks; bookings/payment; player/owner account and notifications; favourites; admin venues/users/refunds/audit; subscriptions; match statistics; leaderboard; Elite; tournaments. |
+| Domain API | [routes directory](artifacts/api-server/src/routes/) | Groups: auth; public/owner venues/pitches/pricing/hours/photos/blocks; bookings/payment; player/owner account and notifications; favourites; admin venues/users/refunds/audit; subscriptions; growth tools; match statistics; leaderboard; Elite; tournaments. |
 | Shared contract and generation | [OpenAPI](lib/api-spec/openapi.yaml), [Orval configuration](lib/api-spec/orval.config.ts), [React client](lib/api-client-react/src/), [custom fetch](lib/api-client-react/src/custom-fetch.ts), [Zod exports](lib/api-zod/src/index.ts), [handwritten policies](lib/api-zod/src/secure.ts) | Spec drives generated types/hooks and Zod. Handwritten validation is the security boundary; don't hand-edit generated outputs. Generated Zod export is nested `generated/api/api`, not a stale sibling. |
 | Persistence | [DB package](lib/db/package.json), [pool](lib/db/src/index.ts), [schema](lib/db/src/schema/), [migrations](lib/db/migrations/) | PostgreSQL constraints/transactions underpin concurrency. Review runtime schema plus migration history; keep them aligned. |
-| Background work | [notifications](artifacts/api-server/src/lib/notifications.ts), [SMS jobs](artifacts/api-server/src/lib/sms-reminders.ts), [Elite recovery](artifacts/api-server/src/lib/elite.ts) | Started by API process: push/reminder and SMS ticks 60 seconds, Elite recovery 30 seconds. Not separate durable scheduler services. |
+| Background work | [notifications](artifacts/api-server/src/lib/notifications.ts), [SMS jobs](artifacts/api-server/src/lib/sms-reminders.ts), [Elite recovery](artifacts/api-server/src/lib/elite.ts), [growth checkout cleanup](artifacts/api-server/src/lib/growth-checkout-cleanup.ts) | Started by API process: push/reminder, SMS and growth cleanup ticks 60 seconds, Elite recovery 30 seconds. Not separate durable scheduler services. |
 | Providers and files | [payment provider](artifacts/api-server/src/lib/payment-provider.ts), [reset email](artifacts/api-server/src/lib/password-reset-email.ts), [SMS adapter](artifacts/api-server/src/lib/sms-provider.ts), [photo storage](artifacts/api-server/src/lib/venue-photo-storage.ts), [avatar route](artifacts/api-server/src/routes/player-avatar.ts) | Stripe direct SDK; Resend through Replit connectors; custom HTTP SMS protocol; venue images in Replit storage but avatars on process filesystem. |
 | Development preview | [canvas artifact](artifacts/mockup-sandbox/), [.replit](.replit) | Canvas is supporting component preview, not a separate shipped Versa app. Keep artifacts' routing distinct. |
 
@@ -169,6 +172,7 @@ Express middleware → domain routes → domain helpers → Drizzle / pg → Pos
 - Bookings relate to venue, pitch and player (manual guests are additional fields, not necessarily registered accounts). They retain a policy snapshot and source/offline-payment marker. Payments/refunds and booking audit entries relate to booking activity.
 - Notifications retain scheduled/delivery/read state. SMS jobs have attempts, budgets and claim leases.
 - Owner subscriptions/events preserve provider state, periods, pending checkout leases, overrides and webhook ordering cursor.
+- Growth promotions have booking-linked redemption records; venue/player streak progress has weekly entries and cycle-linked rewards. Booking pricing snapshots and checkout keys connect these incentives to payment recovery.
 - Match statistics include matches, participants, scores/results and per-player statistics with relational consistency constraints. Leaderboards derive from eligible persisted match history, not card payments or tournament prizes.
 - Elite schema includes squad requests/members/availability, proposals, waitlist entries/claims and mutation-rate buckets.
 - Tournament schema is separate: tournaments → optional teams → registrations → payment attempts and bracket matches; tournament audit events preserve lifecycle changes. Its ledger is not the ordinary booking payment table.
@@ -211,7 +215,7 @@ The codegen script itself runs library typechecking. Review generated diffs and 
 | Pro/Elite owner/player: match records, scores and statistics | Owner booking detail; player profile/venue detail → `match-statistics.ts` | S; #99 Merged; V0 | DB with match schema, owner entitlement | Ownership and participant/privacy rules, corrections/deletion and score consistency need role tests. Not a universal player “finish session” feature. |
 | Pro/Elite owner: premium insights and discovery cues | `(owner)/stats.tsx`, player venue discovery → `bookings.ts`, owner-analytics/venue-discovery helpers | S; #101 Merged; V0 | DB, ADVANCED_ANALYTICS entitlement | Retention/repeat/cancellation confidence thresholds can intentionally return insufficient data. Plans still say coming soon. |
 | Pro/Elite owner: automated 24-hour SMS reminders | Booking confirmation/edit/offline receipt paths → SMS helper/jobs/provider | S; #101 Merged; #106/#107 Draft; V0 | HTTP SMS service, phone consent, running worker | Disabled without provider; late-created bookings inside lead window do not schedule. Delivery and opt-in product decisions outstanding. |
-| Pro/Elite owner/player: discount codes and weekly loyalty rewards | Planned in #100; no delivered growth model/routes identified in baseline | Active separate branch; not inspected; V0 | Future entitlement, booking/pricing/ledger integration, Stripe | Planned four qualifying paid weekly bookings then fifth free, not current behavior. Coordinate merge and #115/#116; no completion claim. |
+| Pro/Elite owner/player: discount codes and weekly loyalty rewards | `owner/growth-tools.tsx`, owner profile/settings, player discovery/venue/checkout/booking detail → `growth-tools.ts` routes and helpers | S; #100 Merged; V0 | Owner GROWTH_TOOLS entitlement, DB incentive/pricing state, payment provider | Four qualifying paid weeks earn a fifth-booking reward; read-only previews, immutable checkout pricing and refund recovery are source-present. Aggregate analytics only; per-code attribution #115 and real Stripe/device recovery #116 remain outstanding. |
 | Elite player/owner: squad matchmaking, proposals, waitlists/demand | `player/elite.tsx`, `(owner)/bookings.tsx` demand panel → `elite.ts`, recovery helper | S; #103 Merged; V0 | DB, Elite venue owner, notifications/payment | Locks/expiry/booking reuse exist; captain/member consent policy and concurrency still need launch proof. Archived #111/#112 are not mandates. |
 | Elite venue/player: leaderboard and player breakdown | Venue detail's VenueLeaderboard component → `leaderboard.ts`, leaderboard helper | S; #104 Merged; V0 | DB, recorded eligible statistics, Elite venue | Public exposure and sample/tie behavior need product/privacy review. Downgrade/hidden/no-data behavior must be checked. |
 | Elite owner: create/edit/publish/close/bracket/results/cancel tournaments | `(owner)/tournaments/index.tsx`, `new.tsx`, `edit.tsx`, `[id].tsx` → `tournaments.ts` | S; #102 Merged; V0 | DB, Elite entitlement, Stripe/refund provider | Single elimination only; prize pool is tracked, not escrow/payout. Concurrent lifecycle acceptance #113 outstanding. Plans label contradicts source. |
@@ -247,7 +251,7 @@ Read [payments routes](artifacts/api-server/src/routes/payments.ts), [provider](
 4. **Booking fee is added**, not deducted from the advertised booking base: fee = paid base × percentage rounded to two decimals; charged total = base + fee. Example: €100 full base → €6 fee → €106 charge. €30 deposit → €1.80 fee → €31.80 charge; waived → €30. These are code arithmetic examples, not settlement rehearsals. Float arithmetic/rounding boundary coverage remains #12.
 5. Amount, percentage, waiver, currency and payment type are persisted per payment. Never recompute a past payment from today's admin settings.
 6. No server Stripe key → mock intent; default mock success confirms immediately, `MOCK_PAYMENT_FAIL=true` simulates decline. Server Stripe key → real Stripe intent, HTTP 202/client action, then `/capture` checks provider status before marking payment/booking successful in a DB transaction.
-7. Idempotency defaults to booking/type/user or uses caller key. Successful same-key replay returns existing state. Existing pending Stripe replay currently returns provider ID without a fresh `clientSecret`; failed/retry states can require a new key. Crash/reopen recovery and preventing multiple different-key successful intents on one booking need explicit tests. There is no ordinary-booking Stripe webhook route in the inspected payments file; do not assume tournament/subscription webhooks reconcile ordinary bookings.
+7. Idempotency defaults to booking/type/user or uses caller key. Successful same-key replay returns existing state. Pending Stripe replay retrieves the existing intent's `clientSecret` for resuming checkout; temporary provider uncertainty returns a retryable 503 and retains reservations. Confirmed terminal cancellation closes the unpaid booking and requires a fresh booking. Other failed/retry states can require a new key. Crash/reopen recovery and preventing multiple different-key successful intents on one booking still need provider/device rehearsal. There is no ordinary-booking Stripe webhook route in the inspected payments file; do not assume tournament/subscription webhooks reconcile ordinary bookings.
 8. Current Stripe intent uses `transfer_data.destination` if owner Connect ID exists; uses `application_fee_amount` for nonwaived fees. With an owner ID and waived fee it still transfers. Without an ID, it creates a platform charge; **this is not proof that the owner gets paid**. It does not fetch `charges_enabled`/`payouts_enabled` before intent creation. #13's Ready change overlaps this logic and #94 covers verification.
 
 Owner Connect onboarding is in [owner-account routes](artifacts/api-server/src/routes/owner-account.ts). `APP_DOMAIN` supplies return/refresh URLs and otherwise defaults to an example host. Rehearse expired onboarding links, refresh/resume, disabled charges/payouts and account updates; #14/#15 remain Draft.
@@ -269,7 +273,7 @@ Read [subscription routes](artifacts/api-server/src/routes/subscriptions.ts), [e
 | Effective plan | Current server capabilities |
 |---|---|
 | FREE | Core booking/venue management; empty premium-capability list |
-| PRO | MANUAL_BOOKING, ADVANCED_ANALYTICS, MATCH_STATISTICS |
+| PRO | MANUAL_BOOKING, ADVANCED_ANALYTICS, MATCH_STATISTICS, GROWTH_TOOLS |
 | ELITE | All Pro capabilities plus ELITE_MATCHMAKING, TOURNAMENT_CREATOR |
 
 Capabilities belong to the **venue owner**, not a paid player membership. Elite discovery/features resolve the venue owner's effective plan. A currently active admin override takes precedence. ACTIVE with unexpired/no recorded end grants the recorded plan; PAST_DUE or CANCELED retains it only until a future paid period end; otherwise FREE. Cancellation at period end is distinct from immediate loss of access. Do not bypass server gating by trusting plan cards.
@@ -279,6 +283,21 @@ Premium discovery metadata labels Pro/Elite venues as “Verified Pro”/“Veri
 Billing requires both price IDs, server key and subscription webhook secret; otherwise checkout returns unavailable (no fake recurring purchase). A conditional checkout-creation lease and provider idempotency protect concurrent attempts. Existing open same-plan sessions can be reused; provider subscription/session reconciliation prevents blindly issuing a new checkout after delayed webhook/expired local lease. Existing subscriptions are managed via billing portal/cancel route. Provider events are deduped and ordered by provider timestamp/ID cursor. The signed raw-body endpoint is `/api/webhooks/stripe/subscriptions`; it processes `customer.subscription.*`. Browser success navigation alone does not grant entitlement.
 
 Rehearse duplicate/delayed/out-of-order webhooks, missing owner mapping, failure between provider session creation and DB update, grace period expiry, overrides and downgrade for existing records. Display prices are not authoritative invoices; decide and configure Stripe products/currency/tax policy with the product owner.
+
+### Pro growth tools and incentive checkout lifecycle
+
+Read [growth routes](artifacts/api-server/src/routes/growth-tools.ts), [growth domain logic](artifacts/api-server/src/lib/growth-tools.ts), [growth schema](lib/db/src/schema/growth.ts), [pricing recovery](artifacts/api-server/src/lib/growth-pricing-recovery.ts), [checkout cleanup](artifacts/api-server/src/lib/growth-checkout-cleanup.ts), and the revised [payment routes](artifacts/api-server/src/routes/payments.ts).
+
+- Owners with the GROWTH_TOOLS capability (Pro/Elite) manage venue-scoped percentage/fixed promotions through `owner/growth-tools.tsx`, reached from owner profile/settings. Server-side ownership, entitlement, validation, expiry and usage controls remain authoritative. Promotions with redemption history cannot be deleted; disable them instead.
+- Players see promotion/streak information in discovery, venue details and booking details. Checkout previews are **non-reserving**: opening the summary must not claim a slot or incentive. The checkout UI allows a discount/reward selection and displays the priced breakdown.
+- Venue loyalty tracks qualifying paid weekly bookings. Four qualifying paid weeks earn a free fifth-booking reward; fully discounted bookings do not count toward paid qualification. Progress expires and refunds rebuild it from surviving qualifying bookings. Reward metadata identifies its qualifying cycle so refunds from older settled cycles do not incorrectly credit a newer cycle.
+- Bookings carry an immutable pricing snapshot and a checkout key. Persist payment state, incentive reservations and pricing atomically before exposing a client secret. Commission uses the discounted paid base; zero-cost checkout follows its explicit confirmation path rather than creating a paid provider charge.
+- Preserve reservations during provider processing or uncertainty. Release incentives only after confirmed terminal provider cancellation, or the explicit zero-cost path. A released incentive must not leave its old discounted booking retryable: close the unpaid booking and require a fresh one. Recovery also handles interrupted legacy pricing writes and expired unpriced checkout claims.
+- The API starts growth checkout cleanup alongside its other background work. This is an in-process development/operations dependency, not evidence of durable execution on an idle autoscaled deployment.
+- Streak-near-completion and expiry notifications are cycle-aware. Their partial uniqueness scopes differ from ordinary booking notices; changes to notification inserts must remain compatible with both.
+- Owner analytics currently return aggregate promotion/redemption/discount and streak-player counts. They do not establish per-code conversion, incremental bookings or causal revenue uplift (#115).
+
+Source test entry points: `pnpm --filter @workspace/api-server run test:growth-tools` and `test:growth-tools:db`. The latter requires `TEST_DATABASE_URL` pointing to a disposable database and runs migrations before integration tests. Inspect [integration coverage](artifacts/api-server/src/growth-tools.integration.test.ts) and [payment-state coverage](artifacts/api-server/src/growth-payment-state.test.ts); neither test presence nor prior branch reports prove Stripe-device recovery. No growth tests or payment rehearsals were rerun for this documentation update; #116 remains a release-verification gap.
 
 ### Notification and SMS lifecycle
 
@@ -381,6 +400,7 @@ Commands below are verified as scripts in [API package](artifacts/api-server/pac
 | `pnpm --filter @workspace/api-server run test:elite-validation` | Elite input/range/slot helper validation |
 | `pnpm --filter @workspace/api-server run test:tournaments` | Bracket/byes and confirmation helper tests |
 | `pnpm --filter @workspace/api-server run test:tournament-secure` | Small tournament request-schema tests; no live concurrency/provider coverage |
+| `pnpm --filter @workspace/api-server run test:growth-tools` | Growth domain and payment-state regression tests; not Stripe/device rehearsal |
 
 The following are **database-mutating integration scripts**. Set `TEST_DATABASE_URL` privately to a dedicated disposable DB. Their package wrappers substitute it for `DATABASE_URL` and run migrations before the suite:
 
@@ -391,6 +411,7 @@ pnpm --filter @workspace/api-server run test:password-reset
 pnpm --filter @workspace/api-server run test:match-statistics:integration
 pnpm --filter @workspace/api-server run test:leaderboard:integration
 pnpm --filter @workspace/api-server run test:manual-bookings:integration
+pnpm --filter @workspace/api-server run test:growth-tools:db
 ```
 
 Password-reset integration uses NODE_ENV=test and a test outbox, not Resend delivery. Review fixture cleanup and test auth secrets before running each file. A failing migration may prevent the suite from exercising features at all; record provisioning separately from test results.
@@ -475,13 +496,13 @@ This is a proposed sequencing guide, **not a commitment that every Draft is requ
 | P0 financial | Booking fee/refund/Connect safety (#10/#12/#13/#94): wrong ledger/payout can lose money | Provider/payments/analytics/admin; reconcile Ready #13; Stripe test mode + owner test Connect + disposable DB | Full/deposit/waiver/rounding/different-key retry/late capture tested; one charge/confirmation; owner readiness policy enforced; refunds/fee/transfer and UI/export totals reconcile; recovery after interrupted DB/provider action documented |
 | P0 financial | Subscription recovery: prevent duplicate billing or wrong access | Subscription routes/events/entitlements; recurring prices, webhook test endpoint, isolated owner | Duplicate/concurrent checkout and delayed/out-of-order events yield one subscription; override/grace/expiry/downgrade proven; restart recovery does not require manual DB edit |
 | P0 if tournaments ship | Tournament concurrency (#113): capacity/payment/bracket safety | Tournament routes/migrations; TEST_DATABASE_URL + Stripe test configuration | Parallel last-seat/duplicate registration tests, one active payment, capture+webhook race, late success refund, idempotent refunds, safe schedule conflicts and prize-ledger totals |
-| P0 security/operations | Durable avatars and release access policy (#118): local files can be lost | Avatar route/app static uploads; approved storage and data-retention policy | Avatar survives deploy/restart/replica; unauthorized access/upload rejected; existing references migrated without broken profiles |
-| P0 operations | Background jobs (#117): current autoscale/timers do not guarantee timing | API startup, notifications/SMS/Elite helpers; chosen worker model | Idle/restart/multi-instance rehearsal sends no duplicate charge, recovers due leases and expires proposals; alerts identify overdue work |
+| P0 security/operations | Durable avatars and release access policy: local files can be lost; #118 suggestion archived | Avatar route/app static uploads; approved storage and data-retention policy | Avatar survives deploy/restart/replica; unauthorized access/upload rejected; existing references migrated without broken profiles |
+| P0 operations | Background jobs: current autoscale/timers do not guarantee timing; #117 suggestion archived | API startup, notifications/SMS/Elite/growth cleanup helpers; chosen worker model | Idle/restart/multi-instance rehearsal sends no duplicate charge, recovers due leases and expires proposals; alerts identify overdue work |
 | P1 release configuration | Live Stripe/Connect/recurring/tournament settings and approved origins | Provider table, APP_DOMAIN, signed webhooks; business owner/account approvals | Matching modes/accounts, verified webhook signatures and redirects, missing config fails safely, no mock in live money flows |
 | P1 if SMS ships | Delivery and consent (#106/#107): code is not a carrier integration or permission | SMS adapter/jobs; chosen provider, consent policy, approved recipients | One approved reminder delivered; reschedule/cancel/retry cost/duplicate behavior proven; opt-out honored; delivery/error monitoring and budget owner assigned |
 | P1 release configuration | Physical-device push (#30/#32/#56), reset email, storage rehearsal (#85/#88) | Native development builds, push hook/receipts; sender/storage authorization | iOS/Android background/resume/denial verified, badges resync, recipient isolation enforced; reset single-use link arrives/works; image lifecycle/security regression passes |
 | P1 merge/verification | Forms (#96/#97): motion must not block controls | Reconcile Ready branch; shared Motion/keyboard/profile/onboarding/admin forms | Focus/edit/submit/reason/switch/selector/modal behavior passes native+web and reduced-motion checks with no duplicate action |
-| P1 feature integration | Growth tools (#100/#115/#116): discounts/rewards change financial rules | Coordinate separate Active/Ready work, immutable pricing/redemption schema and task plan; no parallel rewrite | Entitlement/usage/expiry/concurrency limits, fifth reward/reversal and zero-cost checkout proven; fees use discounted paid base; device Stripe recovery; owner analytics scope agreed |
+| P1 financial verification | Growth tools (#100 Merged; #115/#116): discounts/rewards change financial rules | Inspect delivered immutable pricing/redemption and recovery logic; no parallel rewrite | Entitlement/usage/expiry/concurrency limits, fifth reward/reversal and zero-cost checkout proven; fees use discounted paid base; device Stripe recovery; owner analytics scope agreed |
 | P1 product accuracy | Plan-copy alignment and pricing: customers should not buy misleading capabilities | Plans screen vs entitlement/routes; owner chooses launch availability/prices | Labels/upgrade paths match released and verified functionality; web/device exclusions disclosed; Stripe prices agree with approved copy |
 | P1 owner decisions | Platforms, privacy/prizes/retention/refunds: implementation cannot decide these | Readiness decision table; legal/privacy review and operating owner | Written platform/scope/fee/refund/prize/consent/retention decisions; appropriate terms and release sign-off |
 | P2 feature/UX | Owner editing/onboarding/recovery (#6/#7/#9/#14/#15/#20–#23), cancellation/badge UX (#31), offline receipts/reconciliation (#108/#109) | Corresponding client/server flows; reproduce before accepting Draft work | Crash/background/expired-link recovery preserves valid data, users see approval/cancellation next steps, receipt and period totals match defined offline policy |
@@ -498,7 +519,7 @@ These are sequencing suggestions, not a promise of one-week completion.
 1. **Baseline/access:** record revision; refresh Merged/Active/Ready/Draft work; identify product/release owner; get least-privilege service access. Confirm approved platforms and premium launch scope.
 2. **Setup/checks:** provision disposable PostgreSQL, resolve/rehearse clean migration setup, install frozen dependencies, reproduce current typecheck/build results. Record blockers rather than pushing a shared DB.
 3. **Role walkthrough:** seed isolated demo, approve a venue, run the three role scenarios below without real messages/payments. Reconcile actual screens/API data and missing plan copy.
-4. **Financial/provider rehearsal:** once schema/checks are sound and access approved, use test-only providers/recipients; reconcile #13/#96 and coordinate growth work. Exercise paid/refunded/subscription/tournament lifecycles including failure/retry.
+4. **Financial/provider rehearsal:** once schema/checks are sound and access approved, use test-only providers/recipients; reconcile #13/#96 and inspect merged growth work. Exercise paid/refunded/subscription/tournament/incentive lifecycles including failure/retry.
 5. **Operations/transition:** choose worker/hosting model, define monitoring/restore/on-call, prepare signed native builds and release checklist; agree acceptance ownership and remaining feature scope.
 
 ### Role-based smoke acceptance
@@ -524,7 +545,7 @@ These are sequencing suggestions, not a promise of one-week completion.
 - [ ] Ordinary payment/deposit/fee/waiver/Connect/cancellation/admin-refund and interruption recovery reconcile against provider and ledger; defined financial exports agree.
 - [ ] Recurring checkout/webhook recovery, renewal/grace/cancel/override/downgrade pass; plan card copy/prices reflect what is actually released.
 - [ ] Tournament last-seat/payment/webhook/bracket/cancel/refund concurrency covered if tournaments ship; no implied escrow/prize payout.
-- [ ] Incentive concurrency/zero-cost/redemption/reversal recovery checked after growth merge if incentives ship.
+- [ ] Incentive concurrency/zero-cost/redemption/reversal recovery checked against the merged growth source and Stripe test payments before incentives ship.
 - [ ] Each of iOS, Android and web has a written support scope. Unsupported web native payments are excluded honestly or implemented and tested.
 - [ ] Physical-device signed builds prove Stripe, push/background/resume, keyboard/motion, deep links and media/location permissions; Expo Go alone is insufficient.
 - [ ] Reset email, object storage and (if shipped) consented SMS delivered/rehearsed through approved test recipients/configuration.
@@ -566,9 +587,9 @@ These are sequencing suggestions, not a promise of one-week completion.
 
 ## Task-status appendix
 
-Board entries are historical delivery/work records, not feature tests. Draft = suggested/unaccepted work, possibly stale or overlapping; Active may be on another branch; Ready awaits merge; Merged is delivered status; Archived is not mandatory work and does not imply user rejection. The handoff task itself remains Active while this snapshot is written.
+Board entries are historical delivery/work records, not feature tests. Draft = suggested/unaccepted work, possibly stale or overlapping; Active may be on another branch; Ready awaits merge; Merged is delivered status; Archived is not mandatory work and does not imply user rejection. The original handoff task is now Merged; this document update does not change other task statuses.
 
-**Final board refresh:** 2026-10-05 06:23 UTC, all 118 records: 40 Merged, 48 Draft, 2 Ready, 2 Active, 26 Archived. #117/#118 were suggested during preparation and are included as Drafts, not delivered changes. Repository HEAD was rechecked unchanged at the source baseline.
+**Original full board refresh:** 2026-10-05 06:23 UTC, all 118 records: 40 Merged, 48 Draft, 2 Ready, 2 Active, 26 Archived. **Subsequent update, 2026-10-05:** #100 and #114 are now Merged; #117/#118 suggestions were archived, not implemented. The full board was not re-counted for this update; remaining statuses below retain the original snapshot unless explicitly changed. Source baseline now includes the growth merge and post-merge constraint repair.
 
 The following groups account for the complete refreshed board, including archived suggestions because this handoff explicitly requests reconciliation. Original task titles are retained for lookup; claims inside titles (such as “live” or “fix”) are not runtime evidence. Use the feature matrix/domain rules/roadmap above to interpret source and acceptance.
 
@@ -617,14 +638,14 @@ The following groups account for the complete refreshed board, including archive
 | #104 | Add Elite venue leaderboards |
 | #105 | Make manual bookings a Pro feature |
 
-### Active and Ready work
+### Previously Active and Ready work
 
 | Ref | Status | Title / reconciliation |
 |---|---|---|
 | #13 | Ready | Route booking payments to the owner's Stripe account at checkout — overlapping routing already visible; pending implementation not inspected |
 | #96 | Ready | Restore form behavior after motion — no claim that its fixes are in baseline |
-| #100 | Active | Add Pro growth tools — separate branch; described plan, not inspected implementation |
-| #114 | Active | Comprehensive Versa developer handoff — this document; status before completion |
+| #100 | Merged | Add Pro growth tools — current models, routes, UI, pricing/recovery logic and tests inspected for this update |
+| #114 | Merged | Comprehensive Versa developer handoff — this document, subsequently updated |
 
 ### Drafts: financial, setup, security and release verification
 
@@ -650,9 +671,7 @@ The following groups account for the complete refreshed board, including archive
 | #106 | Connect SMS delivery and prove reminders arrive before launch |
 | #110 | Make sure new databases can start with the full booking and match history schema — historical isolated test reports do not prove bootstrap |
 | #113 | Prove tournament registrations and payments stay safe under simultaneous requests |
-| #116 | Verify incentive checkout recovery against Stripe test payments — depends on unmerged growth work |
-| #117 | Keep reminders and match recovery running when the API is idle — follow-up suggested during this handoff; no implementation |
-| #118 | Keep profile photos from disappearing after a release or restart — follow-up suggested during this handoff; no implementation |
+| #116 | Verify incentive checkout recovery against Stripe test payments — growth is merged; provider/device rehearsal still outstanding |
 
 ### Drafts: feature/UX and optional later work
 
@@ -682,7 +701,7 @@ The following groups account for the complete refreshed board, including archive
 | #107 | Let players choose whether booking reminders are sent by SMS |
 | #108 | Give owners a clear receipt for an offline booking payment |
 | #109 | Help owners reconcile offline booking income at the end of each period |
-| #115 | Show owners which discount codes actually improve bookings — depends on unmerged growth work; not current dashboard evidence |
+| #115 | Show owners which discount codes actually improve bookings — growth is merged; current dashboard provides aggregates, not per-code attribution |
 
 ### Archived records (not mandatory requirements)
 
@@ -716,6 +735,8 @@ These may include automatically archived suggestions. Neither archived status no
 | #95 | Catch motion accessibility regressions before they reach users |
 | #111 | Make sure Elite matches stay conflict-free when many players act at once |
 | #112 | Let teammates confirm before their name is used in an Elite squad |
+| #117 | Keep reminders and match recovery running when the API is idle — archived suggestion; no implementation |
+| #118 | Keep profile photos from disappearing after a release or restart — archived suggestion; no implementation |
 
 ### Refresh protocol
 
@@ -723,6 +744,6 @@ Before using this appendix for implementation, fetch **all** task records (a sin
 
 ### Document verification record
 
-Preparation verified repository-relative Markdown links, table-of-contents anchors, package-script names and one-to-one appendix reference/title/status coverage against the refreshed board. A text redaction check and manual inspection found no credential values, real account details, production records or credential-bearing URLs in this handoff. Only this file and the README handoff link were changed.
+Original preparation verified repository-relative Markdown links, table-of-contents anchors, package-script names and one-to-one appendix reference/title/status coverage against the refreshed board. A text redaction check and manual inspection found no credential values, real account details, production records or credential-bearing URLs in this handoff. That preparation changed this file and the README handoff link. This subsequent update changes only this file, checks local links/anchors and whitespace, and records the selected status changes above without claiming a new full-board refresh.
 
 Application/build/typecheck/security/provider/database/browser/device/release checks remain **not run** for this documentation-only task. Their commands, prerequisites, hazards and acceptance gates are documented above; none is implied by successful document validation.
