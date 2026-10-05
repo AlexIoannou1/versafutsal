@@ -33,3 +33,17 @@ mtime_ms = 1788436389136
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:55954ffe-e66f-485d-859a-0d4d1971ba5f/20828b4c-e321-48af-9066-aeed08325d4d/15b9d588-79c7-4e82-a9f4-d7f311266cba"
 storage_version_token = "1788436390896692"
 content_type = "image/svg+xml"
+
+[[outputs]]
+id = "6Mkl_kVynHehLNf2wJMzt"
+uri = "file://DEVELOPER_HANDOFF.md"
+type = "text"
+title = "Versa Developer Handoff"
+description = "Shareable developer guide covering onboarding, architecture, feature status, financial rules, operations, all 118 task records and release acceptance checks. Documentation/source inspection only; no production-readiness claim."
+logical_id = "a2b5fec5-07e1-48c2-832b-555a3285d20c"
+content_hash = "sha256:eacbb2a3dd19ce8f2e74b27b1e6209312337f01929e1049ec0aed427f83ad896"
+size = 95381
+mtime_ms = 1791181470523
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:55954ffe-e66f-485d-859a-0d4d1971ba5f/a2b5fec5-07e1-48c2-832b-555a3285d20c/0fa31c74-c54e-472b-b75e-2058fd199524"
+storage_version_token = "1791181506856884"
+content_type = "text/markdown"

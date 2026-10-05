@@ -2,6 +2,10 @@
 
 A premium mobile futsal booking platform for Cyprus. Two-sided marketplace connecting players with venues for live availability, secure payments, and professional venue management.
 
+## Developer handoff
+
+The app is currently branded **Versa**. See [DEVELOPER_HANDOFF.md](DEVELOPER_HANDOFF.md) for the current source/task snapshot, safe onboarding, feature status, domain rules, setup risks and release checklist. The abbreviated setup below is not proof of clean database bootstrap or production readiness.
+
 ## Architecture
 
 - **Mobile App**: Expo (React Native) — Player, Venue Owner, and Admin roles
