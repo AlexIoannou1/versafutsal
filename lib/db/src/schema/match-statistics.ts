@@ -8,6 +8,7 @@ import {
   pgTable,
   timestamp,
   uniqueIndex,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -62,7 +63,9 @@ export const matchParticipantsTable = pgTable(
   },
   (table) => [
     uniqueIndex("match_participants_match_player_unique").on(table.matchId, table.playerId),
-    uniqueIndex("match_participants_match_id_unique").on(table.matchId, table.id),
+    // Drizzle introspects unique-constraint columns in table-column order.
+    // Keep this declaration in that order to avoid recreating an FK target.
+    unique("match_participants_match_id_unique").on(table.id, table.matchId),
     index("match_participants_player_idx").on(table.playerId),
   ],
 );
