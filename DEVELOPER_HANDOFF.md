@@ -15,6 +15,8 @@
 11. [Readiness and access-transfer checklists](#readiness-and-access-transfer-checklists)
 12. [Task-status appendix](#task-status-appendix)
 
+**Audience:** the receiving developer will work outside Replit, on their own machine. Start with [local-machine setup and required adaptations](#local-machine-setup-and-required-adaptations); Replit workflow instructions are reference material, not the local startup path.
+
 ## Snapshot and executive summary
 
 **Source baseline:** `5bf1828cdf6d36742cba1d0d34c6f7cb11a2036f`.
@@ -38,7 +40,7 @@ No builds, package installation, application tests, schema changes, shared-datab
 ### Immediate risks and contradictions
 
 - #102 (Build Elite tournament creator) and #100 (Add Pro growth tools) are Merged and their source is present. Growth incentives now affect booking pricing, payment recovery and refunds; inspect the lifecycle below before changing checkout.
-- #13 (Route booking payments to the owner's Stripe account at checkout) and #96 (Restore form behavior after motion) are Ready. The current payment provider already uses Connect destinations if an account ID exists, but does not check charge/payout readiness at charge creation. Inspect the pending change when merged rather than treating routing as wholly absent or fully resolved.
+- #13 (Route booking payments to the owner's Stripe account at checkout) is Ready. The current payment provider already uses Connect destinations if an account ID exists, but does not check charge/payout readiness at charge creation. Inspect the pending change when merged rather than treating routing as wholly absent or fully resolved. #96/#97 form-motion work was subsequently archived; do not assume those changes were delivered.
 - #11 and #74 record historic build/typecheck issues. No current failure count was reproduced here.
 - #110 records clean-database failure. The journal visibly omits the guest-column migration and contains non-monotonic timestamps; new bootstrap remains a release gate, not a guaranteed command.
 - #106 and #113 are configuration/verification gaps, not evidence that delivered reminders or concurrent tournaments work.
@@ -60,6 +62,65 @@ Specific Draft/source mismatches worth resolving before assigning new work:
 | #115/#116 growth follow-ups | Growth models, routes, aggregate analytics and tests are now in this checkout | Per-code attribution and Stripe test-payment recovery remain separate verification/enhancement work; source presence is not provider rehearsal |
 
 ## Start here: safe onboarding
+
+### Local-machine setup and required adaptations
+
+**The current checkout is not a turnkey local setup.** The commands below can start its processes after dependencies/database/environment are prepared, but client networking, media storage and email need the explicit adaptations below. These adaptations are instructions for the receiving developer, **not changes implemented by this handoff update**.
+
+#### Local prerequisites and operating-system considerations
+
+- Install Node.js 24, a team-agreed pnpm version and PostgreSQL 16 locally. Replit's Nix/module configuration and automatic service provisioning do not install anything on the developer's machine. Create separate development and disposable integration-test databases; use private local credentials, not a production copy by default.
+- Use Bash for the existing package scripts. On Windows, WSL2 is the simplest compatible starting point; native PowerShell cannot execute the API script's `export` or the integration scripts' shell syntax unchanged. Alternatively, rewrite those scripts for cross-platform environment handling. Verify device access/firewall routing if Metro/API run inside WSL2.
+- Inspect [workspace package settings](pnpm-workspace.yaml) before installation: Linux-oriented optional/platform dependency exclusions can prevent needed binaries on macOS/Windows. Adjust them for the target OS without blindly replacing dependency versions; retain reviewed patches/overrides and commit intentional lockfile changes. Sharp/esbuild must resolve binaries for the actual machine.
+- Install native platform tooling only for the platforms being tested: Xcode/macOS for local iOS native builds; Android SDK/emulator tooling for Android. A physical phone must reach the development computer over LAN or an approved development tunnel.
+
+#### Required local adaptations by source boundary
+
+| Area | Current local failure or limitation | Change required for local operation |
+|---|---|---|
+| Client API origin: [root layout](artifacts/futsalcy/app/_layout.tsx) and [custom fetch](lib/api-client-react/src/custom-fetch.ts) | Web derives an origin from `window.location.hostname`, **dropping the port**. With Expo at `http://localhost:20728`, requests target `http://localhost/api`, not API port 8080. Native forces HTTPS from a hostname-only variable. | Add an explicit, public **origin-only** API override such as `EXPO_PUBLIC_API_URL` and use it before existing Replit derivation. This variable is proposed, not currently supported. Accept `http://localhost:8080` for local web/emulator development or `http://<computer-LAN-IP>:8080` for a reachable phone; use a trusted HTTPS tunnel if native networking policy requires it. Do not include `/api` in this override: generated paths already include it. Preserve the existing Replit path when the override is absent. Alternatively, implement a same-origin proxy and preserve `window.location.origin`, including its port. |
+| Media URLs: [venue routes](artifacts/api-server/src/routes/venues.ts), [avatar route](artifacts/api-server/src/routes/player-avatar.ts) | Without Replit metadata, venue photos return `/api/...` and avatars may return a bare storage key. An API fetch override does not rewrite React Native image URLs. | Add a validated server public-origin setting, for example `PUBLIC_API_ORIGIN` (proposed, not existing), and use it to construct absolute venue-photo and `/api/uploads/` URLs. Its host must be reachable from the phone, not `localhost`. Alternatively resolve these URLs consistently client-side. Preserve photo access-token behavior and avoid trusting arbitrary request `Host` headers. Test upload/read/delete and avatar display separately. |
+| Venue-photo persistence: [storage adapter](artifacts/api-server/src/lib/venue-photo-storage.ts) | The current adapter uses Replit object storage. A bucket ID alone does not provide local authorization or a standalone filesystem backend. | For local-only development, replace or branch the adapter's save/read/remove functions with a filesystem implementation using a configured directory outside source control, or use an explicitly authenticated external object store. Preserve `uploads/venue-photos/` keys, ownership/read authorization, byte validation and safe key-to-path containment. Keep the existing API photo endpoints; do not expose the private photo directory as generic static files. Existing hosted photo references need an approved file transfer/mapping, not just a DB dump. |
+| Reset email: [email helper](artifacts/api-server/src/lib/password-reset-email.ts) | Delivery goes through `@replit/connectors-sdk`; local provider credentials are not wired into this helper. Generic reset-request success does not prove delivery. | Introduce a direct server-side Resend/SMTP transport or an explicitly local development mail sink while retaining timeouts, safe errors and token privacy. A new `RESEND_API_KEY` would need server-only configuration and code support; merely setting it does nothing today. Configure the sender and reset URL explicitly. The current reset URL validator requires HTTPS, so use trusted local HTTPS/a development tunnel or narrowly permit HTTP loopback in development without weakening production checks. The test outbox is `NODE_ENV=test` only, not a normal development mail server. |
+| Expo startup: [launcher](artifacts/futsalcy/scripts/start-dev.mjs) | `run dev` assumes Replit metadata, rewrites `.env.local` and starts its own tunnel. | Bypass it with direct Expo CLI commands below, or add a separate local launcher that does not overwrite local settings. No Replit ID, artifact proxy or canvas server should be required for ordinary local API/client development. |
+| Database | A running local PostgreSQL instance does not resolve the migration-chain problems below. | Repair/review and rehearse journal-driven bootstrap against an empty disposable database before seeding. Do not run post-merge automation or forced schema push as a substitute; migration-defined triggers must be installed. |
+| Stripe/SMS/push | Existing workspace configuration is neither available nor implicitly authorized off-platform. | Initially omit the Stripe server key to use explicit mock booking payments and leave SMS unconfigured. For provider work, use separate approved test credentials and recipients. Forward Stripe test webhooks to `/api/webhooks/stripe/subscriptions` and `/api/webhooks/stripe/tournaments`, configuring their respective signing secrets. Use reachable callback origins for Connect/subscriptions. Physical-device signed builds remain necessary for push/native payment proof. |
+
+Do not set fake `REPLIT_DEV_DOMAIN`/`REPLIT_DOMAINS` values as a permanent workaround: they enforce HTTPS/hostname assumptions in several places and conceal the missing local configuration boundary.
+
+#### Local startup sequence after the adaptations
+
+1. From the repository root, install dependencies with `pnpm install --frozen-lockfile` after checking OS compatibility.
+2. Supply the [server configuration](#configuration-reference) privately to each process: at minimum `DATABASE_URL`, `JWT_SECRET` and `PORT=8080`; coordinate `SESSION_SECRET`. Use a shell/private environment loader or explicitly add env-file loading. The API/DB do not promise to load a root `.env` automatically. Do not commit local secrets; if adding private env files, verify their paths are ignored.
+3. Review/fix migration ordering, then run `pnpm --filter @workspace/db run migrate` against the disposable database. Verify constraints and the immutable pricing trigger. Only then optionally run the seed command in the next section with a private `DEMO_SEED_PASSWORD`.
+4. Start the API from the repository root using the package command below. The script builds and starts; restart it after server code changes. The package's working directory also determines its `uploads` directory—retain that directory between restarts if testing avatars.
+5. Put only the proposed **public API origin** in `artifacts/futsalcy/.env.local` after implementing the override. Set it to the phone-reachable origin when testing devices. Never place DB, signing, Stripe secret or email credentials in Expo environment files.
+
+```bash
+# Server variables must already be supplied privately to this shell/process.
+PORT=8080 pnpm --filter @workspace/api-server run dev
+
+# Separate terminal: browser development, no Replit launcher.
+pnpm --filter @workspace/futsalcy exec expo start --web --port 20728
+
+# Or device development over LAN; scan the current Metro QR.
+pnpm --filter @workspace/futsalcy exec expo start --host lan --port 20728
+
+# API smoke check on the developer's machine.
+curl -i http://localhost:8080/api/healthz
+```
+
+For Android's emulator, the host machine is normally `10.0.2.2`, not emulator `localhost`; a physical device needs the computer's LAN address or tunnel. A Metro QR only connects the packager—it does not expose the API. Check host firewall, emulator/WSL routing and native cleartext/TLS policy; prefer trusted HTTPS over disabling release transport security.
+
+#### Local acceptance gate
+
+- API health succeeds against the new local DB; login and role navigation work without a Replit runtime or metadata variables.
+- Browser requests include the intended API port; physical-device requests reach the same local API, with no hardcoded Replit host or device `localhost`.
+- Venue-photo upload/read/delete and avatar upload/display survive API restart; missing storage configuration produces an explicit error, not a broken image accepted as success.
+- Reset flow delivers through the chosen development transport and opens the configured reset page; tokens are not logged. Mock checkout and incentive confirmation/reversal work before attempting approved Stripe test flows.
+- Integration suites use a **different disposable DB**, not the developer's seeded DB. The local setup is not verified merely because package installation or `/api/healthz` passed.
+
+No local-machine execution, dependency changes or provider replacement was performed for this documentation update. The receiving developer must implement and verify the listed adaptations before declaring standalone local support.
 
 ### 1. Establish an isolated development environment
 
@@ -207,7 +268,7 @@ The codegen script itself runs library typechecking. Review generated diffs and 
 | Owner: onboarding, venue/pitch creation/editing | `owner/onboarding.tsx`, `venue-new.tsx`, `venue/[id].tsx`, venue/pitch `edit.tsx` → `venues.ts` | S; #3/#16/#17 Merged; V0 | DB | Approval gates discovery; Outdoor default source-present. Wizard/edit crash and background persistence #7/#9/#20–#23. |
 | Owner: venue photos and ordering/cover | Venue create/edit/manage screens → `venues.ts`, photo storage helper | S; #8/#81 Merged; V0 | Replit object storage, Sharp | Ownership/byte validation exists; prove full lifecycle and cover ordering #88, not merely bucket provisioning. |
 | Owner: pitches/pricing/hours/off-days/holidays/maintenance | Venue/pitch management → `venues.ts`, availability and booking helpers | S; #19 Merged; V0 | DB | Existing-booking impact policy and DST semantics require explicit decision/tests; not every block should silently cancel bookings. |
-| Owner: dashboard, booking search/calendar/edit/detail | `(owner)/index.tsx`, `bookings.tsx`, `calendar.tsx`, `owner/booking-edit.tsx`, `booking/[id].tsx` → `bookings.ts` | S; #18/#39 Merged; #96 Ready; V0 | DB, auth | Ownership-scoped actions and reason input; form/keyboard/reduced-motion regression must be checked after merge #97. Cancellation alerts #31 may overlap current helper. |
+| Owner: dashboard, booking search/calendar/edit/detail | `(owner)/index.tsx`, `bookings.tsx`, `calendar.tsx`, `owner/booking-edit.tsx`, `booking/[id].tsx` → `bookings.ts` | S; #18/#39 Merged; #96/#97 Archived; V0 | DB, auth | Ownership-scoped actions and reason input; form/keyboard/reduced-motion behavior still needs release verification, without assuming archived fixes were delivered. Cancellation alerts #31 may overlap current helper. |
 | Owner: stats/revenue/exports | `(owner)/stats.tsx`, booking export → `bookings.ts`, owner analytics/manual-booking helpers | S; V0 | DB, persisted payments/refunds | Financial revenue, booking counts and CSV revenue use different definitions. Fee/refund limitations #10/#12; offline reconciliation #109. |
 | Owner: Stripe onboarding/settings | `owner/settings-payments.tsx` → `owner-account.ts` | S; #4/#65 Merged; #13 Ready; V0 | Stripe Express/Connect, APP_DOMAIN | Status refresh and expired link recovery #14/#15; ID alone is not charges/payouts readiness. |
 | Owner/admin: subscription plan, billing portal/cancel/override | `(owner)/plans.tsx`, admin users subscription controls → `subscriptions.ts`, entitlements helper | S; #98 Merged; V0 | Stripe recurring prices, webhook, APP_DOMAIN; DB | API entitlement enforcement exists. Plan card €29/€59 monthly is display copy, not verified Stripe pricing. Overrides and recovery need rehearsal. |
@@ -501,7 +562,7 @@ This is a proposed sequencing guide, **not a commitment that every Draft is requ
 | P1 release configuration | Live Stripe/Connect/recurring/tournament settings and approved origins | Provider table, APP_DOMAIN, signed webhooks; business owner/account approvals | Matching modes/accounts, verified webhook signatures and redirects, missing config fails safely, no mock in live money flows |
 | P1 if SMS ships | Delivery and consent (#106/#107): code is not a carrier integration or permission | SMS adapter/jobs; chosen provider, consent policy, approved recipients | One approved reminder delivered; reschedule/cancel/retry cost/duplicate behavior proven; opt-out honored; delivery/error monitoring and budget owner assigned |
 | P1 release configuration | Physical-device push (#30/#32/#56), reset email, storage rehearsal (#85/#88) | Native development builds, push hook/receipts; sender/storage authorization | iOS/Android background/resume/denial verified, badges resync, recipient isolation enforced; reset single-use link arrives/works; image lifecycle/security regression passes |
-| P1 merge/verification | Forms (#96/#97): motion must not block controls | Reconcile Ready branch; shared Motion/keyboard/profile/onboarding/admin forms | Focus/edit/submit/reason/switch/selector/modal behavior passes native+web and reduced-motion checks with no duplicate action |
+| P1 verification | Forms: motion must not block controls; #96/#97 archived | Inspect current shared Motion/keyboard/profile/onboarding/admin forms; reproduce before changing | Focus/edit/submit/reason/switch/selector/modal behavior passes native+web and reduced-motion checks with no duplicate action |
 | P1 financial verification | Growth tools (#100 Merged; #115/#116): discounts/rewards change financial rules | Inspect delivered immutable pricing/redemption and recovery logic; no parallel rewrite | Entitlement/usage/expiry/concurrency limits, fifth reward/reversal and zero-cost checkout proven; fees use discounted paid base; device Stripe recovery; owner analytics scope agreed |
 | P1 product accuracy | Plan-copy alignment and pricing: customers should not buy misleading capabilities | Plans screen vs entitlement/routes; owner chooses launch availability/prices | Labels/upgrade paths match released and verified functionality; web/device exclusions disclosed; Stripe prices agree with approved copy |
 | P1 owner decisions | Platforms, privacy/prizes/retention/refunds: implementation cannot decide these | Readiness decision table; legal/privacy review and operating owner | Written platform/scope/fee/refund/prize/consent/retention decisions; appropriate terms and release sign-off |
@@ -519,7 +580,7 @@ These are sequencing suggestions, not a promise of one-week completion.
 1. **Baseline/access:** record revision; refresh Merged/Active/Ready/Draft work; identify product/release owner; get least-privilege service access. Confirm approved platforms and premium launch scope.
 2. **Setup/checks:** provision disposable PostgreSQL, resolve/rehearse clean migration setup, install frozen dependencies, reproduce current typecheck/build results. Record blockers rather than pushing a shared DB.
 3. **Role walkthrough:** seed isolated demo, approve a venue, run the three role scenarios below without real messages/payments. Reconcile actual screens/API data and missing plan copy.
-4. **Financial/provider rehearsal:** once schema/checks are sound and access approved, use test-only providers/recipients; reconcile #13/#96 and inspect merged growth work. Exercise paid/refunded/subscription/tournament/incentive lifecycles including failure/retry.
+4. **Financial/provider rehearsal:** once schema/checks are sound and access approved, use test-only providers/recipients; reconcile #13 and inspect merged growth work. Exercise paid/refunded/subscription/tournament/incentive lifecycles including failure/retry.
 5. **Operations/transition:** choose worker/hosting model, define monitoring/restore/on-call, prepare signed native builds and release checklist; agree acceptance ownership and remaining feature scope.
 
 ### Role-based smoke acceptance
@@ -589,7 +650,7 @@ These are sequencing suggestions, not a promise of one-week completion.
 
 Board entries are historical delivery/work records, not feature tests. Draft = suggested/unaccepted work, possibly stale or overlapping; Active may be on another branch; Ready awaits merge; Merged is delivered status; Archived is not mandatory work and does not imply user rejection. The original handoff task is now Merged; this document update does not change other task statuses.
 
-**Original full board refresh:** 2026-10-05 06:23 UTC, all 118 records: 40 Merged, 48 Draft, 2 Ready, 2 Active, 26 Archived. **Subsequent update, 2026-10-05:** #100 and #114 are now Merged; #117/#118 suggestions were archived, not implemented. The full board was not re-counted for this update; remaining statuses below retain the original snapshot unless explicitly changed. Source baseline now includes the growth merge and post-merge constraint repair.
+**Original full board refresh:** 2026-10-05 06:23 UTC, all 118 records: 40 Merged, 48 Draft, 2 Ready, 2 Active, 26 Archived. **Subsequent updates, 2026-10-05:** #100 and #114 are now Merged; #96/#97 work and #117/#118 suggestions were archived, not implemented. The full board was not re-counted for these updates; remaining statuses below retain the original snapshot unless explicitly changed. Source baseline now includes the growth merge and post-merge constraint repair.
 
 The following groups account for the complete refreshed board, including archived suggestions because this handoff explicitly requests reconciliation. Original task titles are retained for lookup; claims inside titles (such as “live” or “fix”) are not runtime evidence. Use the feature matrix/domain rules/roadmap above to interpret source and acceptance.
 
@@ -643,7 +704,6 @@ The following groups account for the complete refreshed board, including archive
 | Ref | Status | Title / reconciliation |
 |---|---|---|
 | #13 | Ready | Route booking payments to the owner's Stripe account at checkout — overlapping routing already visible; pending implementation not inspected |
-| #96 | Ready | Restore form behavior after motion — no claim that its fixes are in baseline |
 | #100 | Merged | Add Pro growth tools — current models, routes, UI, pricing/recovery logic and tests inspected for this update |
 | #114 | Merged | Comprehensive Versa developer handoff — this document, subsequently updated |
 
@@ -667,7 +727,6 @@ The following groups account for the complete refreshed board, including archive
 | #86 | Catch mobile sessions failing after an app upgrade |
 | #88 | Catch venue photo upload and cover-order regressions before owners see them |
 | #94 | Catch owner payout routing failures before a booking is paid — depends on Ready #13 |
-| #97 | Catch form controls becoming unresponsive after future motion changes — depends on Ready #96 |
 | #106 | Connect SMS delivery and prove reminders arrive before launch |
 | #110 | Make sure new databases can start with the full booking and match history schema — historical isolated test reports do not prove bootstrap |
 | #113 | Prove tournament registrations and payments stay safe under simultaneous requests |
@@ -733,6 +792,8 @@ These may include automatically archived suggestions. Neither archived status no
 | #91 | Add Greek language for players and venue owners |
 | #92 | Catch Greek-language regressions before app updates ship |
 | #95 | Catch motion accessibility regressions before they reach users |
+| #96 | Restore form behavior after motion — archived; no claim that its fixes are in baseline |
+| #97 | Catch form controls becoming unresponsive after future motion changes — archived follow-up |
 | #111 | Make sure Elite matches stay conflict-free when many players act at once |
 | #112 | Let teammates confirm before their name is used in an Elite squad |
 | #117 | Keep reminders and match recovery running when the API is idle — archived suggestion; no implementation |

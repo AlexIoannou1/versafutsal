@@ -17,3 +17,4 @@
 - [Orval object-size validation](orval-object-size-validation.md) — generated Zod request schemas do not enforce OpenAPI minProperties/maxProperties; enforce object shape server-side.
 - [Schema push false success](schema-push-false-success.md) — Drizzle may exit zero after a PostgreSQL error; validate output as well as process status.
 - [Growth checkout reservations](growth-checkout-reservations.md) — released incentives must not remain reusable through immutable retry quotes; notification deduplication needs cycle identity.
+- [Handoff audience](handoff-audience.md) — receiving developer works outside Replit; document required standalone local setup adaptations.
