@@ -38,7 +38,6 @@ function subscription(values: Partial<OwnerSubscription>): OwnerSubscription {
     ...values,
   };
 }
-
 assert.equal(resolveEffectivePlan(null, now), "FREE", "owners without rows default to Free");
 assert.equal(resolveEffectivePlan(subscription({ plan: "PRO", status: "ACTIVE" }), now), "PRO");
 assert.equal(resolveEffectivePlan(subscription({
@@ -70,6 +69,9 @@ assert.equal(planHasCapability("ELITE", "MATCH_STATISTICS"), true);
 assert.equal(planHasCapability("FREE", "ELITE_MATCHMAKING"), false);
 assert.equal(planHasCapability("PRO", "ELITE_MATCHMAKING"), false);
 assert.equal(planHasCapability("ELITE", "ELITE_MATCHMAKING"), true);
+assert.equal(planHasCapability("FREE", "TOURNAMENT_CREATOR"), false);
+assert.equal(planHasCapability("PRO", "TOURNAMENT_CREATOR"), false);
+assert.equal(planHasCapability("ELITE", "TOURNAMENT_CREATOR"), true);
 assert.equal(shouldAdvanceProviderEventCursor(null, null, now, "evt_b"), true);
 assert.equal(shouldAdvanceProviderEventCursor(new Date("2026-01-14T00:00:00Z"), "evt_z", now, "evt_a"), true);
 assert.equal(shouldAdvanceProviderEventCursor(new Date("2026-01-16T00:00:00Z"), "evt_a", now, "evt_z"), false);

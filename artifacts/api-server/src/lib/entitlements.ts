@@ -10,10 +10,10 @@ import { eq } from "drizzle-orm";
 export const PLAN_CAPABILITIES = {
   FREE: [],
   PRO: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS"],
-  ELITE: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS", "ELITE_MATCHMAKING"],
+  ELITE: ["MANUAL_BOOKING", "ADVANCED_ANALYTICS", "MATCH_STATISTICS", "ELITE_MATCHMAKING", "TOURNAMENT_CREATOR"],
 } as const satisfies Record<SubscriptionPlan, readonly string[]>;
 
-export type OwnerCapability = "MANUAL_BOOKING" | "ADVANCED_ANALYTICS" | "MATCH_STATISTICS" | "ELITE_MATCHMAKING";
+export type OwnerCapability = "MANUAL_BOOKING" | "ADVANCED_ANALYTICS" | "MATCH_STATISTICS" | "ELITE_MATCHMAKING" | "TOURNAMENT_CREATOR";
 
 export function shouldAdvanceProviderEventCursor(
   lastAppliedAt: Date | null,
@@ -81,7 +81,9 @@ export function requireOwnerCapability(capability: OwnerCapability) {
       const entitlement = await getOwnerEntitlements(req.user.userId);
       if (!planHasCapability(entitlement.effectivePlan, capability)) {
         res.status(403).json({
-          error: "This feature requires a Pro or Elite owner plan.",
+          error: capability === "TOURNAMENT_CREATOR"
+            ? "This feature requires an Elite owner plan."
+            : "This feature requires a Pro or Elite owner plan.",
           code: "ENTITLEMENT_REQUIRED",
           capability,
         });

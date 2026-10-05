@@ -501,6 +501,7 @@ export const ListOwnerVenuesResponse = zod.object({
         zod.object({
           pitchCount: zod.number(),
           rejectionReason: zod.string().nullish(),
+          eliteMatchmakingEnabled: zod.boolean(),
         }),
       ),
   ),
@@ -3789,4 +3790,860 @@ export const GetEliteDemandResponse = zod.object({
       }),
     )
     .max(getEliteDemandResponseWaitlistEntriesMax),
+});
+
+export const ListTournamentsResponse = zod.object({
+  tournaments: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      pitchId: zod.string().uuid(),
+      name: zod.string(),
+      description: zod.string().nullish(),
+      status: zod.enum([
+        "DRAFT",
+        "PUBLISHED",
+        "REGISTRATION_CLOSED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "CANCELLED",
+      ]),
+      format: zod.enum(["SINGLE_ELIMINATION"]),
+      entryType: zod.enum(["PLAYER", "TEAM"]),
+      capacity: zod.number(),
+      registrationDeadline: zod.coerce.date(),
+      startsAt: zod.coerce.date(),
+      endsAt: zod.coerce.date(),
+      entryFeeAmount: zod.string(),
+      prizePoolAmount: zod.string(),
+      successfulEntryAmount: zod
+        .string()
+        .describe(
+          "Sum of immutable entry contributions from successful payments",
+        ),
+      fundedPrizePoolAmount: zod
+        .string()
+        .describe(
+          "Declared prize pool plus successful immutable entry contributions",
+        ),
+      currency: zod.string(),
+      confirmedRegistrations: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+export const GetTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetTournamentResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  registrations: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      tournamentId: zod.string().uuid(),
+      tournamentName: zod.string().nullish(),
+      status: zod.enum([
+        "PAYMENT_PENDING",
+        "CONFIRMED",
+        "PAYMENT_FAILED",
+        "CANCELLED",
+        "REFUNDED",
+      ]),
+      amountSnapshot: zod.string(),
+      currencySnapshot: zod.string(),
+      paymentStatus: zod
+        .union([
+          zod.literal("PENDING"),
+          zod.literal("SUCCEEDED"),
+          zod.literal("FAILED"),
+          zod.literal("REFUND_PENDING"),
+          zod.literal("REFUNDED"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      teamName: zod.string().nullish(),
+      participantName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  matches: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      roundNumber: zod.number(),
+      matchNumber: zod.number(),
+      participantOneRegistrationId: zod.string().uuid().nullish(),
+      participantTwoRegistrationId: zod.string().uuid().nullish(),
+      winnerRegistrationId: zod.string().uuid().nullish(),
+      startAt: zod.coerce.date().nullish(),
+      endAt: zod.coerce.date().nullish(),
+      status: zod.enum(["PENDING", "READY", "COMPLETED", "CANCELLED"]),
+      score: zod.record(zod.string(), zod.number()).nullish(),
+    }),
+  ),
+});
+
+export const ListOwnerTournamentsResponse = zod.object({
+  tournaments: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      venueId: zod.string().uuid(),
+      pitchId: zod.string().uuid(),
+      name: zod.string(),
+      description: zod.string().nullish(),
+      status: zod.enum([
+        "DRAFT",
+        "PUBLISHED",
+        "REGISTRATION_CLOSED",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "CANCELLED",
+      ]),
+      format: zod.enum(["SINGLE_ELIMINATION"]),
+      entryType: zod.enum(["PLAYER", "TEAM"]),
+      capacity: zod.number(),
+      registrationDeadline: zod.coerce.date(),
+      startsAt: zod.coerce.date(),
+      endsAt: zod.coerce.date(),
+      entryFeeAmount: zod.string(),
+      prizePoolAmount: zod.string(),
+      successfulEntryAmount: zod
+        .string()
+        .describe(
+          "Sum of immutable entry contributions from successful payments",
+        ),
+      fundedPrizePoolAmount: zod
+        .string()
+        .describe(
+          "Declared prize pool plus successful immutable entry contributions",
+        ),
+      currency: zod.string(),
+      confirmedRegistrations: zod.number(),
+      createdAt: zod.coerce.date(),
+      updatedAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+export const createTournamentBodyNameMax = 160;
+
+export const createTournamentBodyDescriptionMax = 4000;
+
+export const createTournamentBodyCapacityMin = 2;
+export const createTournamentBodyCapacityMax = 256;
+
+export const createTournamentBodyEntryFeeAmountRegExp = new RegExp(
+  "^\\d{1,10}(\\.\\d{1,2})?$",
+);
+export const createTournamentBodyPrizePoolAmountRegExp = new RegExp(
+  "^\\d{1,10}(\\.\\d{1,2})?$",
+);
+
+export const CreateTournamentBody = zod.object({
+  venueId: zod.string().uuid(),
+  pitchId: zod.string().uuid(),
+  name: zod.string().min(1).max(createTournamentBodyNameMax),
+  description: zod.string().max(createTournamentBodyDescriptionMax).optional(),
+  entryType: zod.enum(["PLAYER", "TEAM"]),
+  capacity: zod
+    .number()
+    .min(createTournamentBodyCapacityMin)
+    .max(createTournamentBodyCapacityMax),
+  registrationDeadline: zod.coerce.date(),
+  startsAt: zod.coerce.date(),
+  endsAt: zod.coerce.date(),
+  entryFeeAmount: zod.string().regex(createTournamentBodyEntryFeeAmountRegExp),
+  prizePoolAmount: zod
+    .string()
+    .regex(createTournamentBodyPrizePoolAmountRegExp),
+});
+
+export const GetOwnerTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const GetOwnerTournamentResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  registrations: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      tournamentId: zod.string().uuid(),
+      tournamentName: zod.string().nullish(),
+      status: zod.enum([
+        "PAYMENT_PENDING",
+        "CONFIRMED",
+        "PAYMENT_FAILED",
+        "CANCELLED",
+        "REFUNDED",
+      ]),
+      amountSnapshot: zod.string(),
+      currencySnapshot: zod.string(),
+      paymentStatus: zod
+        .union([
+          zod.literal("PENDING"),
+          zod.literal("SUCCEEDED"),
+          zod.literal("FAILED"),
+          zod.literal("REFUND_PENDING"),
+          zod.literal("REFUNDED"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      teamName: zod.string().nullish(),
+      participantName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  matches: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      roundNumber: zod.number(),
+      matchNumber: zod.number(),
+      participantOneRegistrationId: zod.string().uuid().nullish(),
+      participantTwoRegistrationId: zod.string().uuid().nullish(),
+      winnerRegistrationId: zod.string().uuid().nullish(),
+      startAt: zod.coerce.date().nullish(),
+      endAt: zod.coerce.date().nullish(),
+      status: zod.enum(["PENDING", "READY", "COMPLETED", "CANCELLED"]),
+      score: zod.record(zod.string(), zod.number()).nullish(),
+    }),
+  ),
+});
+
+export const UpdateTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const updateTournamentBodyOneNameMax = 160;
+
+export const updateTournamentBodyOneDescriptionMax = 4000;
+
+export const updateTournamentBodyOneCapacityMin = 2;
+export const updateTournamentBodyOneCapacityMax = 256;
+
+export const updateTournamentBodyOneEntryFeeAmountRegExp = new RegExp(
+  "^\\d{1,10}(\\.\\d{1,2})?$",
+);
+export const updateTournamentBodyOnePrizePoolAmountRegExp = new RegExp(
+  "^\\d{1,10}(\\.\\d{1,2})?$",
+);
+
+export const UpdateTournamentBody = zod.object({
+  venueId: zod.string().uuid(),
+  pitchId: zod.string().uuid(),
+  name: zod.string().min(1).max(updateTournamentBodyOneNameMax),
+  description: zod
+    .string()
+    .max(updateTournamentBodyOneDescriptionMax)
+    .optional(),
+  entryType: zod.enum(["PLAYER", "TEAM"]),
+  capacity: zod
+    .number()
+    .min(updateTournamentBodyOneCapacityMin)
+    .max(updateTournamentBodyOneCapacityMax),
+  registrationDeadline: zod.coerce.date(),
+  startsAt: zod.coerce.date(),
+  endsAt: zod.coerce.date(),
+  entryFeeAmount: zod
+    .string()
+    .regex(updateTournamentBodyOneEntryFeeAmountRegExp),
+  prizePoolAmount: zod
+    .string()
+    .regex(updateTournamentBodyOnePrizePoolAmountRegExp),
+});
+
+export const UpdateTournamentResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+export const DeleteTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const PublishTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const PublishTournamentResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+export const CloseTournamentRegistrationParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const CloseTournamentRegistrationResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+export const GenerateTournamentBracketParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const ScheduleTournamentMatchParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  matchId: zod.coerce.string().uuid(),
+});
+
+export const ScheduleTournamentMatchBody = zod.object({
+  startAt: zod.coerce.date(),
+  endAt: zod.coerce.date(),
+});
+
+export const ScheduleTournamentMatchResponse = zod.object({
+  match: zod.object({
+    id: zod.string().uuid(),
+    roundNumber: zod.number(),
+    matchNumber: zod.number(),
+    participantOneRegistrationId: zod.string().uuid().nullish(),
+    participantTwoRegistrationId: zod.string().uuid().nullish(),
+    winnerRegistrationId: zod.string().uuid().nullish(),
+    startAt: zod.coerce.date().nullish(),
+    endAt: zod.coerce.date().nullish(),
+    status: zod.enum(["PENDING", "READY", "COMPLETED", "CANCELLED"]),
+    score: zod.record(zod.string(), zod.number()).nullish(),
+  }),
+});
+
+export const RecordTournamentResultParams = zod.object({
+  id: zod.coerce.string().uuid(),
+  matchId: zod.coerce.string().uuid(),
+});
+
+export const recordTournamentResultBodyScoreMinOne = 0;
+
+export const RecordTournamentResultBody = zod.object({
+  winnerRegistrationId: zod.string().uuid(),
+  score: zod.record(
+    zod.string(),
+    zod.number().min(recordTournamentResultBodyScoreMinOne),
+  ),
+});
+
+export const RecordTournamentResultResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  registrations: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      tournamentId: zod.string().uuid(),
+      tournamentName: zod.string().nullish(),
+      status: zod.enum([
+        "PAYMENT_PENDING",
+        "CONFIRMED",
+        "PAYMENT_FAILED",
+        "CANCELLED",
+        "REFUNDED",
+      ]),
+      amountSnapshot: zod.string(),
+      currencySnapshot: zod.string(),
+      paymentStatus: zod
+        .union([
+          zod.literal("PENDING"),
+          zod.literal("SUCCEEDED"),
+          zod.literal("FAILED"),
+          zod.literal("REFUND_PENDING"),
+          zod.literal("REFUNDED"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      teamName: zod.string().nullish(),
+      participantName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  matches: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      roundNumber: zod.number(),
+      matchNumber: zod.number(),
+      participantOneRegistrationId: zod.string().uuid().nullish(),
+      participantTwoRegistrationId: zod.string().uuid().nullish(),
+      winnerRegistrationId: zod.string().uuid().nullish(),
+      startAt: zod.coerce.date().nullish(),
+      endAt: zod.coerce.date().nullish(),
+      status: zod.enum(["PENDING", "READY", "COMPLETED", "CANCELLED"]),
+      score: zod.record(zod.string(), zod.number()).nullish(),
+    }),
+  ),
+});
+
+export const CancelTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const cancelTournamentBodyReasonMax = 1000;
+
+export const CancelTournamentBody = zod.object({
+  reason: zod.string().min(1).max(cancelTournamentBodyReasonMax),
+});
+
+export const CancelTournamentResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+export const RetryTournamentRefundsParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const RetryTournamentRefundsResponse = zod.object({
+  tournament: zod.object({
+    id: zod.string().uuid(),
+    venueId: zod.string().uuid(),
+    pitchId: zod.string().uuid(),
+    name: zod.string(),
+    description: zod.string().nullish(),
+    status: zod.enum([
+      "DRAFT",
+      "PUBLISHED",
+      "REGISTRATION_CLOSED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "CANCELLED",
+    ]),
+    format: zod.enum(["SINGLE_ELIMINATION"]),
+    entryType: zod.enum(["PLAYER", "TEAM"]),
+    capacity: zod.number(),
+    registrationDeadline: zod.coerce.date(),
+    startsAt: zod.coerce.date(),
+    endsAt: zod.coerce.date(),
+    entryFeeAmount: zod.string(),
+    prizePoolAmount: zod.string(),
+    successfulEntryAmount: zod
+      .string()
+      .describe(
+        "Sum of immutable entry contributions from successful payments",
+      ),
+    fundedPrizePoolAmount: zod
+      .string()
+      .describe(
+        "Declared prize pool plus successful immutable entry contributions",
+      ),
+    currency: zod.string(),
+    confirmedRegistrations: zod.number(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  registrations: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      tournamentId: zod.string().uuid(),
+      tournamentName: zod.string().nullish(),
+      status: zod.enum([
+        "PAYMENT_PENDING",
+        "CONFIRMED",
+        "PAYMENT_FAILED",
+        "CANCELLED",
+        "REFUNDED",
+      ]),
+      amountSnapshot: zod.string(),
+      currencySnapshot: zod.string(),
+      paymentStatus: zod
+        .union([
+          zod.literal("PENDING"),
+          zod.literal("SUCCEEDED"),
+          zod.literal("FAILED"),
+          zod.literal("REFUND_PENDING"),
+          zod.literal("REFUNDED"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      teamName: zod.string().nullish(),
+      participantName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  matches: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      roundNumber: zod.number(),
+      matchNumber: zod.number(),
+      participantOneRegistrationId: zod.string().uuid().nullish(),
+      participantTwoRegistrationId: zod.string().uuid().nullish(),
+      winnerRegistrationId: zod.string().uuid().nullish(),
+      startAt: zod.coerce.date().nullish(),
+      endAt: zod.coerce.date().nullish(),
+      status: zod.enum(["PENDING", "READY", "COMPLETED", "CANCELLED"]),
+      score: zod.record(zod.string(), zod.number()).nullish(),
+    }),
+  ),
+});
+
+export const RegisterForTournamentParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const registerForTournamentBodyTeamNameMax = 100;
+
+export const RegisterForTournamentBody = zod.object({
+  teamName: zod
+    .string()
+    .min(1)
+    .max(registerForTournamentBodyTeamNameMax)
+    .optional(),
+});
+
+export const CheckoutTournamentRegistrationParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const checkoutTournamentRegistrationBodyIdempotencyKeyMin = 8;
+export const checkoutTournamentRegistrationBodyIdempotencyKeyMax = 200;
+
+export const CheckoutTournamentRegistrationBody = zod.object({
+  idempotencyKey: zod
+    .string()
+    .min(checkoutTournamentRegistrationBodyIdempotencyKeyMin)
+    .max(checkoutTournamentRegistrationBodyIdempotencyKeyMax),
+});
+
+export const CheckoutTournamentRegistrationResponse = zod.object({
+  registration: zod.object({
+    id: zod.string().uuid(),
+    tournamentId: zod.string().uuid(),
+    tournamentName: zod.string().nullish(),
+    status: zod.enum([
+      "PAYMENT_PENDING",
+      "CONFIRMED",
+      "PAYMENT_FAILED",
+      "CANCELLED",
+      "REFUNDED",
+    ]),
+    amountSnapshot: zod.string(),
+    currencySnapshot: zod.string(),
+    paymentStatus: zod
+      .union([
+        zod.literal("PENDING"),
+        zod.literal("SUCCEEDED"),
+        zod.literal("FAILED"),
+        zod.literal("REFUND_PENDING"),
+        zod.literal("REFUNDED"),
+        zod.literal(null),
+      ])
+      .nullable(),
+    teamName: zod.string().nullish(),
+    participantName: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+  }),
+  requiresClientAction: zod.boolean(),
+  clientSecret: zod.string().nullish(),
+  publishableKey: zod.string().nullish(),
+});
+
+export const ListPlayerTournamentRegistrationsResponse = zod.object({
+  registrations: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      tournamentId: zod.string().uuid(),
+      tournamentName: zod.string().nullish(),
+      status: zod.enum([
+        "PAYMENT_PENDING",
+        "CONFIRMED",
+        "PAYMENT_FAILED",
+        "CANCELLED",
+        "REFUNDED",
+      ]),
+      amountSnapshot: zod.string(),
+      currencySnapshot: zod.string(),
+      paymentStatus: zod
+        .union([
+          zod.literal("PENDING"),
+          zod.literal("SUCCEEDED"),
+          zod.literal("FAILED"),
+          zod.literal("REFUND_PENDING"),
+          zod.literal("REFUNDED"),
+          zod.literal(null),
+        ])
+        .nullable(),
+      teamName: zod.string().nullish(),
+      participantName: zod.string().nullish(),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+export const CaptureTournamentRegistrationParams = zod.object({
+  id: zod.coerce.string().uuid(),
+});
+
+export const CaptureTournamentRegistrationResponse = zod.object({
+  registration: zod.object({
+    id: zod.string().uuid(),
+    tournamentId: zod.string().uuid(),
+    tournamentName: zod.string().nullish(),
+    status: zod.enum([
+      "PAYMENT_PENDING",
+      "CONFIRMED",
+      "PAYMENT_FAILED",
+      "CANCELLED",
+      "REFUNDED",
+    ]),
+    amountSnapshot: zod.string(),
+    currencySnapshot: zod.string(),
+    paymentStatus: zod
+      .union([
+        zod.literal("PENDING"),
+        zod.literal("SUCCEEDED"),
+        zod.literal("FAILED"),
+        zod.literal("REFUND_PENDING"),
+        zod.literal("REFUNDED"),
+        zod.literal(null),
+      ])
+      .nullable(),
+    teamName: zod.string().nullish(),
+    participantName: zod.string().nullish(),
+    createdAt: zod.coerce.date(),
+  }),
 });

@@ -70,6 +70,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "calendar", selected: "calendar" }} />
         <Label>Bookings</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="tournaments">
+        <Icon sf={{ default: "trophy", selected: "trophy.fill" }} />
+        <Label>Tournaments</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -136,6 +140,14 @@ function ClassicTabLayout() {
         options={{
           title: "My Bookings",
           tabBarIcon: ({ color }) => <FeatherIcons name="calendar" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tournaments"
+        options={{
+          title: "Tournaments",
+          headerShown: false,
+          tabBarIcon: ({ color }) => <FeatherIcons name="award" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

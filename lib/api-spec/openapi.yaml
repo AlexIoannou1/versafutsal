@@ -22,6 +22,8 @@ tags:
     description: Owner plan, entitlement, and recurring billing operations
   - name: match-statistics
     description: Completed-booking match results and player performance statistics
+  - name: tournaments
+    description: Elite tournament management, registration, payments, and brackets
 paths:
   /healthz:
     get:
@@ -2531,7 +2533,177 @@ paths:
         "200": { description: Elite demand, content: { application/json: { schema: { $ref: "#/components/schemas/EliteDemand" } } } }
         "403": { description: Ownership or Elite required, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
 
+  # ── Tournaments ───────────────────────────────────────────────────────────
+  /tournaments:
+    get:
+      operationId: listTournaments
+      tags: [tournaments]
+      responses:
+        "200":
+          description: Published tournaments
+          content: { application/json: { schema: { $ref: "#/components/schemas/TournamentListResponse" } } }
+  /tournaments/{id}:
+    get:
+      operationId: getTournament
+      tags: [tournaments]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses:
+        "200":
+          description: Tournament detail
+          content: { application/json: { schema: { $ref: "#/components/schemas/TournamentDetailResponse" } } }
+        "404": { description: Not found, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /owner/tournaments:
+    get:
+      operationId: listOwnerTournaments
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Owner tournaments, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentListResponse" } } } }
+    post:
+      operationId: createTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentInput" } } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentResponse" } } } }
+        "400": { description: Invalid, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+        "403": { description: Elite required, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /owner/tournaments/{id}:
+    get:
+      operationId: getOwnerTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses:
+        "200": { description: Detail, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentDetailResponse" } } } }
+    put:
+      operationId: updateTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentUpdate" } } } }
+      responses:
+        "200": { description: Updated, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentResponse" } } } }
+    delete:
+      operationId: deleteTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses: { "204": { description: Draft deleted } }
+  /owner/tournaments/{id}/publish:
+    post:
+      operationId: publishTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses:
+        "200": { description: Published, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentResponse" } } } }
+  /owner/tournaments/{id}/close:
+    post:
+      operationId: closeTournamentRegistration
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses:
+        "200": { description: Closed, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentResponse" } } } }
+  /owner/tournaments/{id}/bracket:
+    post:
+      operationId: generateTournamentBracket
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses:
+        "201": { description: Generated, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentDetailResponse" } } } }
+  /owner/tournaments/{id}/matches/{matchId}:
+    put:
+      operationId: scheduleTournamentMatch
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TournamentId" }
+        - { name: matchId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentMatchSchedule" } } } }
+      responses:
+        "200": { description: Scheduled, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentMatchResponse" } } } }
+  /owner/tournaments/{id}/matches/{matchId}/result:
+    post:
+      operationId: recordTournamentResult
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TournamentId" }
+        - { name: matchId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentResultInput" } } } }
+      responses:
+        "200": { description: Result recorded, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentDetailResponse" } } } }
+  /owner/tournaments/{id}/cancel:
+    post:
+      operationId: cancelTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentCancellation" } } } }
+      responses:
+        "200": { description: Cancelled and refunds reconciled, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentResponse" } } } }
+  /owner/tournaments/{id}/refunds/retry:
+    post:
+      operationId: retryTournamentRefunds
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      responses:
+        "200": { description: Refund reconciliation attempted, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentDetailResponse" } } } }
+        "409": { description: Tournament is not cancelled or is not owned, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /tournaments/{id}/register:
+    post:
+      operationId: registerForTournament
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: "#/components/parameters/TournamentId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentRegistrationInput" } } } }
+      responses:
+        "201": { description: Capacity reserved, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentRegistrationResponse" } } } }
+        "409": { description: Full or duplicate, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
+  /tournament-registrations/{id}/checkout:
+    post:
+      operationId: checkoutTournamentRegistration
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentCheckoutInput" } } } }
+      responses:
+        "200": { description: Checkout state, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentCheckoutResponse" } } } }
+  /player/tournament-registrations:
+    get:
+      operationId: listPlayerTournamentRegistrations
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: Player registration and payment states, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentRegistrationListResponse" } } } }
+  /tournament-registrations/{id}/capture:
+    post:
+      operationId: captureTournamentRegistration
+      tags: [tournaments]
+      security: [{ bearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Captured, content: { application/json: { schema: { $ref: "#/components/schemas/TournamentRegistrationResponse" } } } }
+  /webhooks/stripe/tournaments:
+    post:
+      operationId: reconcileTournamentStripeWebhook
+      tags: [tournaments]
+      summary: Verified Stripe tournament payment webhook
+      responses:
+        "200": { description: Event reconciled }
+        "400": { description: Invalid webhook request }
+
 components:
+  parameters:
+    TournamentId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
   securitySchemes:
     bearerAuth:
       type: http
@@ -3513,7 +3685,9 @@ components:
             rejectionReason:
               type: string
               nullable: true
-          required: [pitchCount]
+            eliteMatchmakingEnabled:
+              type: boolean
+          required: [pitchCount, eliteMatchmakingEnabled]
 
     VenueDetail:
       allOf:
@@ -4411,3 +4585,137 @@ components:
         guestPhone:
           $ref: "#/components/schemas/PhoneNumber"
       required: [pitchId, startAt]
+    Tournament:
+      type: object
+      required: [id, venueId, pitchId, name, status, format, entryType, capacity, registrationDeadline, startsAt, endsAt, entryFeeAmount, prizePoolAmount, successfulEntryAmount, fundedPrizePoolAmount, currency, confirmedRegistrations, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        venueId: { type: string, format: uuid }
+        pitchId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: [string, "null"] }
+        status: { type: string, enum: [DRAFT, PUBLISHED, REGISTRATION_CLOSED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        format: { type: string, enum: [SINGLE_ELIMINATION] }
+        entryType: { type: string, enum: [PLAYER, TEAM] }
+        capacity: { type: integer }
+        registrationDeadline: { type: string, format: date-time }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        entryFeeAmount: { type: string }
+        prizePoolAmount: { type: string }
+        successfulEntryAmount: { type: string, description: Sum of immutable entry contributions from successful payments }
+        fundedPrizePoolAmount: { type: string, description: Declared prize pool plus successful immutable entry contributions }
+        currency: { type: string }
+        confirmedRegistrations: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    TournamentInput:
+      type: object
+      required: [venueId, pitchId, name, entryType, capacity, registrationDeadline, startsAt, endsAt, entryFeeAmount, prizePoolAmount]
+      properties:
+        venueId: { type: string, format: uuid }
+        pitchId: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string, maxLength: 4000 }
+        entryType: { type: string, enum: [PLAYER, TEAM] }
+        capacity: { type: integer, minimum: 2, maximum: 256 }
+        registrationDeadline: { type: string, format: date-time }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        entryFeeAmount: { type: string, pattern: '^\d{1,10}(\.\d{1,2})?$' }
+        prizePoolAmount: { type: string, pattern: '^\d{1,10}(\.\d{1,2})?$' }
+    TournamentUpdate:
+      allOf:
+        - $ref: "#/components/schemas/TournamentInput"
+    TournamentResponse:
+      type: object
+      required: [tournament]
+      properties: { tournament: { $ref: "#/components/schemas/Tournament" } }
+    TournamentListResponse:
+      type: object
+      required: [tournaments]
+      properties:
+        tournaments: { type: array, items: { $ref: "#/components/schemas/Tournament" } }
+    TournamentRegistration:
+      type: object
+      required: [id, tournamentId, status, amountSnapshot, currencySnapshot, paymentStatus, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        tournamentId: { type: string, format: uuid }
+        tournamentName: { type: [string, "null"] }
+        status: { type: string, enum: [PAYMENT_PENDING, CONFIRMED, PAYMENT_FAILED, CANCELLED, REFUNDED] }
+        amountSnapshot: { type: string }
+        currencySnapshot: { type: string }
+        paymentStatus: { type: [string, "null"], enum: [PENDING, SUCCEEDED, FAILED, REFUND_PENDING, REFUNDED, null] }
+        teamName: { type: [string, "null"] }
+        participantName: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+    TournamentMatch:
+      type: object
+      required: [id, roundNumber, matchNumber, status]
+      properties:
+        id: { type: string, format: uuid }
+        roundNumber: { type: integer }
+        matchNumber: { type: integer }
+        participantOneRegistrationId: { type: [string, "null"], format: uuid }
+        participantTwoRegistrationId: { type: [string, "null"], format: uuid }
+        winnerRegistrationId: { type: [string, "null"], format: uuid }
+        startAt: { type: [string, "null"], format: date-time }
+        endAt: { type: [string, "null"], format: date-time }
+        status: { type: string, enum: [PENDING, READY, COMPLETED, CANCELLED] }
+        score: { type: [object, "null"], additionalProperties: { type: integer } }
+    TournamentDetailResponse:
+      type: object
+      required: [tournament, registrations, matches]
+      properties:
+        tournament: { $ref: "#/components/schemas/Tournament" }
+        registrations: { type: array, items: { $ref: "#/components/schemas/TournamentRegistration" } }
+        matches: { type: array, items: { $ref: "#/components/schemas/TournamentMatch" } }
+    TournamentRegistrationInput:
+      type: object
+      properties:
+        teamName: { type: string, minLength: 1, maxLength: 100 }
+    TournamentRegistrationResponse:
+      type: object
+      required: [registration]
+      properties: { registration: { $ref: "#/components/schemas/TournamentRegistration" } }
+    TournamentRegistrationListResponse:
+      type: object
+      required: [registrations]
+      properties:
+        registrations: { type: array, items: { $ref: "#/components/schemas/TournamentRegistration" } }
+    TournamentCheckoutInput:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey: { type: string, minLength: 8, maxLength: 200 }
+    TournamentCheckoutResponse:
+      type: object
+      required: [registration, requiresClientAction]
+      properties:
+        registration: { $ref: "#/components/schemas/TournamentRegistration" }
+        requiresClientAction: { type: boolean }
+        clientSecret: { type: [string, "null"] }
+        publishableKey: { type: [string, "null"] }
+    TournamentMatchSchedule:
+      type: object
+      required: [startAt, endAt]
+      properties:
+        startAt: { type: string, format: date-time }
+        endAt: { type: string, format: date-time }
+    TournamentMatchResponse:
+      type: object
+      required: [match]
+      properties:
+        match: { $ref: "#/components/schemas/TournamentMatch" }
+    TournamentResultInput:
+      type: object
+      required: [winnerRegistrationId, score]
+      properties:
+        winnerRegistrationId: { type: string, format: uuid }
+        score: { type: object, minProperties: 2, maxProperties: 2, additionalProperties: { type: integer, minimum: 0 } }
+    TournamentCancellation:
+      type: object
+      required: [reason]
+      properties:
+       reason: { type: string, minLength: 1, maxLength: 1000 }

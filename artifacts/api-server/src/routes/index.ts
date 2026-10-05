@@ -15,9 +15,9 @@ import subscriptionsRouter from "./subscriptions";
 import matchStatisticsRouter from "./match-statistics";
 import leaderboardRouter from "./leaderboard";
 import eliteRouter from "./elite";
+import tournamentsRouter from "./tournaments";
 
 const router: IRouter = Router();
-
 router.use(healthRouter);
 router.use(authRouter);
 router.use(venuesRouter);
@@ -35,4 +35,5 @@ router.use(matchStatisticsRouter);
 router.use(leaderboardRouter);
 router.use(eliteRouter);
 
+router.use(tournamentsRouter);
 export default router;

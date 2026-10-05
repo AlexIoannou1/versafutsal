@@ -272,6 +272,19 @@ export const requestSchemas = {
       endsAt: isoDateTime.nullable().optional(),
     }),
   },
+  "POST /owner/tournaments": { body: strict({ venueId: uuid, pitchId: uuid, name: plainText(1, 160), description: multilineText(0, 4000).optional(), entryType: z.enum(["PLAYER", "TEAM"]), capacity: z.number().int().min(2).max(256), registrationDeadline: isoDateTime, startsAt: isoDateTime, endsAt: isoDateTime, entryFeeAmount: priceText, prizePoolAmount: priceText }) },
+  "GET /owner/tournaments/:id": { params: strict({ id: uuid }) },
+  "PUT /owner/tournaments/:id": { params: strict({ id: uuid }), body: strict({ venueId: uuid, pitchId: uuid, name: plainText(1, 160), description: multilineText(0, 4000).optional(), entryType: z.enum(["PLAYER", "TEAM"]), capacity: z.number().int().min(2).max(256), registrationDeadline: isoDateTime, startsAt: isoDateTime, endsAt: isoDateTime, entryFeeAmount: priceText, prizePoolAmount: priceText }) },
+  "DELETE /owner/tournaments/:id": { params: strict({ id: uuid }) },
+  "POST /owner/tournaments/:id/publish": { params: strict({ id: uuid }), body: empty },
+  "POST /owner/tournaments/:id/close": { params: strict({ id: uuid }), body: empty },
+  "POST /owner/tournaments/:id/bracket": { params: strict({ id: uuid }), body: empty },
+  "POST /tournaments/:id/register": { params: strict({ id: uuid }), body: strict({ teamName: plainText(1, 100).optional() }) },
+  "POST /tournament-registrations/:id/checkout": { params: strict({ id: uuid }), body: strict({ idempotencyKey: providerId }) },
+  "POST /tournament-registrations/:id/capture": { params: strict({ id: uuid }), body: empty },
+  "PUT /owner/tournaments/:id/matches/:matchId": { params: strict({ id: uuid, matchId: uuid }), body: strict({ startAt: isoDateTime, endAt: isoDateTime }) },
+  "POST /owner/tournaments/:id/matches/:matchId/result": { params: strict({ id: uuid, matchId: uuid }), body: strict({ winnerRegistrationId: uuid, score: z.record(z.string(), z.number().int().min(0)) }) },
+  "POST /owner/tournaments/:id/cancel": { params: strict({ id: uuid }), body: strict({ reason }) },
 } as const;
 
 export type RequestSchemaKey = keyof typeof requestSchemas;

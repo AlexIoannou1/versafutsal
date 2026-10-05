@@ -10,3 +10,4 @@ export * from "./subscriptions";
 export * from "./sms-reminders";
 export * from "./match-statistics";
 export * from "./elite-matchmaking";
+export * from "./tournaments";

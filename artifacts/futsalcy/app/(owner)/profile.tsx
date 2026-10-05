@@ -162,6 +162,16 @@ export default function OwnerProfileScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.menuRow, s.menuRowBorder]}
+            accessibilityRole="button"
+            accessibilityLabel="Open tournaments"
+            onPress={() => router.push("/(owner)/tournaments")}
+          >
+            <FeatherIcons name="award" size={20} color={colors.primary} />
+            <Text style={s.menuRowText}>Tournaments</Text>
+            <FeatherIcons name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.menuRow, s.menuRowBorder]}
             onPress={() => router.push("/(owner)/plans")}
           >
             <FeatherIcons name="credit-card" size={20} color={colors.primary} />

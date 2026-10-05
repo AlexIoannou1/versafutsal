@@ -14,3 +14,4 @@
 - [Recurring checkout recovery](recurring-checkout-recovery.md) — never issue a new subscription checkout until pending provider state is reconciled; webhook delay can outlive session expiry.
 - [Durable outbound reminder leases](durable-reminder-leases.md) — reclaim expired processing leases and keep event-time validation distinct from retry timing.
 - [React Native range-slider drag stability](react-native-range-slider-drag-stability.md) — use stable per-thumb responders and gesture deltas; nested touch coordinates can jump between targets.
+- [Orval object-size validation](orval-object-size-validation.md) — generated Zod request schemas do not enforce OpenAPI minProperties/maxProperties; enforce object shape server-side.

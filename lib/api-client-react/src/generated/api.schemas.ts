@@ -896,6 +896,7 @@ export interface VenueSummary {
 export type OwnerVenueSummary = VenueSummary & {
   pitchCount: number;
   rejectionReason?: string | null;
+  eliteMatchmakingEnabled: boolean;
 };
 
 export type VenueDetail = VenueRecord & {
@@ -1464,6 +1465,242 @@ export interface OwnerBookingUpdate {
    */
   guestName?: string;
   guestPhone?: PhoneNumber;
+}
+
+export type TournamentStatus =
+  (typeof TournamentStatus)[keyof typeof TournamentStatus];
+
+export const TournamentStatus = {
+  DRAFT: "DRAFT",
+  PUBLISHED: "PUBLISHED",
+  REGISTRATION_CLOSED: "REGISTRATION_CLOSED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export type TournamentFormat =
+  (typeof TournamentFormat)[keyof typeof TournamentFormat];
+
+export const TournamentFormat = {
+  SINGLE_ELIMINATION: "SINGLE_ELIMINATION",
+} as const;
+
+export type TournamentEntryType =
+  (typeof TournamentEntryType)[keyof typeof TournamentEntryType];
+
+export const TournamentEntryType = {
+  PLAYER: "PLAYER",
+  TEAM: "TEAM",
+} as const;
+
+export interface Tournament {
+  id: string;
+  venueId: string;
+  pitchId: string;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  status: TournamentStatus;
+  format: TournamentFormat;
+  entryType: TournamentEntryType;
+  capacity: number;
+  registrationDeadline: string;
+  startsAt: string;
+  endsAt: string;
+  entryFeeAmount: string;
+  prizePoolAmount: string;
+  /** Sum of immutable entry contributions from successful payments */
+  successfulEntryAmount: string;
+  /** Declared prize pool plus successful immutable entry contributions */
+  fundedPrizePoolAmount: string;
+  currency: string;
+  confirmedRegistrations: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type TournamentInputEntryType =
+  (typeof TournamentInputEntryType)[keyof typeof TournamentInputEntryType];
+
+export const TournamentInputEntryType = {
+  PLAYER: "PLAYER",
+  TEAM: "TEAM",
+} as const;
+
+export interface TournamentInput {
+  venueId: string;
+  pitchId: string;
+  /**
+   * @minLength 1
+   * @maxLength 160
+   */
+  name: string;
+  /** @maxLength 4000 */
+  description?: string;
+  entryType: TournamentInputEntryType;
+  /**
+   * @minimum 2
+   * @maximum 256
+   */
+  capacity: number;
+  registrationDeadline: string;
+  startsAt: string;
+  endsAt: string;
+  /** @pattern ^\d{1,10}(\.\d{1,2})?$ */
+  entryFeeAmount: string;
+  /** @pattern ^\d{1,10}(\.\d{1,2})?$ */
+  prizePoolAmount: string;
+}
+
+export type TournamentUpdate = TournamentInput;
+
+export interface TournamentResponse {
+  tournament: Tournament;
+}
+
+export interface TournamentListResponse {
+  tournaments: Tournament[];
+}
+
+export type TournamentRegistrationStatus =
+  (typeof TournamentRegistrationStatus)[keyof typeof TournamentRegistrationStatus];
+
+export const TournamentRegistrationStatus = {
+  PAYMENT_PENDING: "PAYMENT_PENDING",
+  CONFIRMED: "CONFIRMED",
+  PAYMENT_FAILED: "PAYMENT_FAILED",
+  CANCELLED: "CANCELLED",
+  REFUNDED: "REFUNDED",
+} as const;
+
+/**
+ * @nullable
+ */
+export type TournamentRegistrationPaymentStatus =
+  | (typeof TournamentRegistrationPaymentStatus)[keyof typeof TournamentRegistrationPaymentStatus]
+  | null;
+
+export const TournamentRegistrationPaymentStatus = {
+  PENDING: "PENDING",
+  SUCCEEDED: "SUCCEEDED",
+  FAILED: "FAILED",
+  REFUND_PENDING: "REFUND_PENDING",
+  REFUNDED: "REFUNDED",
+} as const;
+
+export interface TournamentRegistration {
+  id: string;
+  tournamentId: string;
+  /** @nullable */
+  tournamentName?: string | null;
+  status: TournamentRegistrationStatus;
+  amountSnapshot: string;
+  currencySnapshot: string;
+  /** @nullable */
+  paymentStatus: TournamentRegistrationPaymentStatus;
+  /** @nullable */
+  teamName?: string | null;
+  /** @nullable */
+  participantName?: string | null;
+  createdAt: string;
+}
+
+export type TournamentMatchStatus =
+  (typeof TournamentMatchStatus)[keyof typeof TournamentMatchStatus];
+
+export const TournamentMatchStatus = {
+  PENDING: "PENDING",
+  READY: "READY",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+/**
+ * @nullable
+ */
+export type TournamentMatchScore = { [key: string]: number } | null;
+
+export interface TournamentMatch {
+  id: string;
+  roundNumber: number;
+  matchNumber: number;
+  /** @nullable */
+  participantOneRegistrationId?: string | null;
+  /** @nullable */
+  participantTwoRegistrationId?: string | null;
+  /** @nullable */
+  winnerRegistrationId?: string | null;
+  /** @nullable */
+  startAt?: string | null;
+  /** @nullable */
+  endAt?: string | null;
+  status: TournamentMatchStatus;
+  /** @nullable */
+  score?: TournamentMatchScore;
+}
+
+export interface TournamentDetailResponse {
+  tournament: Tournament;
+  registrations: TournamentRegistration[];
+  matches: TournamentMatch[];
+}
+
+export interface TournamentRegistrationInput {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  teamName?: string;
+}
+
+export interface TournamentRegistrationResponse {
+  registration: TournamentRegistration;
+}
+
+export interface TournamentRegistrationListResponse {
+  registrations: TournamentRegistration[];
+}
+
+export interface TournamentCheckoutInput {
+  /**
+   * @minLength 8
+   * @maxLength 200
+   */
+  idempotencyKey: string;
+}
+
+export interface TournamentCheckoutResponse {
+  registration: TournamentRegistration;
+  requiresClientAction: boolean;
+  /** @nullable */
+  clientSecret?: string | null;
+  /** @nullable */
+  publishableKey?: string | null;
+}
+
+export interface TournamentMatchSchedule {
+  startAt: string;
+  endAt: string;
+}
+
+export interface TournamentMatchResponse {
+  match: TournamentMatch;
+}
+
+export type TournamentResultInputScore = { [key: string]: number };
+
+export interface TournamentResultInput {
+  winnerRegistrationId: string;
+  score: TournamentResultInputScore;
+}
+
+export interface TournamentCancellation {
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  reason: string;
 }
 
 export type ListVenuesParams = {
